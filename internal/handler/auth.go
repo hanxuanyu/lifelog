@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hxuanyu/lifelog/model"
-	"github.com/hxuanyu/lifelog/service"
+	"github.com/hxuanyu/lifelog/internal/model"
+	"github.com/hxuanyu/lifelog/internal/service"
 )
 
 // Login 登录

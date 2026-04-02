@@ -4,8 +4,8 @@ import (
 	"regexp"
 	"sync"
 
-	"github.com/hxuanyu/lifelog/config"
-	"github.com/hxuanyu/lifelog/model"
+	"github.com/hxuanyu/lifelog/internal/config"
+	"github.com/hxuanyu/lifelog/internal/model"
 )
 
 var (

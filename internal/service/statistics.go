@@ -5,9 +5,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/hxuanyu/lifelog/config"
-	"github.com/hxuanyu/lifelog/model"
-	"github.com/hxuanyu/lifelog/repository"
+	"github.com/hxuanyu/lifelog/internal/config"
+	"github.com/hxuanyu/lifelog/internal/model"
+	"github.com/hxuanyu/lifelog/internal/repository"
 )
 
 // GetDailyStatistics 获取某天的统计数据

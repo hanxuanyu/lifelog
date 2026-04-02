@@ -1,13 +1,12 @@
 package middleware
-package middleware
 
 import (
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hxuanyu/lifelog/model"
-	"github.com/hxuanyu/lifelog/service"
+	"github.com/hxuanyu/lifelog/internal/model"
+	"github.com/hxuanyu/lifelog/internal/service"
 )
 
 // AuthRequired JWT 认证中间件

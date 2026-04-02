@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hxuanyu/lifelog/config"
-	"github.com/hxuanyu/lifelog/model"
+	"github.com/hxuanyu/lifelog/internal/config"
+	"github.com/hxuanyu/lifelog/internal/model"
 )
 
 // GetCategories 获取大类配置（只读）

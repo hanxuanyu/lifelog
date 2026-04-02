@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/hxuanyu/lifelog/model"
+	"github.com/hxuanyu/lifelog/internal/model"
 	"github.com/spf13/viper"
 )
 

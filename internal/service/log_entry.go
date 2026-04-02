@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hxuanyu/lifelog/model"
-	"github.com/hxuanyu/lifelog/repository"
-	"github.com/hxuanyu/lifelog/util"
+	"github.com/hxuanyu/lifelog/internal/model"
+	"github.com/hxuanyu/lifelog/internal/repository"
+	"github.com/hxuanyu/lifelog/internal/util"
 )
 
 // CreateLogEntry 新增日志条目

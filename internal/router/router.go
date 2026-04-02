@@ -2,8 +2,8 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/hxuanyu/lifelog/handler"
-	"github.com/hxuanyu/lifelog/middleware"
+	"github.com/hxuanyu/lifelog/internal/handler"
+	"github.com/hxuanyu/lifelog/internal/middleware"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 

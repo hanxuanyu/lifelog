@@ -5,9 +5,9 @@ import (
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hxuanyu/lifelog/config"
-	"github.com/hxuanyu/lifelog/repository"
-	"github.com/hxuanyu/lifelog/router"
+	"github.com/hxuanyu/lifelog/internal/config"
+	"github.com/hxuanyu/lifelog/internal/repository"
+	"github.com/hxuanyu/lifelog/internal/router"
 )
 
 // @title Lifelog API

@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"github.com/hxuanyu/lifelog/model"
+	"github.com/hxuanyu/lifelog/internal/model"
 	"gorm.io/gorm"
 )
 

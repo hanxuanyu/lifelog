@@ -5,9 +5,9 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hxuanyu/lifelog/model"
-	"github.com/hxuanyu/lifelog/repository"
-	"github.com/hxuanyu/lifelog/service"
+	"github.com/hxuanyu/lifelog/internal/model"
+	"github.com/hxuanyu/lifelog/internal/repository"
+	"github.com/hxuanyu/lifelog/internal/service"
 )
 
 // CreateLogEntry 新增日志
