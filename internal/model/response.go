@@ -17,12 +17,13 @@ type PageResult struct {
 
 // LogEntryResponse 日志响应 DTO（含动态匹配的大类）
 type LogEntryResponse struct {
-	ID        uint   `json:"id"`
-	LogDate   string `json:"log_date"`
-	LogTime   string `json:"log_time"`
-	EventType string `json:"event_type"`
-	Detail    string `json:"detail"`
-	Category  string `json:"category"`
+	ID            uint   `json:"id"`
+	LogDate       string `json:"log_date"`
+	LogTime       string `json:"log_time"`
+	EventType     string `json:"event_type"`
+	Detail        string `json:"detail"`
+	Category      string `json:"category"`
+	TimePointMode string `json:"time_point_mode,omitempty"`
 }
 
 // LogEntryRequest 新增/修改日志请求
@@ -56,6 +57,7 @@ type DurationItem struct {
 	Duration  int    `json:"duration"`          // 秒
 	Display   string `json:"display"`           // 可读格式 "1h30m"
 	Unknown   bool   `json:"unknown,omitempty"` // 首条/末条未知时长
+	CrossDay  bool   `json:"cross_day,omitempty"` // 跨天任务
 	StartTime string `json:"start_time"`        // HH:mm
 	EndTime   string `json:"end_time"`          // HH:mm
 }

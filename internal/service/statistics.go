@@ -17,7 +17,22 @@ func GetDailyStatistics(date string) (*model.DailyStatistics, error) {
 		return nil, err
 	}
 
-	items := calculateDurations(entries)
+	// 始终查询跨天衔接数据（因为日志可能包含混合模式）
+	var prevEntry *model.LogEntry
+	var nextEntry *model.LogEntry
+
+	if len(entries) > 0 {
+		prev, err := repository.GetLastEntryBefore(date)
+		if err == nil {
+			prevEntry = prev
+		}
+		next, err := repository.GetFirstEntryAfter(date)
+		if err == nil {
+			nextEntry = next
+		}
+	}
+
+	items := calculateDurations(entries, date, prevEntry, nextEntry)
 	summary, totalKnown := buildSummary(items)
 
 	return &model.DailyStatistics{
@@ -61,15 +76,53 @@ func getPeriodStatistics(startDate, endDate string) (*model.PeriodStatistics, er
 		return nil, err
 	}
 
-	// 按天分组计算
+	// 按天分组计算，支持跨天衔接
 	dayGroups := groupByDate(entries)
-	var allItems []model.DurationItem
-	dayCount := 0
 
-	for _, dayEntries := range dayGroups {
-		items := calculateDurations(dayEntries)
+	// 排序日期
+	var dates []string
+	for d := range dayGroups {
+		dates = append(dates, d)
+	}
+	sort.Strings(dates)
+
+	var allItems []model.DurationItem
+
+	for i, date := range dates {
+		dayEntries := dayGroups[date]
+		var prevEntry *model.LogEntry
+		var nextEntry *model.LogEntry
+
+		// 始终获取前一天衔接
+		if i > 0 {
+			prevDayEntries := dayGroups[dates[i-1]]
+			if len(prevDayEntries) > 0 {
+				last := prevDayEntries[len(prevDayEntries)-1]
+				prevEntry = &last
+			}
+		} else {
+			prev, err := repository.GetLastEntryBefore(date)
+			if err == nil {
+				prevEntry = prev
+			}
+		}
+
+		// 始终获取后一天衔接
+		if i < len(dates)-1 {
+			nextDayEntries := dayGroups[dates[i+1]]
+			if len(nextDayEntries) > 0 {
+				first := nextDayEntries[0]
+				nextEntry = &first
+			}
+		} else {
+			next, err := repository.GetFirstEntryAfter(date)
+			if err == nil {
+				nextEntry = next
+			}
+		}
+
+		items := calculateDurations(dayEntries, date, prevEntry, nextEntry)
 		allItems = append(allItems, items...)
-		dayCount++
 	}
 
 	summary, totalKnown := buildSummary(allItems)
@@ -79,20 +132,32 @@ func getPeriodStatistics(startDate, endDate string) (*model.PeriodStatistics, er
 		EndDate:    endDate,
 		Summary:    summary,
 		TotalKnown: totalKnown,
-		DayCount:   dayCount,
+		DayCount:   len(dates),
 	}, nil
 }
 
-// calculateDurations 根据 time_point_mode 计算每条日志的持续时间
-func calculateDurations(entries []model.LogEntry) []model.DurationItem {
+// getEntryMode 获取单条日志记录的时间点模式
+// 如果日志本身已记录模式则使用之，否则回退到全局配置
+func getEntryMode(e *model.LogEntry) string {
+	if e.TimePointMode == "start" || e.TimePointMode == "end" {
+		return e.TimePointMode
+	}
+	return config.GetTimePointMode()
+}
+
+// calculateDurations 根据每条日志自身的 time_point_mode 计算持续时间
+// 在相邻两条模式不同的边界处标记 Unknown
+// prevEntry: 前一天最后一条记录（用于补全第一条的起点）
+// nextEntry: 后一天第一条记录（用于补全最后一条的终点）
+func calculateDurations(entries []model.LogEntry, currentDate string, prevEntry, nextEntry *model.LogEntry) []model.DurationItem {
 	if len(entries) == 0 {
 		return nil
 	}
 
-	mode := config.GetTimePointMode()
 	items := make([]model.DurationItem, len(entries))
 
 	for i, e := range entries {
+		mode := getEntryMode(&e)
 		items[i] = model.DurationItem{
 			EventType: e.EventType,
 			Category:  MatchCategory(e.EventType),
@@ -102,32 +167,88 @@ func calculateDurations(entries []model.LogEntry) []model.DurationItem {
 
 		switch mode {
 		case "end":
-			// End 模式: 当前记录时间 - 上一条记录时间 = 当前事项时长
+			// End 模式: 当前记录时间是结束时间
 			items[i].EndTime = logTime
 			if i == 0 {
-				items[i].Unknown = true
-				items[i].Display = "未知起点"
-				items[i].StartTime = ""
+				// 第一条: 尝试使用前一天最后一条来补全起点
+				if prevEntry != nil {
+					prevMode := getEntryMode(prevEntry)
+					if prevMode == "end" {
+						// 模式一致，正常衔接
+						prevTime := prevEntry.LogTime[:5]
+						items[i].StartTime = prevTime
+						items[i].CrossDay = true
+						dur := crossDayDiffSeconds(prevEntry.LogDate, prevTime, currentDate, logTime)
+						items[i].Duration = dur
+						items[i].Display = formatDuration(dur)
+					} else {
+						// 前一天末条是 start 模式，当前是 end 模式 → 模式边界
+						items[i].Unknown = true
+						items[i].Display = "模式边界"
+						items[i].StartTime = ""
+					}
+				} else {
+					items[i].Unknown = true
+					items[i].Display = "未知起点"
+					items[i].StartTime = ""
+				}
 			} else {
-				prevTime := entries[i-1].LogTime[:5]
-				items[i].StartTime = prevTime
-				dur := timeDiffSeconds(entries[i-1].LogTime, e.LogTime)
-				items[i].Duration = dur
-				items[i].Display = formatDuration(dur)
+				prevMode := getEntryMode(&entries[i-1])
+				if prevMode == "end" {
+					// 同一天内，模式一致
+					prevTime := entries[i-1].LogTime[:5]
+					items[i].StartTime = prevTime
+					dur := timeDiffSeconds(entries[i-1].LogTime, e.LogTime)
+					items[i].Duration = dur
+					items[i].Display = formatDuration(dur)
+				} else {
+					// 模式边界: 前一条是 start，当前是 end
+					items[i].Unknown = true
+					items[i].Display = "模式边界"
+					items[i].StartTime = ""
+				}
 			}
 		case "start":
-			// Start 模式: 下一条记录时间 - 当前记录时间 = 当前事项时长
+			// Start 模式: 当前记录时间是开始时间
 			items[i].StartTime = logTime
 			if i == len(entries)-1 {
-				items[i].Unknown = true
-				items[i].Display = "未知终点"
-				items[i].EndTime = ""
+				// 最后一条: 尝试使用后一天第一条来补全终点
+				if nextEntry != nil {
+					nextMode := getEntryMode(nextEntry)
+					if nextMode == "start" {
+						// 模式一致，正常衔接
+						nextTime := nextEntry.LogTime[:5]
+						items[i].EndTime = nextTime
+						items[i].CrossDay = true
+						dur := crossDayDiffSeconds(currentDate, logTime, nextEntry.LogDate, nextTime)
+						items[i].Duration = dur
+						items[i].Display = formatDuration(dur)
+					} else {
+						// 后一天首条是 end 模式 → 模式边界
+						items[i].Unknown = true
+						items[i].Display = "模式边界"
+						items[i].EndTime = ""
+					}
+				} else {
+					items[i].Unknown = true
+					items[i].Display = "未知终点"
+					items[i].EndTime = ""
+				}
 			} else {
-				nextTime := entries[i+1].LogTime[:5]
-				items[i].EndTime = nextTime
-				dur := timeDiffSeconds(e.LogTime, entries[i+1].LogTime)
-				items[i].Duration = dur
-				items[i].Display = formatDuration(dur)
+				nextMode := getEntryMode(&entries[i+1])
+				if nextMode == "start" {
+					// 同一天内，模式一致
+					nextTime := entries[i+1].LogTime[:5]
+					items[i].EndTime = nextTime
+					dur := timeDiffSeconds(e.LogTime, entries[i+1].LogTime)
+					items[i].Duration = dur
+					items[i].Display = formatDuration(dur)
+				} else {
+					// 模式边界: 下一条是 end，当前是 start
+					items[i].Unknown = true
+					items[i].Display = "模式边界"
+					items[i].EndTime = ""
+				}
 			}
 		}
 	}
@@ -178,6 +299,20 @@ func groupByDate(entries []model.LogEntry) map[string][]model.LogEntry {
 func timeDiffSeconds(from, to string) int {
 	t1, err1 := time.Parse("15:04:05", from)
 	t2, err2 := time.Parse("15:04:05", to)
+	if err1 != nil || err2 != nil {
+		return 0
+	}
+	diff := int(t2.Sub(t1).Seconds())
+	if diff < 0 {
+		diff = 0
+	}
+	return diff
+}
+
+// crossDayDiffSeconds 计算跨天的时间差（秒），支持不同日期
+func crossDayDiffSeconds(fromDate, fromTime, toDate, toTime string) int {
+	t1, err1 := time.Parse("2006-01-02 15:04", fromDate+" "+fromTime)
+	t2, err2 := time.Parse("2006-01-02 15:04", toDate+" "+toTime)
 	if err1 != nil || err2 != nil {
 		return 0
 	}

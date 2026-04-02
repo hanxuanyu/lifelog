@@ -84,6 +84,30 @@ func GetEntriesByDateRange(startDate, endDate string) ([]model.LogEntry, error) 
 	return entries, err
 }
 
+// GetLastEntryBefore 获取指定日期之前最近的一条日志（用于跨天衔接）
+func GetLastEntryBefore(date string) (*model.LogEntry, error) {
+	var entry model.LogEntry
+	err := DB.Where("log_date < ?", date).
+		Order("log_date DESC, log_time DESC").
+		First(&entry).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entry, nil
+}
+
+// GetFirstEntryAfter 获取指定日期之后最近的一条日志（用于跨天衔接）
+func GetFirstEntryAfter(date string) (*model.LogEntry, error) {
+	var entry model.LogEntry
+	err := DB.Where("log_date > ?", date).
+		Order("log_date ASC, log_time ASC").
+		First(&entry).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entry, nil
+}
+
 func applyFilters(tx *gorm.DB, q LogEntryQuery) *gorm.DB {
 	if q.Date != "" {
 		tx = tx.Where("log_date = ?", q.Date)

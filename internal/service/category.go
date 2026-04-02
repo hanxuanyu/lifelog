@@ -52,12 +52,13 @@ func MatchCategories(entries []model.LogEntry) []model.LogEntryResponse {
 // ToResponse 单条日志转响应 DTO
 func ToResponse(e *model.LogEntry) model.LogEntryResponse {
 	return model.LogEntryResponse{
-		ID:        e.ID,
-		LogDate:   e.LogDate,
-		LogTime:   e.LogTime,
-		EventType: e.EventType,
-		Detail:    e.Detail,
-		Category:  MatchCategory(e.EventType),
+		ID:            e.ID,
+		LogDate:       e.LogDate,
+		LogTime:       e.LogTime,
+		EventType:     e.EventType,
+		Detail:        e.Detail,
+		Category:      MatchCategory(e.EventType),
+		TimePointMode: e.TimePointMode,
 	}
 }
 

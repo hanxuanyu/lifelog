@@ -11,6 +11,11 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   getCategories, getSettings, setPassword,
   updateSettings, updateCategories,
 } from "@/api"
@@ -40,6 +45,8 @@ export function SettingsPage() {
   const [origCategories, setOrigCategories] = useState<Category[]>([])
   const [savingSettings, setSavingSettings] = useState(false)
   const [savingCategories, setSavingCategories] = useState(false)
+  const [modeDialogOpen, setModeDialogOpen] = useState(false)
+  const [pendingMode, setPendingMode] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([getCategories(), getSettings()])
@@ -222,7 +229,12 @@ export function SettingsPage() {
                         variant={timePointMode === "end" ? "default" : "outline"}
                         size="sm"
                         className="flex-1"
-                        onClick={() => setTimePointMode("end")}
+                        onClick={() => {
+                          if (timePointMode !== "end") {
+                            setPendingMode("end")
+                            setModeDialogOpen(true)
+                          }
+                        }}
                       >
                         结束时间
                       </Button>
@@ -230,11 +242,35 @@ export function SettingsPage() {
                         variant={timePointMode === "start" ? "default" : "outline"}
                         size="sm"
                         className="flex-1"
-                        onClick={() => setTimePointMode("start")}
+                        onClick={() => {
+                          if (timePointMode !== "start") {
+                            setPendingMode("start")
+                            setModeDialogOpen(true)
+                          }
+                        }}
                       >
                         开始时间
                       </Button>
                     </div>
+                    <AlertDialog open={modeDialogOpen} onOpenChange={setModeDialogOpen}>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>切换时间记录模式</AlertDialogTitle>
+                          <AlertDialogDescription className="space-y-2">
+                            <p>切换后，新记录的日志将使用新模式标记。</p>
+                            <p>已有日志不受影响——每条日志已保存了创建时的模式信息，统计分析时会按各自模式正确计算。</p>
+                            <p className="text-amber-600 dark:text-amber-400">注意：早期未标记模式的日志将使用当前全局设置来解读，切换后这部分日志的时长统计可能发生变化。</p>
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel onClick={() => setPendingMode(null)}>取消</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => {
+                            if (pendingMode) setTimePointMode(pendingMode)
+                            setPendingMode(null)
+                          }}>确认切换</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </CardContent>
                 </Card>
               </motion.div>

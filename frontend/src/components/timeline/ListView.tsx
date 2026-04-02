@@ -366,10 +366,52 @@ export function ListView({
         {/* Colored duration segments on rail */}
         {durationItems.map((item, i) => {
           if (item.unknown || !item.start_time || !item.end_time) return null
+          const color = getCategoryColor(item.category)
+
+          if (item.cross_day) {
+            // Cross-day task: in "end" mode, start_time is from previous day,
+            // so on THIS day's rail we render from 00:00 to end_time.
+            // In "start" mode, end_time is from next day,
+            // so on THIS day's rail we render from start_time to 24:00 (end of day).
+            if (timePointMode === "end") {
+              const y1 = timeToRailY("00:00")
+              const y2 = timeToRailY(formatTime(item.end_time))
+              if (y2 <= y1) return null
+              return (
+                <rect
+                  key={`seg-${i}`}
+                  x={cx - 3}
+                  y={y1}
+                  width={6}
+                  height={y2 - y1}
+                  rx={3}
+                  fill={color}
+                  fillOpacity={0.35}
+                />
+              )
+            } else {
+              const y1 = timeToRailY(formatTime(item.start_time))
+              const y2 = timeToRailY("23:59")
+              if (y2 <= y1) return null
+              return (
+                <rect
+                  key={`seg-${i}`}
+                  x={cx - 3}
+                  y={y1}
+                  width={6}
+                  height={y2 - y1}
+                  rx={3}
+                  fill={color}
+                  fillOpacity={0.35}
+                />
+              )
+            }
+          }
+
+          // Normal same-day segment
           const y1 = timeToRailY(formatTime(item.start_time))
           const y2 = timeToRailY(formatTime(item.end_time))
           if (y2 <= y1) return null
-          const color = getCategoryColor(item.category)
           return (
             <rect
               key={`seg-${i}`}
@@ -422,12 +464,12 @@ export function ListView({
           )
         })}
 
-        {/* Current time indicator — left-side arrow + text */}
+        {/* Current time indicator — arrow pointing right toward rail */}
         {isToday && currentTimeRailY >= 0 && (
           <g>
-            {/* Right-pointing arrow on the left side of rail */}
+            {/* Right-pointing triangle arrow toward the rail line */}
             <polygon
-              points={`${cx - 8} ${currentTimeRailY}, ${cx - 2} ${currentTimeRailY - 3.5}, ${cx - 2} ${currentTimeRailY + 3.5}`}
+              points={`${cx - 8} ${currentTimeRailY - 3.5}, ${cx - 8} ${currentTimeRailY + 3.5}, ${cx - 2} ${currentTimeRailY}`}
               className="fill-primary"
             />
             {/* Pulse ring */}
@@ -448,7 +490,7 @@ export function ListView({
             {/* Time text on the left */}
             <text
               x={cx - 10}
-              y={currentTimeRailY - 4}
+              y={currentTimeRailY + 3}
               textAnchor="end"
               className="fill-primary"
               fontSize={7}
@@ -638,7 +680,7 @@ export function ListView({
                     </div>
                   ) : (
                     <motion.div
-                      whileHover={{ scale: 1.01 }}
+                      whileHover={{ x: 2 }}
                       whileTap={{ scale: 0.99 }}
                       className="group rounded-xl border bg-card p-3 shadow-sm hover:shadow-md transition-shadow cursor-default"
                     >

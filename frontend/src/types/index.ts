@@ -5,6 +5,7 @@ export interface LogEntry {
   event_type: string
   detail: string
   category: string
+  time_point_mode?: string
   created_at: string
   updated_at: string
 }
@@ -33,6 +34,7 @@ export interface DurationItem {
   duration: number
   display: string
   unknown: boolean
+  cross_day?: boolean
   start_time: string
   end_time: string
 }
