@@ -1,0 +1,511 @@
+basePath: /
+definitions:
+  model.Category:
+    properties:
+      name:
+        type: string
+      rules:
+        items:
+          $ref: '#/definitions/model.CategoryRule'
+        type: array
+    type: object
+  model.CategoryRule:
+    properties:
+      pattern:
+        type: string
+      type:
+        description: '"fixed" 或 "regex"'
+        type: string
+    type: object
+  model.CategorySummary:
+    properties:
+      category:
+        type: string
+      display:
+        type: string
+      duration:
+        description: 总秒数
+        type: integer
+      percentage:
+        description: 占比
+        type: number
+    type: object
+  model.DailyStatistics:
+    properties:
+      date:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/model.DurationItem'
+        type: array
+      summary:
+        items:
+          $ref: '#/definitions/model.CategorySummary'
+        type: array
+      total_known:
+        description: 已知时长总秒数
+        type: integer
+    type: object
+  model.DurationItem:
+    properties:
+      category:
+        type: string
+      display:
+        description: 可读格式 "1h30m"
+        type: string
+      duration:
+        description: 秒
+        type: integer
+      event_type:
+        type: string
+      unknown:
+        description: 首条/末条未知时长
+        type: boolean
+    type: object
+  model.LogEntryRequest:
+    properties:
+      detail:
+        type: string
+      event_type:
+        type: string
+      log_date:
+        description: 可选，默认今天
+        type: string
+      log_time:
+        description: 必填，支持多种格式
+        type: string
+    required:
+    - event_type
+    - log_time
+    type: object
+  model.LogEntryResponse:
+    properties:
+      category:
+        type: string
+      detail:
+        type: string
+      event_type:
+        type: string
+      id:
+        type: integer
+      log_date:
+        type: string
+      log_time:
+        type: string
+    type: object
+  model.LoginRequest:
+    properties:
+      password:
+        type: string
+    required:
+    - password
+    type: object
+  model.LoginResponse:
+    properties:
+      token:
+        type: string
+    type: object
+  model.PageResult:
+    properties:
+      items: {}
+      page:
+        type: integer
+      size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  model.PasswordRequest:
+    properties:
+      new_password:
+        minLength: 4
+        type: string
+      old_password:
+        type: string
+    required:
+    - new_password
+    type: object
+  model.PeriodStatistics:
+    properties:
+      day_count:
+        type: integer
+      end_date:
+        type: string
+      start_date:
+        type: string
+      summary:
+        items:
+          $ref: '#/definitions/model.CategorySummary'
+        type: array
+      total_known:
+        type: integer
+    type: object
+  model.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: 无压力每日事项记录系统
+  title: Lifelog API
+  version: "1.0"
+paths:
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 登录信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.LoginResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 密码登录
+      tags:
+      - 认证
+  /api/auth/password:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 密码信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.PasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 设置或修改密码
+      tags:
+      - 认证
+  /api/categories:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Category'
+                  type: array
+              type: object
+      summary: 获取所有大类及其匹配规则
+      tags:
+      - 大类
+  /api/logs:
+    get:
+      parameters:
+      - description: 日期 YYYY-MM-DD
+        in: query
+        name: date
+        type: string
+      - description: 事项类型
+        in: query
+        name: event_type
+        type: string
+      - description: 大类名称
+        in: query
+        name: category
+        type: string
+      - description: 关键词
+        in: query
+        name: keyword
+        type: string
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.PageResult'
+              type: object
+      summary: 查询日志列表
+      tags:
+      - 日志
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 日志内容
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.LogEntryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.LogEntryResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 新增日志条目
+      tags:
+      - 日志
+  /api/logs/{id}:
+    delete:
+      parameters:
+      - description: 日志ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 删除日志条目
+      tags:
+      - 日志
+    get:
+      parameters:
+      - description: 日志ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.LogEntryResponse'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 获取单条日志
+      tags:
+      - 日志
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 日志ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 日志内容
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.LogEntryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.LogEntryResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 修改日志条目
+      tags:
+      - 日志
+  /api/logs/timeline:
+    get:
+      parameters:
+      - description: 日期 YYYY-MM-DD
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.LogEntryResponse'
+                  type: array
+              type: object
+      summary: 获取某天时间轴
+      tags:
+      - 日志
+  /api/settings:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 获取系统配置
+      tags:
+      - 设置
+  /api/statistics/daily:
+    get:
+      parameters:
+      - description: 日期 YYYY-MM-DD
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.DailyStatistics'
+              type: object
+      summary: 获取某天的统计数据
+      tags:
+      - 统计
+  /api/statistics/monthly:
+    get:
+      parameters:
+      - description: 年份
+        in: query
+        name: year
+        required: true
+        type: integer
+      - description: 月份
+        in: query
+        name: month
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.PeriodStatistics'
+              type: object
+      summary: 获取某月的统计数据
+      tags:
+      - 统计
+  /api/statistics/weekly:
+    get:
+      parameters:
+      - description: 日期 YYYY-MM-DD
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.PeriodStatistics'
+              type: object
+      summary: 获取某天所在周的统计数据
+      tags:
+      - 统计
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

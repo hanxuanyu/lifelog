@@ -1,0 +1,84 @@
+package model
+
+// Response 统一 API 响应结构
+type Response struct {
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
+}
+
+// PageResult 分页结果
+type PageResult struct {
+	Total int64       `json:"total"`
+	Page  int         `json:"page"`
+	Size  int         `json:"size"`
+	Items interface{} `json:"items"`
+}
+
+// LogEntryResponse 日志响应 DTO（含动态匹配的大类）
+type LogEntryResponse struct {
+	ID        uint   `json:"id"`
+	LogDate   string `json:"log_date"`
+	LogTime   string `json:"log_time"`
+	EventType string `json:"event_type"`
+	Detail    string `json:"detail"`
+	Category  string `json:"category"`
+}
+
+// LogEntryRequest 新增/修改日志请求
+type LogEntryRequest struct {
+	LogDate   string `json:"log_date" binding:"omitempty"`            // 可选，默认今天
+	LogTime   string `json:"log_time" binding:"required"`             // 必填，支持多种格式
+	EventType string `json:"event_type" binding:"required"`
+	Detail    string `json:"detail"`
+}
+
+// LoginRequest 登录请求
+type LoginRequest struct {
+	Password string `json:"password" binding:"required"`
+}
+
+// LoginResponse 登录响应
+type LoginResponse struct {
+	Token string `json:"token"`
+}
+
+// PasswordRequest 修改密码请求
+type PasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password" binding:"required,min=4"`
+}
+
+// DurationItem 单条时长统计项
+type DurationItem struct {
+	EventType string  `json:"event_type"`
+	Category  string  `json:"category"`
+	Duration  int     `json:"duration"`          // 秒
+	Display   string  `json:"display"`           // 可读格式 "1h30m"
+	Unknown   bool    `json:"unknown,omitempty"` // 首条/末条未知时长
+}
+
+// CategorySummary 大类汇总
+type CategorySummary struct {
+	Category   string  `json:"category"`
+	Duration   int     `json:"duration"`    // 总秒数
+	Display    string  `json:"display"`
+	Percentage float64 `json:"percentage"`  // 占比
+}
+
+// DailyStatistics 日统计
+type DailyStatistics struct {
+	Date       string            `json:"date"`
+	Items      []DurationItem    `json:"items"`
+	Summary    []CategorySummary `json:"summary"`
+	TotalKnown int               `json:"total_known"` // 已知时长总秒数
+}
+
+// PeriodStatistics 周/月统计
+type PeriodStatistics struct {
+	StartDate  string            `json:"start_date"`
+	EndDate    string            `json:"end_date"`
+	Summary    []CategorySummary `json:"summary"`
+	TotalKnown int               `json:"total_known"`
+	DayCount   int               `json:"day_count"`
+}
