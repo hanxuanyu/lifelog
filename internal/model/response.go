@@ -56,6 +56,8 @@ type DurationItem struct {
 	Duration  int    `json:"duration"`          // 秒
 	Display   string `json:"display"`           // 可读格式 "1h30m"
 	Unknown   bool   `json:"unknown,omitempty"` // 首条/末条未知时长
+	StartTime string `json:"start_time"`        // HH:mm
+	EndTime   string `json:"end_time"`          // HH:mm
 }
 
 // CategorySummary 大类汇总
@@ -68,10 +70,11 @@ type CategorySummary struct {
 
 // DailyStatistics 日统计
 type DailyStatistics struct {
-	Date       string            `json:"date"`
-	Items      []DurationItem    `json:"items"`
-	Summary    []CategorySummary `json:"summary"`
-	TotalKnown int               `json:"total_known"` // 已知时长总秒数
+	Date          string            `json:"date"`
+	Items         []DurationItem    `json:"items"`
+	Summary       []CategorySummary `json:"summary"`
+	TotalKnown    int               `json:"total_known"` // 已知时长总秒数
+	TimePointMode string            `json:"time_point_mode"`
 }
 
 // PeriodStatistics 周/月统计

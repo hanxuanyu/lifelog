@@ -9,5 +9,6 @@ type CategoryRule struct {
 // Category 大类配置（映射 config.yaml）
 type Category struct {
 	Name  string         `yaml:"name" json:"name"`
+	Color string         `yaml:"color" json:"color"`
 	Rules []CategoryRule `yaml:"rules" json:"rules"`
 }

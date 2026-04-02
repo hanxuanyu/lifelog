@@ -1,7 +1,9 @@
 package main
 
 import (
+	"embed"
 	"fmt"
+	"io/fs"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -9,6 +11,9 @@ import (
 	"github.com/hxuanyu/lifelog/internal/repository"
 	"github.com/hxuanyu/lifelog/internal/router"
 )
+
+//go:embed web/*
+var webFS embed.FS
 
 // @title Lifelog API
 // @version 1.0
@@ -23,7 +28,8 @@ func main() {
 	repository.InitDB(config.GetDBPath())
 
 	r := gin.Default()
-	router.Setup(r)
+	staticFS, _ := fs.Sub(webFS, "web")
+	router.Setup(r, staticFS)
 
 	port := config.GetPort()
 	slog.Info("服务启动", "port", port)

@@ -23,6 +23,7 @@ time_point_mode: "end"
 
 categories:
   - name: "工作"
+    color: "#3b82f6"
     rules:
       - type: fixed
         pattern: "开会"
@@ -31,16 +32,19 @@ categories:
       - type: regex
         pattern: "^(需求|开发|测试|部署).*"
   - name: "学习"
+    color: "#10b981"
     rules:
       - type: fixed
         pattern: "读书"
       - type: regex
         pattern: "^学习.*"
   - name: "生活"
+    color: "#f59e0b"
     rules:
       - type: regex
         pattern: "^(吃饭|午餐|晚餐|早餐|做饭)$"
   - name: "休息"
+    color: "#06b6d4"
     rules:
       - type: fixed
         pattern: "睡觉"
@@ -156,5 +160,59 @@ func GetPasswordHash() string {
 // SetPasswordHash 写入密码 hash 到配置文件
 func SetPasswordHash(hash string) error {
 	viper.Set("auth.password_hash", hash)
+	return viper.WriteConfig()
+}
+
+// SetTimePointMode 设置时间点模式并写入配置文件（热重载生效）
+func SetTimePointMode(mode string) error {
+	if mode != "start" && mode != "end" {
+		mode = "end"
+	}
+	viper.Set("time_point_mode", mode)
+	return viper.WriteConfig()
+}
+
+// SetCategoriesConfig 设置分类规则并写入配置文件（热重载生效）
+func SetCategoriesConfig(cats []model.Category) error {
+	viper.Set("categories", cats)
+	if err := viper.WriteConfig(); err != nil {
+		return err
+	}
+	// 主动触发重新加载
+	loadCategories()
+	return nil
+}
+
+// GetServerConfig 获取服务器配置（端口、数据库路径）
+func GetServerConfig() map[string]interface{} {
+	return map[string]interface{}{
+		"port":    GetPort(),
+		"db_path": GetDBPath(),
+	}
+}
+
+// GetAuthConfig 获取认证配置（不含密码哈希）
+func GetAuthConfig() map[string]interface{} {
+	return map[string]interface{}{
+		"jwt_expire_hours": GetJWTExpireHours(),
+	}
+}
+
+// SetServerConfig 设置服务器配置（需重启生效）
+func SetServerConfig(port int, dbPath string) error {
+	if port > 0 {
+		viper.Set("server.port", port)
+	}
+	if dbPath != "" {
+		viper.Set("server.db_path", dbPath)
+	}
+	return viper.WriteConfig()
+}
+
+// SetAuthConfig 设置认证配置
+func SetAuthConfig(jwtExpireHours int) error {
+	if jwtExpireHours > 0 {
+		viper.Set("auth.jwt_expire_hours", jwtExpireHours)
+	}
 	return viper.WriteConfig()
 }

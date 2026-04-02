@@ -1,4 +1,5 @@
 # Binary
+bin/
 lifelog
 
 # Database
@@ -20,3 +21,5 @@ Thumbs.db
 # Test
 *.test
 coverage.out
+node_modules/
+web/

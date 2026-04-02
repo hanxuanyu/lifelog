@@ -21,10 +21,11 @@ func GetDailyStatistics(date string) (*model.DailyStatistics, error) {
 	summary, totalKnown := buildSummary(items)
 
 	return &model.DailyStatistics{
-		Date:       date,
-		Items:      items,
-		Summary:    summary,
-		TotalKnown: totalKnown,
+		Date:          date,
+		Items:         items,
+		Summary:       summary,
+		TotalKnown:    totalKnown,
+		TimePointMode: config.GetTimePointMode(),
 	}, nil
 }
 
@@ -97,23 +98,33 @@ func calculateDurations(entries []model.LogEntry) []model.DurationItem {
 			Category:  MatchCategory(e.EventType),
 		}
 
+		logTime := e.LogTime[:5] // "HH:mm"
+
 		switch mode {
 		case "end":
 			// End 模式: 当前记录时间 - 上一条记录时间 = 当前事项时长
+			items[i].EndTime = logTime
 			if i == 0 {
 				items[i].Unknown = true
 				items[i].Display = "未知起点"
+				items[i].StartTime = ""
 			} else {
+				prevTime := entries[i-1].LogTime[:5]
+				items[i].StartTime = prevTime
 				dur := timeDiffSeconds(entries[i-1].LogTime, e.LogTime)
 				items[i].Duration = dur
 				items[i].Display = formatDuration(dur)
 			}
 		case "start":
 			// Start 模式: 下一条记录时间 - 当前记录时间 = 当前事项时长
+			items[i].StartTime = logTime
 			if i == len(entries)-1 {
 				items[i].Unknown = true
 				items[i].Display = "未知终点"
+				items[i].EndTime = ""
 			} else {
+				nextTime := entries[i+1].LogTime[:5]
+				items[i].EndTime = nextTime
 				dur := timeDiffSeconds(e.LogTime, entries[i+1].LogTime)
 				items[i].Duration = dur
 				items[i].Display = formatDuration(dur)
