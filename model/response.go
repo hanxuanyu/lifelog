@@ -27,8 +27,8 @@ type LogEntryResponse struct {
 
 // LogEntryRequest 新增/修改日志请求
 type LogEntryRequest struct {
-	LogDate   string `json:"log_date" binding:"omitempty"`            // 可选，默认今天
-	LogTime   string `json:"log_time" binding:"required"`             // 必填，支持多种格式
+	LogDate   string `json:"log_date" binding:"omitempty"` // 可选，默认今天
+	LogTime   string `json:"log_time" binding:"required"`  // 必填，支持多种格式
 	EventType string `json:"event_type" binding:"required"`
 	Detail    string `json:"detail"`
 }
@@ -51,19 +51,19 @@ type PasswordRequest struct {
 
 // DurationItem 单条时长统计项
 type DurationItem struct {
-	EventType string  `json:"event_type"`
-	Category  string  `json:"category"`
-	Duration  int     `json:"duration"`          // 秒
-	Display   string  `json:"display"`           // 可读格式 "1h30m"
-	Unknown   bool    `json:"unknown,omitempty"` // 首条/末条未知时长
+	EventType string `json:"event_type"`
+	Category  string `json:"category"`
+	Duration  int    `json:"duration"`          // 秒
+	Display   string `json:"display"`           // 可读格式 "1h30m"
+	Unknown   bool   `json:"unknown,omitempty"` // 首条/末条未知时长
 }
 
 // CategorySummary 大类汇总
 type CategorySummary struct {
 	Category   string  `json:"category"`
-	Duration   int     `json:"duration"`    // 总秒数
+	Duration   int     `json:"duration"` // 总秒数
 	Display    string  `json:"display"`
-	Percentage float64 `json:"percentage"`  // 占比
+	Percentage float64 `json:"percentage"` // 占比
 }
 
 // DailyStatistics 日统计
