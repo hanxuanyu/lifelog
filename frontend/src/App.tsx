@@ -11,6 +11,7 @@ import { SettingsPage } from "@/pages/SettingsPage"
 import { LoginPage } from "@/pages/LoginPage"
 import { QuickAddDialog } from "@/components/QuickAddDialog"
 import { useTheme } from "@/hooks/use-theme"
+import { useQuickAddShortcut } from "@/hooks/use-shortcut"
 
 function TopNav() {
   const navigate = useNavigate()
@@ -57,6 +58,8 @@ function FloatingNav() {
   const [quickAddOpen, setQuickAddOpen] = useState(false)
 
   const isHome = location.pathname === "/"
+
+  useQuickAddShortcut(() => setQuickAddOpen(true))
 
   return (
     <>

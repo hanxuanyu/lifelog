@@ -80,15 +80,6 @@ export function Timeline({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Time point mode indicator */}
-      {entries.length > 0 && (
-        <div className="flex items-center justify-end mb-2 shrink-0">
-          <span className="text-[10px] text-muted-foreground">
-            {timePointMode === "end" ? "结束时间模式" : "开始时间模式"}
-          </span>
-        </div>
-      )}
-
       {/* View content — fills remaining space */}
       <div className="flex-1 min-h-0">
         <ListView

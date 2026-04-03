@@ -118,13 +118,16 @@ export function HomePage() {
             <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-accent transition-colors text-sm">
               <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="font-medium">{displayDate}</span>
-              {!isToday(currentDate) && (
-                <span className="text-[10px] text-primary font-medium ml-0.5">
-                  回今天
-                </span>
-              )}
             </button>
           </PopoverTrigger>
+          {!isToday(currentDate) && (
+            <button
+              onClick={(e) => { e.stopPropagation(); goToday() }}
+              className="text-[10px] text-primary font-medium ml-0.5 hover:underline"
+            >
+              回今天
+            </button>
+          )}
           <PopoverContent className="w-auto p-0" align="center">
             <Calendar
               mode="single"
