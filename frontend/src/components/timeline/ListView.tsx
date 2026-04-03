@@ -13,11 +13,12 @@ import {
   formatTimeInput,
   timeToMinutes,
   minutesToTime,
+  getContrastText,
 } from "./shared"
 
 // Layout constants
 const RAIL_WIDTH = 56 // Fixed rail column width (wider for left-side labels)
-const GAP = 8 // Gap between rail and cards
+const GAP = 4 // Gap between rail and cards
 const RAIL_PADDING = 12 // Top/bottom padding so dots aren't clipped
 const RAIL_LINE_X = 42 // X position of the rail line (right side, leaving space for labels)
 
@@ -51,10 +52,11 @@ export function ListView({
   const [editingEntry, setEditingEntry] = useState<EditState | null>(null)
   const [quickCreate, setQuickCreate] = useState<QuickCreateState | null>(null)
   const [hoverTime, setHoverTime] = useState<string | null>(null)
+  const [isTouching, setIsTouching] = useState(false)
   const [saving, setSaving] = useState(false)
   const [scrollTop, setScrollTop] = useState(0)
   const [railHeight, setRailHeight] = useState(0)
-  const [cardYPositions, setCardYPositions] = useState<number[]>([])
+  const [cardPositions, setCardPositions] = useState<{top: number, bottom: number}[]>([])
 
   const wrapperRef = useRef<HTMLDivElement>(null)
   const railRef = useRef<HTMLDivElement>(null)
@@ -101,17 +103,16 @@ export function ListView({
     return () => el.removeEventListener("scroll", onScroll)
   }, [])
 
-  // Measure card Y positions (relative to scroll container)
+  // Measure card positions (relative to scroll container)
   const measurePositions = useCallback(() => {
     const scrollEl = cardsScrollRef.current
     if (!scrollEl) return
-    const positions: number[] = entries.map((entry) => {
+    const positions = entries.map((entry) => {
       const el = cardRefs.current.get(entry.id)
-      if (!el) return 0
-      // Position relative to scroll container top
-      return el.offsetTop + el.offsetHeight / 2
+      if (!el) return { top: 0, bottom: 0 }
+      return { top: el.offsetTop, bottom: el.offsetTop + el.offsetHeight }
     })
-    setCardYPositions(positions)
+    setCardPositions(positions)
   }, [entries])
 
   useEffect(() => {
@@ -221,6 +222,65 @@ export function ListView({
     }
   }
 
+  // Touch handlers for mobile — use refs for native listeners to allow preventDefault
+  const isTouchingRef = useRef(false)
+
+  const getTouchTimeFromNative = useCallback((e: TouchEvent): string | null => {
+    const rail = railRef.current
+    if (!rail) return null
+    const rect = rail.getBoundingClientRect()
+    const y = e.touches[0].clientY - rect.top
+    const h = rail.clientHeight
+    if (h <= 0) return null
+    const pct = Math.max(0, Math.min(1, y / h))
+    return minutesToTime(Math.round(pct * 1440))
+  }, [])
+
+  useEffect(() => {
+    const rail = railRef.current
+    if (!rail) return
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (editingEntry || quickCreate) return
+      e.preventDefault()
+      isTouchingRef.current = true
+      setIsTouching(true)
+      const time = getTouchTimeFromNative(e)
+      if (time) setHoverTime(time)
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isTouchingRef.current) return
+      e.preventDefault()
+      const time = getTouchTimeFromNative(e)
+      if (time) setHoverTime(time)
+    }
+    const onTouchEnd = () => {
+      if (!isTouchingRef.current) return
+      isTouchingRef.current = false
+      setIsTouching(false)
+      // Trigger quick create via a callback scheduled in a microtask
+      // so we read the latest hoverTime from DOM
+      setHoverTime((prev) => {
+        if (prev) {
+          quickCreateStartedRef.current = true
+          setQuickCreate({ time: prev, event: "", detail: "" })
+        }
+        return null
+      })
+    }
+
+    rail.addEventListener("touchstart", onTouchStart, { passive: false })
+    rail.addEventListener("touchmove", onTouchMove, { passive: false })
+    rail.addEventListener("touchend", onTouchEnd)
+    rail.addEventListener("touchcancel", onTouchEnd)
+    return () => {
+      rail.removeEventListener("touchstart", onTouchStart)
+      rail.removeEventListener("touchmove", onTouchMove)
+      rail.removeEventListener("touchend", onTouchEnd)
+      rail.removeEventListener("touchcancel", onTouchEnd)
+    }
+  }, [editingEntry, quickCreate, getTouchTimeFromNative])
+
   const currentTimeRailY = isToday ? timeToRailY(currentTime) : -1
   const hoverRailY = hoverTime ? timeToRailY(hoverTime) : -1
 
@@ -301,15 +361,11 @@ export function ListView({
     )
   }
 
-  // Build SVG curves connecting rail dots to cards
+  // Build SVG ribbons connecting rail time-range segments to cards
   const renderCurves = () => {
-    if (railHeight <= 0 || cardYPositions.length !== entries.length) return null
+    if (railHeight <= 0 || cardPositions.length !== entries.length) return null
 
-    // The rail is fixed, the cards scroll.
-    // Rail dot Y is in rail coordinate space.
-    // Card Y is relative to scroll container content, so visible Y = cardY - scrollTop.
-    // We draw the SVG in the wrapper's coordinate space where rail starts at left edge.
-    const railCenterX = RAIL_LINE_X
+    const cx = RAIL_LINE_X
     const curveEndX = RAIL_WIDTH + GAP
 
     return (
@@ -319,14 +375,54 @@ export function ListView({
         height={railHeight}
       >
         {entries.map((entry, i) => {
-          const dotY = timeToRailY(formatTime(entry.log_time))
-          // Card center Y in the visible viewport = cardY - scrollTop
-          const cardVisibleY = cardYPositions[i] - scrollTop
+          const cardTop = cardPositions[i].top - scrollTop
+          const cardBottom = cardPositions[i].bottom - scrollTop
           const color = getCategoryColor(entry.category)
+          const durItem = getDurationForEntry(i)
 
-          // Control points for smooth bezier
-          const cpX = railCenterX + (curveEndX - railCenterX) * 0.6
-          const path = `M ${railCenterX} ${dotY} C ${cpX} ${dotY}, ${cpX} ${cardVisibleY}, ${curveEndX} ${cardVisibleY}`
+          // For entries with a known time range, draw a ribbon from the rail segment to the card
+          if (durItem && !durItem.unknown && durItem.start_time && durItem.end_time) {
+            let railTop: number, railBottom: number
+            if (durItem.cross_day) {
+              if (timePointMode === "end") {
+                railTop = timeToRailY("00:00")
+                railBottom = timeToRailY(formatTime(durItem.end_time))
+              } else {
+                railTop = timeToRailY(formatTime(durItem.start_time))
+                railBottom = timeToRailY("23:59")
+              }
+            } else {
+              railTop = timeToRailY(formatTime(durItem.start_time))
+              railBottom = timeToRailY(formatTime(durItem.end_time))
+            }
+
+            if (railBottom <= railTop) {
+              railBottom = railTop + 2
+            }
+
+            const railEdge = cx + 3
+            const midX = railEdge + (curveEndX - railEdge) * 0.5
+            const ribbonPath = `M ${railEdge} ${railTop} C ${midX} ${railTop}, ${midX} ${cardTop}, ${curveEndX} ${cardTop} L ${curveEndX} ${cardBottom} C ${midX} ${cardBottom}, ${midX} ${railBottom}, ${railEdge} ${railBottom} Z`
+
+            return (
+              <g key={entry.id}>
+                <path
+                  d={ribbonPath}
+                  fill={color}
+                  fillOpacity={0.06}
+                  stroke={color}
+                  strokeWidth={0.5}
+                  strokeOpacity={0.15}
+                />
+              </g>
+            )
+          }
+
+          // For entries without known range, draw a dashed line from the time point to card center
+          const dotY = timeToRailY(formatTime(entry.log_time))
+          const cardCenterY = (cardTop + cardBottom) / 2
+          const cpX = cx + (curveEndX - cx) * 0.6
+          const path = `M ${cx} ${dotY} C ${cpX} ${dotY}, ${cpX} ${cardCenterY}, ${curveEndX} ${cardCenterY}`
 
           return (
             <g key={entry.id}>
@@ -334,16 +430,16 @@ export function ListView({
                 d={path}
                 fill="none"
                 stroke={color}
-                strokeWidth={1.5}
-                strokeOpacity={0.3}
+                strokeWidth={1}
+                strokeOpacity={0.25}
+                strokeDasharray="3 2"
               />
-              {/* Small connector dot at card end */}
               <circle
                 cx={curveEndX}
-                cy={cardVisibleY}
+                cy={cardCenterY}
                 r={2}
                 fill={color}
-                fillOpacity={0.4}
+                fillOpacity={0.3}
               />
             </g>
           )
@@ -363,18 +459,6 @@ export function ListView({
         width={RAIL_WIDTH}
         height={railHeight}
       >
-        {/* Main rail line */}
-        <line
-          x1={cx}
-          y1={RAIL_PADDING}
-          x2={cx}
-          y2={railHeight - RAIL_PADDING}
-          stroke="currentColor"
-          strokeWidth={2}
-          className="text-border"
-          strokeLinecap="round"
-        />
-
         {/* Colored duration segments on rail */}
         {durationItems.map((item, i) => {
           if (item.unknown || !item.start_time || !item.end_time) return null
@@ -392,13 +476,13 @@ export function ListView({
               return (
                 <rect
                   key={`seg-${i}`}
-                  x={cx - 3}
+                  x={cx - 4}
                   y={y1}
-                  width={6}
+                  width={8}
                   height={y2 - y1}
-                  rx={3}
+                  rx={4}
                   fill={color}
-                  fillOpacity={0.35}
+                  fillOpacity={0.45}
                 />
               )
             } else {
@@ -408,13 +492,13 @@ export function ListView({
               return (
                 <rect
                   key={`seg-${i}`}
-                  x={cx - 3}
+                  x={cx - 4}
                   y={y1}
-                  width={6}
+                  width={8}
                   height={y2 - y1}
-                  rx={3}
+                  rx={4}
                   fill={color}
-                  fillOpacity={0.35}
+                  fillOpacity={0.45}
                 />
               )
             }
@@ -427,13 +511,13 @@ export function ListView({
           return (
             <rect
               key={`seg-${i}`}
-              x={cx - 3}
+              x={cx - 4}
               y={y1}
-              width={6}
+              width={8}
               height={y2 - y1}
-              rx={3}
+              rx={4}
               fill={color}
-              fillOpacity={0.5}
+              fillOpacity={0.6}
             />
           )
         })}
@@ -445,9 +529,9 @@ export function ListView({
           return (
             <g key={h}>
               <line
-                x1={cx - 3}
+                x1={cx - 4}
                 y1={y}
-                x2={cx + 3}
+                x2={cx + 4}
                 y2={y}
                 stroke="currentColor"
                 strokeWidth={1}
@@ -467,12 +551,14 @@ export function ListView({
           )
         })}
 
-        {/* Entry dots on rail */}
-        {entries.map((entry) => {
+        {/* Entry dots on rail — only for entries without a known time range */}
+        {entries.map((entry, i) => {
+          const durItem = getDurationForEntry(i)
+          if (durItem && !durItem.unknown && durItem.start_time && durItem.end_time) return null
           const dotY = timeToRailY(formatTime(entry.log_time))
           const color = getCategoryColor(entry.category)
           return (
-            <circle key={entry.id} cx={cx} cy={dotY} r={4} fill={color} />
+            <circle key={entry.id} cx={cx} cy={dotY} r={3} fill={color} fillOpacity={0.7} />
           )
         })}
 
@@ -514,30 +600,55 @@ export function ListView({
           </g>
         )}
 
-        {/* Hover indicator */}
+        {/* Hover / touch indicator */}
         {hoverTime && hoverRailY >= 0 && (
           <g>
             <line
-              x1={cx - 3}
+              x1={cx - 4}
               y1={hoverRailY}
-              x2={cx + 3}
+              x2={cx + 4}
               y2={hoverRailY}
               stroke="currentColor"
-              strokeWidth={1}
+              strokeWidth={isTouching ? 2 : 1}
               strokeDasharray="3 3"
               className="text-muted-foreground/40"
             />
-            <circle cx={cx} cy={hoverRailY} r={3} className="fill-muted-foreground/50" />
-            <text
-              x={cx - 7}
-              y={hoverRailY - 5}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              fontSize={10}
-              fontFamily="monospace"
-            >
-              {hoverTime}
-            </text>
+            <circle cx={cx} cy={hoverRailY} r={isTouching ? 5 : 3} className={isTouching ? "fill-primary" : "fill-muted-foreground/50"} />
+            {/* Time label — offset above finger on touch */}
+            {isTouching ? (
+              <>
+                <rect
+                  x={0}
+                  y={Math.max(0, hoverRailY - 55)}
+                  width={cx - 2}
+                  height={20}
+                  rx={4}
+                  className="fill-primary"
+                />
+                <text
+                  x={(cx - 2) / 2}
+                  y={Math.max(0, hoverRailY - 55) + 14}
+                  textAnchor="middle"
+                  fill="white"
+                  fontSize={13}
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                >
+                  {hoverTime}
+                </text>
+              </>
+            ) : (
+              <text
+                x={cx - 7}
+                y={hoverRailY - 5}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                fontSize={10}
+                fontFamily="monospace"
+              >
+                {hoverTime}
+              </text>
+            )}
           </g>
         )}
       </svg>
@@ -551,7 +662,7 @@ export function ListView({
         {/* Fixed rail */}
         <div
           ref={railRef}
-          className="relative shrink-0 cursor-crosshair"
+          className="relative shrink-0 cursor-crosshair touch-none"
           style={{ width: RAIL_WIDTH }}
           onMouseMove={handleRailHover}
           onMouseLeave={() => setHoverTime(null)}
@@ -582,7 +693,7 @@ export function ListView({
       {/* Fixed rail */}
       <div
         ref={railRef}
-        className="relative shrink-0 cursor-crosshair"
+        className="relative shrink-0 cursor-crosshair touch-none"
         style={{ width: RAIL_WIDTH }}
         onMouseMove={handleRailHover}
         onMouseLeave={() => setHoverTime(null)}
@@ -628,7 +739,7 @@ export function ListView({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10, scale: 0.95 }}
                   transition={{ delay: index * 0.02 }}
-                  className="mb-2"
+                  className="mb-1.5"
                 >
                   {isEditing ? (
                     <div className="rounded-xl border-2 border-primary/30 bg-card p-3 shadow-sm">
@@ -644,6 +755,13 @@ export function ListView({
                             }
                             className="w-[80px] text-center font-mono text-sm"
                             maxLength={5}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault()
+                                editEventRef.current?.focus()
+                              }
+                              if (e.key === "Escape") cancelEdit()
+                            }}
                           />
                           <Input
                             ref={editEventRef}
@@ -692,21 +810,26 @@ export function ListView({
                     </div>
                   ) : (
                     <motion.div
-                      whileHover={{ x: 2 }}
                       whileTap={{ scale: 0.99 }}
-                      className="group rounded-xl border bg-card p-3 shadow-sm hover:shadow-md transition-shadow cursor-default"
+                      className="group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm hover:brightness-95 transition-all cursor-default"
+                      style={{ backgroundColor: `${color}10`, borderColor: `${color}20` }}
                     >
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-medium text-sm truncate">
                               {entry.event_type}
                             </span>
                             <span
-                              className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
-                              style={{ backgroundColor: color }}
+                              className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                              style={{ backgroundColor: color, color: getContrastText(color) }}
                             >
                               {entry.category}
+                            </span>
+                            <span className="text-[11px] font-mono text-muted-foreground">
+                              {durItem && !durItem.unknown && durItem.start_time && durItem.end_time
+                                ? `${formatTime(durItem.start_time)}~${formatTime(durItem.end_time)}`
+                                : `${formatTime(entry.log_time)}(${timePointMode === "end" ? "结束" : "开始"})`}
                             </span>
                             {durItem &&
                               !durItem.unknown &&
@@ -721,13 +844,8 @@ export function ListView({
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <span className="text-[10px] font-mono text-muted-foreground/70">
-                              {formatTime(entry.log_time)}
-                            </span>
-                          </div>
                           {entry.detail && (
-                            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
                               {entry.detail}
                             </p>
                           )}
@@ -736,7 +854,7 @@ export function ListView({
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-7 w-7"
+                            className="h-6 w-6"
                             onClick={() => startEdit(entry)}
                           >
                             <Pencil className="h-3 w-3" />
@@ -744,7 +862,7 @@ export function ListView({
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            className="h-6 w-6 text-destructive hover:text-destructive"
                             onClick={() => onDeleteRequest(entry.id)}
                           >
                             <Trash2 className="h-3 w-3" />

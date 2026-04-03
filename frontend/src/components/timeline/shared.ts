@@ -65,3 +65,34 @@ export function getCategoryColorFn(
   }
   return DEFAULT_COLORS[category] || DEFAULT_COLORS["未分类"]
 }
+
+/** Parse hex color (#rgb or #rrggbb) to [r, g, b] */
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "")
+  if (h.length === 3) {
+    return [
+      parseInt(h[0] + h[0], 16),
+      parseInt(h[1] + h[1], 16),
+      parseInt(h[2] + h[2], 16),
+    ]
+  }
+  return [
+    parseInt(h.slice(0, 2), 16),
+    parseInt(h.slice(2, 4), 16),
+    parseInt(h.slice(4, 6), 16),
+  ]
+}
+
+/** Relative luminance (WCAG formula), 0 = black, 1 = white */
+export function getLuminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex).map((c) => {
+    const s = c / 255
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+  })
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** Return contrasting text color for a given background hex */
+export function getContrastText(bgHex: string): string {
+  return getLuminance(bgHex) > 0.4 ? "#1a1a1a" : "#ffffff"
+}
