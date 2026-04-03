@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { format, subDays } from "date-fns"
 import { zhCN } from "date-fns/locale"
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import {
   PieChart,
   Pie,
@@ -36,7 +35,6 @@ function durationToHours(seconds: number): number {
 }
 
 export function StatisticsPage() {
-  const navigate = useNavigate()
   const [tab, setTab] = useState("daily")
   const [dailyDate, setDailyDate] = useState(new Date())
   const [weeklyDate, setWeeklyDate] = useState(new Date())
@@ -234,11 +232,8 @@ export function StatisticsPage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-3 mb-4 max-w-5xl mx-auto w-full"
+        className="mb-4 max-w-5xl mx-auto w-full"
       >
-        <Button size="icon" variant="ghost" onClick={() => navigate("/", { replace: true })} className="h-8 w-8">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
         <h1 className="text-lg font-semibold">数据统计</h1>
       </motion.div>
 

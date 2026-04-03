@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  ArrowLeft, Plus, Trash2, Save, Lock, Eye, EyeOff,
+  Plus, Trash2, Save, Lock, Eye, EyeOff,
   Server, Clock, Shield, Tag, X, Keyboard,
 } from "lucide-react"
-import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,7 +23,6 @@ import { toast } from "@/hooks/use-toast"
 import { getShortcut, setShortcut, formatShortcut } from "@/hooks/use-shortcut"
 
 export function SettingsPage() {
-  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
 
   // Settings state
@@ -226,11 +224,8 @@ export function SettingsPage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-3 mb-4 max-w-5xl mx-auto w-full"
+        className="mb-4 max-w-5xl mx-auto w-full"
       >
-        <Button size="icon" variant="ghost" onClick={() => navigate("/", { replace: true })} className="h-8 w-8">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
         <h1 className="text-lg font-semibold">设置</h1>
       </motion.div>
 

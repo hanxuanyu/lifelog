@@ -14,6 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { QuickAddDialog } from "@/components/QuickAddDialog"
 
 export function HomePage() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -63,7 +64,15 @@ export function HomePage() {
   const goNext = () => setCurrentDate((d) => addDays(d, 1))
 
   const [calendarOpen, setCalendarOpen] = useState(false)
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
   const timeInputRef = useRef<HTMLInputElement>(null)
+
+  // Listen for global shortcut event
+  useEffect(() => {
+    const handler = () => setQuickAddOpen(true)
+    window.addEventListener("openQuickAdd", handler)
+    return () => window.removeEventListener("openQuickAdd", handler)
+  }, [])
 
   const displayDate = format(currentDate, "M月d日 EEEE", { locale: zhCN })
 
@@ -107,7 +116,7 @@ export function HomePage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-center gap-1 mb-3"
+        className="flex items-center gap-1 mb-3"
       >
         <Button size="icon" variant="ghost" onClick={goPrev} className="h-7 w-7">
           <ChevronLeft className="h-4 w-4" />
@@ -183,6 +192,14 @@ export function HomePage() {
           />
         )}
       </div>
+
+      <QuickAddDialog
+        open={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        onCreated={() => {
+          window.dispatchEvent(new CustomEvent("logCreated"))
+        }}
+      />
     </div>
   )
 }

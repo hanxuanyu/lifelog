@@ -11,6 +11,7 @@ import remarkGfm from "remark-gfm"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -973,6 +974,7 @@ export function ListView({
               <span>{detailDialog?.title}</span>
               <span className="text-xs font-normal text-muted-foreground">{detailDialog?.time}</span>
             </DialogTitle>
+            <DialogDescription className="sr-only">事件详情</DialogDescription>
           </DialogHeader>
           <div className="prose-compact text-sm">
             <Markdown remarkPlugins={[remarkGfm]}>{detailDialog?.detail ?? ""}</Markdown>
