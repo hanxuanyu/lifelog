@@ -20,15 +20,25 @@ PLATFORMS=(
 # Build flags: static linking, strip debug info
 LDFLAGS="-s -w"
 
-echo "==> Building frontend..."
-(cd frontend && npm install --silent && npm run build)
+# Skip frontend build if --skip-frontend is passed (CI builds frontend separately)
+SKIP_FRONTEND=false
+for arg in "$@"; do
+  if [ "$arg" = "--skip-frontend" ]; then
+    SKIP_FRONTEND=true
+  fi
+done
+
+if [ "$SKIP_FRONTEND" = false ]; then
+  echo "==> Building frontend..."
+  (cd frontend && npm install --silent && npm run build)
+fi
 
 echo "==> Cross-compiling Go binaries..."
 for platform in "${PLATFORMS[@]}"; do
   GOOS="${platform%/*}"
   GOARCH="${platform#*/}"
 
-  output_dir="${BIN_DIR}/${GOOS}_${GOARCH}"
+  output_dir="${BIN_DIR}/${APP_NAME}_${GOOS}_${GOARCH}"
   output="${output_dir}/${APP_NAME}"
   if [ "$GOOS" = "windows" ]; then
     output="${output}.exe"
