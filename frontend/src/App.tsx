@@ -62,16 +62,15 @@ export default function App() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
 
   useEffect(() => {
-    // Check if token exists or if auth is disabled (try an API call)
+    // Check auth status: validate existing token or probe if auth is disabled
     const token = localStorage.getItem("token")
-    if (token) {
-      setAuthenticated(true)
-    } else {
-      // Try to access without auth (auth may be disabled)
-      getSettings()
-        .then(() => setAuthenticated(true))
-        .catch(() => setAuthenticated(false))
-    }
+    // Either way, try an API call to verify access
+    getSettings()
+      .then(() => setAuthenticated(true))
+      .catch(() => {
+        if (token) localStorage.removeItem("token")
+        setAuthenticated(false)
+      })
   }, [])
 
   if (authenticated === null) {

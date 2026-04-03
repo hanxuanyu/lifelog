@@ -42,6 +42,14 @@ func SetPassword(oldPassword, newPassword string) error {
 	return config.SetPasswordHash(string(newHash))
 }
 
+// SetPasswordAndLogin 设置/修改密码并返回新 token
+func SetPasswordAndLogin(oldPassword, newPassword string) (string, error) {
+	if err := SetPassword(oldPassword, newPassword); err != nil {
+		return "", err
+	}
+	return generateToken()
+}
+
 // IsPasswordSet 是否已设置密码
 func IsPasswordSet() bool {
 	return config.GetPasswordHash() != ""

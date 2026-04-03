@@ -53,10 +53,15 @@ func SetPassword(c *gin.Context) {
 		return
 	}
 
-	if err := service.SetPassword(req.OldPassword, req.NewPassword); err != nil {
+	token, err := service.SetPasswordAndLogin(req.OldPassword, req.NewPassword)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "密码设置成功"})
+	c.JSON(http.StatusOK, model.Response{
+		Code:    200,
+		Message: "密码设置成功",
+		Data:    model.LoginResponse{Token: token},
+	})
 }

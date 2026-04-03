@@ -30,7 +30,6 @@ http.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       localStorage.removeItem("token")
-      window.location.reload()
     }
     return Promise.reject(err)
   }
@@ -43,10 +42,13 @@ export async function login(password: string) {
 }
 
 export async function setPassword(oldPassword: string, newPassword: string) {
-  const res = await http.put<ApiResponse>("/auth/password", {
+  const res = await http.put<ApiResponse<{ token?: string }>>("/auth/password", {
     old_password: oldPassword,
     new_password: newPassword,
   })
+  if (res.data.data?.token) {
+    localStorage.setItem("token", res.data.data.token)
+  }
   return res.data
 }
 

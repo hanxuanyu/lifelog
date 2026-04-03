@@ -892,29 +892,31 @@ export function ListView({
                             )}
                           </div>
                           {entry.detail && (
-                            <div className="mt-0.5 flex items-start gap-1">
-                              <div className="text-xs text-muted-foreground prose-compact min-w-0 flex-1 [&>*]:line-clamp-2">
+                            <div className="mt-0.5">
+                              <div className="text-xs text-muted-foreground prose-compact min-w-0 [&>*]:line-clamp-2">
                                 <Markdown remarkPlugins={[remarkGfm]}>{entry.detail}</Markdown>
                               </div>
-                              <button
-                                type="button"
-                                className="shrink-0 mt-0.5 text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setDetailDialog({
-                                    title: entry.event_type,
-                                    detail: entry.detail,
-                                    time: formatTime(entry.log_time),
-                                  })
-                                }}
-                                title="查看详情"
-                              >
-                                <Maximize2 className="h-2.5 w-2.5" />
-                              </button>
                             </div>
                           )}
                         </div>
                         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 sm:transition-opacity shrink-0">
+                          {entry.detail && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6"
+                              onClick={() =>
+                                setDetailDialog({
+                                  title: entry.event_type,
+                                  detail: entry.detail,
+                                  time: formatTime(entry.log_time),
+                                })
+                              }
+                              title="查看详情"
+                            >
+                              <Maximize2 className="h-3 w-3" />
+                            </Button>
+                          )}
                           <Button
                             size="icon"
                             variant="ghost"
