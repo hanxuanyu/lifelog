@@ -179,6 +179,21 @@ func GetTimeline(c *gin.Context) {
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "ok", Data: entries})
 }
 
+// GetEventTypes 获取所有不重复的事项类型
+// @Summary 获取所有事项类型
+// @Tags 日志
+// @Produce json
+// @Success 200 {object} model.Response{data=[]string}
+// @Router /api/logs/event-types [get]
+func GetEventTypes(c *gin.Context) {
+	types, err := repository.GetDistinctEventTypes()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: "查询失败: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "ok", Data: types})
+}
+
 func parseID(c *gin.Context) (uint, error) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)

@@ -108,6 +108,13 @@ func GetFirstEntryAfter(date string) (*model.LogEntry, error) {
 	return &entry, nil
 }
 
+// GetDistinctEventTypes 获取所有不重复的事项类型
+func GetDistinctEventTypes() ([]string, error) {
+	var types []string
+	err := DB.Model(&model.LogEntry{}).Distinct("event_type").Order("event_type").Pluck("event_type", &types).Error
+	return types, err
+}
+
 func applyFilters(tx *gorm.DB, q LogEntryQuery) *gorm.DB {
 	if q.Date != "" {
 		tx = tx.Where("log_date = ?", q.Date)

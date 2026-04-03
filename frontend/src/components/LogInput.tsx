@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { createLog, getCategories, getTimeline } from "@/api"
+import { createLog, getCategories, getEventTypes, getTimeline } from "@/api"
 import type { Category, LogEntry } from "@/types"
 import { toast } from "@/hooks/use-toast"
 
@@ -25,12 +25,14 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
   const [selectedSuggestion, setSelectedSuggestion] = useState(-1)
   const [categories, setCategories] = useState<Category[]>([])
   const [recentEvents, setRecentEvents] = useState<string[]>([])
+  const [allEventTypes, setAllEventTypes] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [detailPreview, setDetailPreview] = useState(false)
 
   const eventInputRef = useRef<HTMLInputElement>(null)
   const timeInputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
+  const suggestionItemsRef = useRef<(HTMLButtonElement | null)[]>([])
 
   // Merge forwarded ref with internal ref
   const setTimeInputRef = useCallback((node: HTMLInputElement | null) => {
@@ -41,6 +43,7 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
 
   useEffect(() => {
     getCategories().then(setCategories).catch(() => {})
+    getEventTypes().then(setAllEventTypes).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -59,8 +62,8 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
         }
       })
     })
-    return [...new Set([...recentEvents, ...fixedEvents])]
-  }, [categories, recentEvents])
+    return [...new Set([...recentEvents, ...fixedEvents, ...allEventTypes])]
+  }, [categories, recentEvents, allEventTypes])
 
   const handleEventChange = (value: string) => {
     setEventValue(value)
@@ -73,7 +76,7 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
       setShowSuggestions(filtered.length > 0)
       setSelectedSuggestion(-1)
     } else {
-      setSuggestions(getAllKnownEvents().slice(0, 8))
+      setSuggestions(getAllKnownEvents())
       setShowSuggestions(true)
       setSelectedSuggestion(-1)
     }
@@ -81,7 +84,7 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
 
   const handleEventFocus = () => {
     if (!eventValue.trim()) {
-      setSuggestions(getAllKnownEvents().slice(0, 8))
+      setSuggestions(getAllKnownEvents())
       setShowSuggestions(true)
     }
   }
@@ -188,6 +191,9 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
       if (!recentEvents.includes(eventValue.trim())) {
         setRecentEvents((prev) => [eventValue.trim(), ...prev])
       }
+      if (!allEventTypes.includes(eventValue.trim())) {
+        setAllEventTypes((prev) => [...prev, eventValue.trim()])
+      }
       onLogCreated()
       timeInputRef.current?.focus()
     } catch (err: unknown) {
@@ -197,6 +203,15 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
       setSubmitting(false)
     }
   }
+
+  // Auto-scroll selected suggestion into view
+  useEffect(() => {
+    if (selectedSuggestion >= 0 && suggestionItemsRef.current[selectedSuggestion]) {
+      suggestionItemsRef.current[selectedSuggestion]?.scrollIntoView({
+        block: "nearest",
+      })
+    }
+  }, [selectedSuggestion])
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -267,7 +282,7 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15 }}
-                className="absolute top-full left-0 right-0 mt-1 z-50 rounded-lg border bg-popover shadow-lg overflow-hidden"
+                className="absolute top-full left-0 right-0 mt-1 z-50 rounded-lg border bg-popover shadow-lg overflow-y-auto max-h-[240px]"
               >
                 {suggestions.map((s, i) => {
                   const cat = categories.find((c) =>
@@ -279,6 +294,7 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
                   return (
                     <button
                       key={s}
+                      ref={(el) => { suggestionItemsRef.current[i] = el }}
                       type="button"
                       className={`w-full px-3 py-1.5 text-left text-sm flex items-center gap-2 transition-colors ${
                         i === selectedSuggestion

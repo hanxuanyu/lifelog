@@ -37,6 +37,7 @@ func Setup(r *gin.Engine, staticFS fs.FS) {
 			logs.POST("", handler.CreateLogEntry)
 			logs.GET("", handler.QueryLogEntries)
 			logs.GET("/timeline", handler.GetTimeline)
+			logs.GET("/event-types", handler.GetEventTypes)
 			logs.GET("/:id", handler.GetLogEntry)
 			logs.PUT("/:id", handler.UpdateLogEntry)
 			logs.DELETE("/:id", handler.DeleteLogEntry)

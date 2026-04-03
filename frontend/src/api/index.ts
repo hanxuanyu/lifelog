@@ -92,6 +92,12 @@ export async function deleteLog(id: number) {
   return res.data
 }
 
+// Event Types
+export async function getEventTypes() {
+  const res = await http.get<ApiResponse<string[]>>("/logs/event-types")
+  return res.data.data
+}
+
 // Categories
 export async function getCategories() {
   const res = await http.get<ApiResponse<Category[]>>("/categories")
