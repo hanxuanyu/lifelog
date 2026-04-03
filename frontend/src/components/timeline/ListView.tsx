@@ -16,10 +16,10 @@ import {
 } from "./shared"
 
 // Layout constants
-const RAIL_WIDTH = 48 // Fixed rail column width (wider for left-side labels)
+const RAIL_WIDTH = 56 // Fixed rail column width (wider for left-side labels)
 const GAP = 8 // Gap between rail and cards
 const RAIL_PADDING = 12 // Top/bottom padding so dots aren't clipped
-const RAIL_LINE_X = 36 // X position of the rail line (right side, leaving space for labels)
+const RAIL_LINE_X = 42 // X position of the rail line (right side, leaving space for labels)
 
 interface ListViewProps {
   entries: LogEntry[]
@@ -62,7 +62,9 @@ export function ListView({
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const editEventRef = useRef<HTMLInputElement>(null)
   const quickEventRef = useRef<HTMLInputElement>(null)
+  const quickTimeRef = useRef<HTMLInputElement>(null)
   const editStartedRef = useRef(false)
+  const quickCreateStartedRef = useRef(false)
 
   // Focus management
   useEffect(() => {
@@ -73,7 +75,8 @@ export function ListView({
   }, [editingEntry])
 
   useEffect(() => {
-    if (quickCreate) {
+    if (quickCreate && quickCreateStartedRef.current) {
+      quickCreateStartedRef.current = false
       setTimeout(() => quickEventRef.current?.focus(), 50)
     }
   }, [quickCreate])
@@ -212,6 +215,7 @@ export function ListView({
 
   const handleRailClick = () => {
     if (hoverTime && !editingEntry && !quickCreate) {
+      quickCreateStartedRef.current = true
       setQuickCreate({ time: hoverTime, event: "", detail: "" })
       setHoverTime(null)
     }
@@ -230,6 +234,7 @@ export function ListView({
         <div className="flex flex-col gap-2">
           <div className="flex gap-2">
             <Input
+              ref={quickTimeRef}
               value={quickCreate.time}
               onChange={(e) =>
                 setQuickCreate({
@@ -240,6 +245,13 @@ export function ListView({
               className="w-[80px] text-center font-mono text-sm"
               maxLength={5}
               placeholder="时间"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  ;(ref || quickEventRef)?.current?.focus()
+                }
+                if (e.key === "Escape") setQuickCreate(null)
+              }}
             />
             <Input
               ref={ref || quickEventRef}
@@ -442,11 +454,11 @@ export function ListView({
                 className="text-muted-foreground/30"
               />
               <text
-                x={cx - 6}
-                y={y + 3}
+                x={cx - 7}
+                y={y + 4}
                 textAnchor="end"
-                className="fill-muted-foreground/40"
-                fontSize={7}
+                className="fill-muted-foreground/50"
+                fontSize={10}
                 fontFamily="monospace"
               >
                 {String(h === 24 ? 0 : h).padStart(2, "0")}
@@ -489,11 +501,11 @@ export function ListView({
             </circle>
             {/* Time text on the left */}
             <text
-              x={cx - 10}
-              y={currentTimeRailY + 3}
+              x={cx - 11}
+              y={currentTimeRailY + 4}
               textAnchor="end"
               className="fill-primary"
-              fontSize={7}
+              fontSize={10}
               fontFamily="monospace"
               fontWeight="bold"
             >
@@ -517,11 +529,11 @@ export function ListView({
             />
             <circle cx={cx} cy={hoverRailY} r={3} className="fill-muted-foreground/50" />
             <text
-              x={cx - 6}
-              y={hoverRailY - 3}
+              x={cx - 7}
+              y={hoverRailY - 5}
               textAnchor="end"
               className="fill-muted-foreground"
-              fontSize={7}
+              fontSize={10}
               fontFamily="monospace"
             >
               {hoverTime}
