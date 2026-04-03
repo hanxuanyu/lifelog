@@ -27,6 +27,9 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
 
+  // Only handle http/https requests
+  if (!request.url.startsWith('http')) return;
+
   // API requests: network only
   if (request.url.includes('/api/')) return;
 

@@ -47,6 +47,13 @@ export function HomePage() {
     loadTimeline()
   }, [loadTimeline])
 
+  // Listen for quick-add created events
+  useEffect(() => {
+    const handler = () => loadTimeline()
+    window.addEventListener("logCreated", handler)
+    return () => window.removeEventListener("logCreated", handler)
+  }, [loadTimeline])
+
   useEffect(() => {
     getCategories().then(setCategories).catch(() => {})
   }, [])

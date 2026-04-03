@@ -54,6 +54,15 @@
   }
 }
 
+/* Hide scrollbar for time picker wheels */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Compact markdown prose style */
 .prose-compact {
   line-height: 1.5;

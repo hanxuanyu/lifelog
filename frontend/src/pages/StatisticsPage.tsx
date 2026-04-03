@@ -236,7 +236,7 @@ export function StatisticsPage() {
         animate={{ opacity: 1, y: 0 }}
         className="flex items-center gap-3 mb-4 max-w-5xl mx-auto w-full"
       >
-        <Button size="icon" variant="ghost" onClick={() => navigate("/")} className="h-8 w-8">
+        <Button size="icon" variant="ghost" onClick={() => navigate("/", { replace: true })} className="h-8 w-8">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h1 className="text-lg font-semibold">数据统计</h1>
