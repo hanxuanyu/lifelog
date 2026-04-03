@@ -1,11 +1,19 @@
 import React, { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Pencil, Trash2, Check, X, Plus } from "lucide-react"
+import { Pencil, Trash2, Check, X, Plus, Maximize2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { updateLog, createLog } from "@/api"
 import type { LogEntry, DurationItem } from "@/types"
 import { toast } from "@/hooks/use-toast"
+import Markdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   type EditState,
   type QuickCreateState,
@@ -54,7 +62,7 @@ export function ListView({
   const [hoverTime, setHoverTime] = useState<string | null>(null)
   const [isTouching, setIsTouching] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [scrollTop, setScrollTop] = useState(0)
+  const [detailDialog, setDetailDialog] = useState<{ title: string; detail: string; time: string } | null>(null)
   const [railHeight, setRailHeight] = useState(0)
   const [cardPositions, setCardPositions] = useState<{top: number, bottom: number}[]>([])
 
@@ -62,6 +70,9 @@ export function ListView({
   const railRef = useRef<HTMLDivElement>(null)
   const cardsScrollRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+  const curveSvgRef = useRef<SVGSVGElement>(null)
+  const scrollTopRef = useRef(0)
+  const rafIdRef = useRef(0)
   const editEventRef = useRef<HTMLInputElement>(null)
   const quickEventRef = useRef<HTMLInputElement>(null)
   const quickTimeRef = useRef<HTMLInputElement>(null)
@@ -94,14 +105,84 @@ export function ListView({
     return () => obs.disconnect()
   }, [])
 
-  // Track scroll position
+  // Time to Y position on rail (proportional to full day, with padding)
+  const usableHeight = Math.max(0, railHeight - RAIL_PADDING * 2)
+  const timeToRailY = useCallback(
+    (timeStr: string): number => {
+      return RAIL_PADDING + (timeToMinutes(timeStr) / 1440) * usableHeight
+    },
+    [usableHeight]
+  )
+
+  // Track scroll position — update curves via rAF, no React state
+  const updateCurvePaths = useCallback(() => {
+    const svg = curveSvgRef.current
+    if (!svg || railHeight <= 0 || cardPositions.length !== entries.length) return
+
+    const st = scrollTopRef.current
+    const cx = RAIL_LINE_X
+    const curveEndX = RAIL_WIDTH + GAP
+
+    const paths = svg.querySelectorAll<SVGPathElement>('[data-curve-index]')
+    paths.forEach((pathEl) => {
+      const i = Number(pathEl.dataset.curveIndex)
+      if (i < 0 || i >= entries.length) return
+      const entry = entries[i]
+      const cardTop = cardPositions[i].top - st
+      const cardBottom = cardPositions[i].bottom - st
+      const durItem = getDurationForEntry(i)
+
+      if (durItem && !durItem.unknown && durItem.start_time && durItem.end_time) {
+        let railTop: number, railBottom: number
+        if (durItem.cross_day) {
+          if (timePointMode === "end") {
+            railTop = timeToRailY("00:00")
+            railBottom = timeToRailY(formatTime(durItem.end_time))
+          } else {
+            railTop = timeToRailY(formatTime(durItem.start_time))
+            railBottom = timeToRailY("23:59")
+          }
+        } else {
+          railTop = timeToRailY(formatTime(durItem.start_time))
+          railBottom = timeToRailY(formatTime(durItem.end_time))
+        }
+        if (railBottom <= railTop) railBottom = railTop + 2
+
+        const railEdge = cx + 3
+        const midX = railEdge + (curveEndX - railEdge) * 0.5
+        pathEl.setAttribute('d', `M ${railEdge} ${railTop} C ${midX} ${railTop}, ${midX} ${cardTop}, ${curveEndX} ${cardTop} L ${curveEndX} ${cardBottom} C ${midX} ${cardBottom}, ${midX} ${railBottom}, ${railEdge} ${railBottom} Z`)
+      } else {
+        const dotY = timeToRailY(formatTime(entry.log_time))
+        const cardCenterY = (cardTop + cardBottom) / 2
+        const cpX = cx + (curveEndX - cx) * 0.6
+        pathEl.setAttribute('d', `M ${cx} ${dotY} C ${cpX} ${dotY}, ${cpX} ${cardCenterY}, ${curveEndX} ${cardCenterY}`)
+
+        // Update associated circle
+        const circle = svg.querySelector<SVGCircleElement>(`[data-circle-index="${i}"]`)
+        if (circle) circle.setAttribute('cy', String(cardCenterY))
+      }
+    })
+  }, [entries, cardPositions, railHeight, getDurationForEntry, timePointMode, timeToRailY])
+
   useEffect(() => {
     const el = cardsScrollRef.current
     if (!el) return
-    const onScroll = () => setScrollTop(el.scrollTop)
+    const onScroll = () => {
+      scrollTopRef.current = el.scrollTop
+      cancelAnimationFrame(rafIdRef.current)
+      rafIdRef.current = requestAnimationFrame(updateCurvePaths)
+    }
     el.addEventListener("scroll", onScroll, { passive: true })
-    return () => el.removeEventListener("scroll", onScroll)
-  }, [])
+    return () => {
+      el.removeEventListener("scroll", onScroll)
+      cancelAnimationFrame(rafIdRef.current)
+    }
+  }, [updateCurvePaths])
+
+  // Also update curves when card positions or rail height change
+  useEffect(() => {
+    updateCurvePaths()
+  }, [updateCurvePaths])
 
   // Measure card positions (relative to scroll container)
   const measurePositions = useCallback(() => {
@@ -135,15 +216,6 @@ export function ListView({
       else cardRefs.current.delete(id)
     },
     []
-  )
-
-  // Time to Y position on rail (proportional to full day, with padding)
-  const usableHeight = Math.max(0, railHeight - RAIL_PADDING * 2)
-  const timeToRailY = useCallback(
-    (timeStr: string): number => {
-      return RAIL_PADDING + (timeToMinutes(timeStr) / 1440) * usableHeight
-    },
-    [usableHeight]
   )
 
   // Edit handlers
@@ -327,15 +399,16 @@ export function ListView({
               }}
             />
           </div>
-          <Input
+          <textarea
             value={quickCreate.detail}
             onChange={(e) =>
               setQuickCreate({ ...quickCreate, detail: e.target.value })
             }
-            placeholder="详情（可选）"
-            className="text-sm"
+            placeholder="详情（可选，支持 Markdown）"
+            rows={2}
+            className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-1.5 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             onKeyDown={(e) => {
-              if (e.key === "Enter") handleQuickCreate()
+              if (e.key === "Enter" && e.metaKey) handleQuickCreate()
               if (e.key === "Escape") setQuickCreate(null)
             }}
           />
@@ -365,49 +438,26 @@ export function ListView({
   const renderCurves = () => {
     if (railHeight <= 0 || cardPositions.length !== entries.length) return null
 
-    const cx = RAIL_LINE_X
     const curveEndX = RAIL_WIDTH + GAP
 
     return (
       <svg
+        ref={curveSvgRef}
         className="absolute top-0 left-0 pointer-events-none z-[6]"
         width={RAIL_WIDTH + GAP}
         height={railHeight}
+        style={{ willChange: 'contents' }}
       >
         {entries.map((entry, i) => {
-          const cardTop = cardPositions[i].top - scrollTop
-          const cardBottom = cardPositions[i].bottom - scrollTop
           const color = getCategoryColor(entry.category)
           const durItem = getDurationForEntry(i)
 
-          // For entries with a known time range, draw a ribbon from the rail segment to the card
           if (durItem && !durItem.unknown && durItem.start_time && durItem.end_time) {
-            let railTop: number, railBottom: number
-            if (durItem.cross_day) {
-              if (timePointMode === "end") {
-                railTop = timeToRailY("00:00")
-                railBottom = timeToRailY(formatTime(durItem.end_time))
-              } else {
-                railTop = timeToRailY(formatTime(durItem.start_time))
-                railBottom = timeToRailY("23:59")
-              }
-            } else {
-              railTop = timeToRailY(formatTime(durItem.start_time))
-              railBottom = timeToRailY(formatTime(durItem.end_time))
-            }
-
-            if (railBottom <= railTop) {
-              railBottom = railTop + 2
-            }
-
-            const railEdge = cx + 3
-            const midX = railEdge + (curveEndX - railEdge) * 0.5
-            const ribbonPath = `M ${railEdge} ${railTop} C ${midX} ${railTop}, ${midX} ${cardTop}, ${curveEndX} ${cardTop} L ${curveEndX} ${cardBottom} C ${midX} ${cardBottom}, ${midX} ${railBottom}, ${railEdge} ${railBottom} Z`
-
             return (
               <g key={entry.id}>
                 <path
-                  d={ribbonPath}
+                  data-curve-index={i}
+                  d=""
                   fill={color}
                   fillOpacity={0.06}
                   stroke={color}
@@ -418,16 +468,11 @@ export function ListView({
             )
           }
 
-          // For entries without known range, draw a dashed line from the time point to card center
-          const dotY = timeToRailY(formatTime(entry.log_time))
-          const cardCenterY = (cardTop + cardBottom) / 2
-          const cpX = cx + (curveEndX - cx) * 0.6
-          const path = `M ${cx} ${dotY} C ${cpX} ${dotY}, ${cpX} ${cardCenterY}, ${curveEndX} ${cardCenterY}`
-
           return (
             <g key={entry.id}>
               <path
-                d={path}
+                data-curve-index={i}
+                d=""
                 fill="none"
                 stroke={color}
                 strokeWidth={1}
@@ -435,8 +480,9 @@ export function ListView({
                 strokeDasharray="3 2"
               />
               <circle
+                data-circle-index={i}
                 cx={curveEndX}
-                cy={cardCenterY}
+                cy={0}
                 r={2}
                 fill={color}
                 fillOpacity={0.3}
@@ -779,7 +825,7 @@ export function ListView({
                             }}
                           />
                         </div>
-                        <Input
+                        <textarea
                           value={editingEntry.detail}
                           onChange={(e) =>
                             setEditingEntry({
@@ -787,10 +833,11 @@ export function ListView({
                               detail: e.target.value,
                             })
                           }
-                          placeholder="详情（可选）"
-                          className="text-sm"
+                          placeholder="详情（可选，支持 Markdown）"
+                          rows={2}
+                          className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-1.5 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") saveEdit()
+                            if (e.key === "Enter" && e.metaKey) saveEdit()
                             if (e.key === "Escape") cancelEdit()
                           }}
                         />
@@ -845,9 +892,26 @@ export function ListView({
                             )}
                           </div>
                           {entry.detail && (
-                            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
-                              {entry.detail}
-                            </p>
+                            <div className="mt-0.5 flex items-start gap-1">
+                              <div className="text-xs text-muted-foreground prose-compact min-w-0 flex-1 [&>*]:line-clamp-2">
+                                <Markdown remarkPlugins={[remarkGfm]}>{entry.detail}</Markdown>
+                              </div>
+                              <button
+                                type="button"
+                                className="shrink-0 mt-0.5 text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setDetailDialog({
+                                    title: entry.event_type,
+                                    detail: entry.detail,
+                                    time: formatTime(entry.log_time),
+                                  })
+                                }}
+                                title="查看详情"
+                              >
+                                <Maximize2 className="h-2.5 w-2.5" />
+                              </button>
+                            </div>
                           )}
                         </div>
                         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 sm:transition-opacity shrink-0">
@@ -898,6 +962,21 @@ export function ListView({
           .group .opacity-0 { opacity: 1 !important; }
         }
       `}</style>
+
+      {/* Detail dialog */}
+      <Dialog open={!!detailDialog} onOpenChange={(open) => !open && setDetailDialog(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <span>{detailDialog?.title}</span>
+              <span className="text-xs font-normal text-muted-foreground">{detailDialog?.time}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="prose-compact text-sm">
+            <Markdown remarkPlugins={[remarkGfm]}>{detailDialog?.detail ?? ""}</Markdown>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

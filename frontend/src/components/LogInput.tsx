@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Send, Clock, FileText, Tag } from "lucide-react"
+import { Send, Clock, FileText, Tag, Eye, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import Markdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { createLog, getCategories, getTimeline } from "@/api"
 import type { Category, LogEntry } from "@/types"
 import { toast } from "@/hooks/use-toast"
@@ -12,7 +14,8 @@ interface LogInputProps {
   date: string
 }
 
-export function LogInput({ onLogCreated, date }: LogInputProps) {
+export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
+  function LogInput({ onLogCreated, date }, ref) {
   const [timeValue, setTimeValue] = useState("")
   const [eventValue, setEventValue] = useState("")
   const [detailValue, setDetailValue] = useState("")
@@ -23,10 +26,18 @@ export function LogInput({ onLogCreated, date }: LogInputProps) {
   const [categories, setCategories] = useState<Category[]>([])
   const [recentEvents, setRecentEvents] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [detailPreview, setDetailPreview] = useState(false)
 
   const eventInputRef = useRef<HTMLInputElement>(null)
   const timeInputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
+
+  // Merge forwarded ref with internal ref
+  const setTimeInputRef = useCallback((node: HTMLInputElement | null) => {
+    (timeInputRef as React.MutableRefObject<HTMLInputElement | null>).current = node
+    if (typeof ref === "function") ref(node)
+    else if (ref) (ref as React.MutableRefObject<HTMLInputElement | null>).current = node
+  }, [ref])
 
   useEffect(() => {
     getCategories().then(setCategories).catch(() => {})
@@ -203,141 +214,153 @@ export function LogInput({ onLogCreated, date }: LogInputProps) {
   }, [])
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="w-full"
-    >
-      <div className="rounded-2xl border bg-card p-4 shadow-sm">
-        <div className="flex flex-col gap-3">
-          {/* Time + Event row */}
-          <div className="flex gap-2">
-            <div className="relative flex items-center">
-              <Input
-                ref={timeInputRef}
-                value={timeValue}
-                onChange={handleTimeChange}
-                onKeyDown={handleTimeKeyDown}
-                placeholder="时间"
-                className="w-[80px] sm:w-[90px] text-center font-mono pr-7"
-                maxLength={5}
-              />
-              <button
-                type="button"
-                onClick={setCurrentTime}
-                className="absolute right-1.5 text-muted-foreground hover:text-foreground transition-colors"
-                title="当前时间"
-              >
-                <Clock className="h-3.5 w-3.5" />
-              </button>
-            </div>
+    <div className="w-full flex flex-col gap-1.5">
+      {/* Main input row */}
+      <div className="flex items-center gap-1.5">
+        <div className="relative flex items-center">
+          <Input
+            ref={setTimeInputRef}
+            value={timeValue}
+            onChange={handleTimeChange}
+            onKeyDown={handleTimeKeyDown}
+            placeholder="时间"
+            className="w-[88px] text-center font-mono text-sm h-8 rounded-lg border-muted bg-muted/40 pr-7"
+            maxLength={5}
+          />
+          <button
+            type="button"
+            onClick={setCurrentTime}
+            className="absolute right-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            title="当前时间"
+          >
+            <Clock className="h-3 w-3" />
+          </button>
+        </div>
 
-            <div className="relative flex-1">
-              <Input
-                ref={eventInputRef}
-                value={eventValue}
-                onChange={(e) => handleEventChange(e.target.value)}
-                onFocus={handleEventFocus}
-                onKeyDown={handleEventKeyDown}
-                placeholder="做了什么..."
-                className="pr-8"
-              />
-              <button
-                type="button"
-                onClick={() => setShowDetail(!showDetail)}
-                className={`absolute right-2 top-1/2 -translate-y-1/2 transition-colors ${
-                  showDetail ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                }`}
-                title="添加详情"
-              >
-                <FileText className="h-3.5 w-3.5" />
-              </button>
+        <div className="relative flex-1">
+          <Input
+            ref={eventInputRef}
+            value={eventValue}
+            onChange={(e) => handleEventChange(e.target.value)}
+            onFocus={handleEventFocus}
+            onKeyDown={handleEventKeyDown}
+            placeholder="做了什么..."
+            className="h-8 rounded-lg border-muted bg-muted/40 text-sm pr-7"
+          />
+          <button
+            type="button"
+            onClick={() => setShowDetail(!showDetail)}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 transition-colors ${
+              showDetail ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            }`}
+            title="添加详情"
+          >
+            <FileText className="h-3 w-3" />
+          </button>
 
-              {/* Suggestions dropdown */}
-              <AnimatePresence>
-                {showSuggestions && suggestions.length > 0 && (
-                  <motion.div
-                    ref={suggestionsRef}
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute top-full left-0 right-0 mt-1 z-50 rounded-lg border bg-popover shadow-lg overflow-hidden"
-                  >
-                    {suggestions.map((s, i) => {
-                      const cat = categories.find((c) =>
-                        c.rules.some((r) => {
-                          if (r.type === "fixed") return r.pattern === s
-                          try { return new RegExp(r.pattern).test(s) } catch { return false }
-                        })
-                      )
-                      return (
-                        <button
-                          key={s}
-                          type="button"
-                          className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors ${
-                            i === selectedSuggestion
-                              ? "bg-accent text-accent-foreground"
-                              : "hover:bg-accent/50"
-                          }`}
-                          onMouseDown={(e) => {
-                            e.preventDefault()
-                            selectSuggestion(s)
-                          }}
-                          onMouseEnter={() => setSelectedSuggestion(i)}
-                        >
-                          <Tag className="h-3 w-3 text-muted-foreground shrink-0" />
-                          <span className="truncate">{s}</span>
-                          {cat && (
-                            <span className="ml-auto text-xs text-muted-foreground shrink-0">
-                              {cat.name}
-                            </span>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            <Button
-              size="icon"
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="shrink-0"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Detail row */}
+          {/* Suggestions dropdown */}
           <AnimatePresence>
-            {showDetail && (
+            {showSuggestions && suggestions.length > 0 && (
               <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
+                ref={suggestionsRef}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-full left-0 right-0 mt-1 z-50 rounded-lg border bg-popover shadow-lg overflow-hidden"
               >
-                <Input
-                  value={detailValue}
-                  onChange={(e) => setDetailValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault()
-                      handleSubmit()
-                    }
-                  }}
-                  placeholder="详情（可选）"
-                  className="text-sm"
-                />
+                {suggestions.map((s, i) => {
+                  const cat = categories.find((c) =>
+                    c.rules.some((r) => {
+                      if (r.type === "fixed") return r.pattern === s
+                      try { return new RegExp(r.pattern).test(s) } catch { return false }
+                    })
+                  )
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      className={`w-full px-3 py-1.5 text-left text-sm flex items-center gap-2 transition-colors ${
+                        i === selectedSuggestion
+                          ? "bg-accent text-accent-foreground"
+                          : "hover:bg-accent/50"
+                      }`}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        selectSuggestion(s)
+                      }}
+                      onMouseEnter={() => setSelectedSuggestion(i)}
+                    >
+                      <Tag className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className="truncate">{s}</span>
+                      {cat && (
+                        <span className="ml-auto text-xs text-muted-foreground shrink-0">
+                          {cat.name}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
+
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="shrink-0 h-8 w-8 text-muted-foreground hover:text-foreground"
+        >
+          <Send className="h-3.5 w-3.5" />
+        </Button>
       </div>
-    </motion.div>
+
+      {/* Detail row */}
+      <AnimatePresence>
+        {showDetail && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden pl-[94px] pr-[38px]"
+          >
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setDetailPreview((v) => !v)}
+                className={`absolute right-1.5 top-1.5 z-10 p-0.5 rounded transition-colors ${
+                  detailPreview ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+                title={detailPreview ? "编辑" : "预览"}
+              >
+                {detailPreview ? <Pencil className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+              </button>
+              {detailPreview ? (
+                <div className="min-h-[60px] max-h-[120px] overflow-y-auto rounded-lg border border-muted bg-muted/40 px-2.5 py-1.5 text-xs prose-compact">
+                  <Markdown remarkPlugins={[remarkGfm]}>{detailValue || "*无内容*"}</Markdown>
+                </div>
+              ) : (
+                <textarea
+                  value={detailValue}
+                  onChange={(e) => setDetailValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && e.metaKey) {
+                      e.preventDefault()
+                      handleSubmit()
+                    }
+                  }}
+                  placeholder="支持 Markdown 格式..."
+                  rows={2}
+                  className="w-full min-h-[60px] max-h-[120px] resize-y rounded-lg border border-muted bg-muted/40 px-2.5 py-1.5 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
-}
+})
