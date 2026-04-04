@@ -58,6 +58,13 @@ func Setup(r *gin.Engine, staticFS fs.FS) {
 		// 设置
 		protected.GET("/settings", handler.GetSettings)
 		protected.PUT("/settings", handler.UpdateSettings)
+
+		// 数据导入导出
+		data := protected.Group("/data")
+		{
+			data.GET("/export", handler.ExportData)
+			data.POST("/import", handler.ImportData)
+		}
 	}
 
 	// 静态文件服务 - 嵌入前端构建产物

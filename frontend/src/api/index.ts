@@ -141,3 +141,36 @@ export async function getMonthlyStats(year: number, month: number) {
   })
   return res.data.data
 }
+
+// Data Export/Import
+export async function exportData() {
+  const res = await http.get("/data/export", { responseType: "blob" })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement("a")
+  a.href = url
+  const disposition = res.headers["content-disposition"]
+  const match = disposition?.match(/filename=(.+)/)
+  a.download = match ? match[1] : "lifelog-export.zip"
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+export async function importData(file: File, mergeLogs: boolean, importConfig: boolean) {
+  const form = new FormData()
+  form.append("file", file)
+  form.append("merge_logs", String(mergeLogs))
+  form.append("import_config", String(importConfig))
+  const res = await http.post<ApiResponse<{
+    logs_imported?: number
+    logs_skipped?: number
+    logs_total?: number
+    config_imported?: boolean
+    config_error?: string
+  }>>("/data/import", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 60000,
+  })
+  return res.data
+}
