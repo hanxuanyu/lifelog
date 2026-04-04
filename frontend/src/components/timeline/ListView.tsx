@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { updateLog, createLog } from "@/api"
 import type { LogEntry, DurationItem } from "@/types"
 import { toast } from "sonner"
-import Markdown from "react-markdown"
-import remarkGfm from "remark-gfm"
+import { MarkdownRenderer } from "@/components/MarkdownRenderer"
+import { MarkdownEditor } from "@/components/MarkdownEditor"
 import {
   Dialog,
   DialogContent,
@@ -400,18 +400,13 @@ export function ListView({
               }}
             />
           </div>
-          <textarea
+          <MarkdownEditor
             value={quickCreate.detail}
-            onChange={(e) =>
-              setQuickCreate({ ...quickCreate, detail: e.target.value })
+            onChange={(v) =>
+              setQuickCreate({ ...quickCreate, detail: v })
             }
             placeholder="详情（可选，支持 Markdown）"
-            rows={2}
-            className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-1.5 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && e.metaKey) handleQuickCreate()
-              if (e.key === "Escape") setQuickCreate(null)
-            }}
+            minHeight={80}
           />
           <div className="flex justify-end gap-1">
             <Button
@@ -826,21 +821,16 @@ export function ListView({
                             }}
                           />
                         </div>
-                        <textarea
+                        <MarkdownEditor
                           value={editingEntry.detail}
-                          onChange={(e) =>
+                          onChange={(v) =>
                             setEditingEntry({
                               ...editingEntry,
-                              detail: e.target.value,
+                              detail: v,
                             })
                           }
                           placeholder="详情（可选，支持 Markdown）"
-                          rows={2}
-                          className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-1.5 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && e.metaKey) saveEdit()
-                            if (e.key === "Escape") cancelEdit()
-                          }}
+                          minHeight={80}
                         />
                         <div className="flex justify-end gap-1">
                           <Button
@@ -895,7 +885,7 @@ export function ListView({
                           {entry.detail && (
                             <div className="mt-0.5">
                               <div className="text-xs text-muted-foreground prose-compact min-w-0 [&>*]:line-clamp-2">
-                                <Markdown remarkPlugins={[remarkGfm]}>{entry.detail}</Markdown>
+                                <MarkdownRenderer content={entry.detail} />
                               </div>
                             </div>
                           )}
@@ -977,7 +967,7 @@ export function ListView({
             <DialogDescription className="sr-only">事件详情</DialogDescription>
           </DialogHeader>
           <div className="prose-compact text-sm">
-            <Markdown remarkPlugins={[remarkGfm]}>{detailDialog?.detail ?? ""}</Markdown>
+            <MarkdownRenderer content={detailDialog?.detail ?? ""} />
           </div>
         </DialogContent>
       </Dialog>

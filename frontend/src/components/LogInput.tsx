@@ -1,10 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Send, Clock, FileText, Tag, Eye, Pencil } from "lucide-react"
+import { Send, Clock, FileText, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import Markdown from "react-markdown"
-import remarkGfm from "remark-gfm"
+import { MarkdownEditor } from "@/components/MarkdownEditor"
 import { createLog, getCategories, getEventTypes, getTimeline } from "@/api"
 import type { Category, LogEntry } from "@/types"
 import { toast } from "sonner"
@@ -27,7 +26,6 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
   const [recentEvents, setRecentEvents] = useState<string[]>([])
   const [allEventTypes, setAllEventTypes] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
-  const [detailPreview, setDetailPreview] = useState(false)
 
   const eventInputRef = useRef<HTMLInputElement>(null)
   const timeInputRef = useRef<HTMLInputElement>(null)
@@ -340,35 +338,12 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
             className="overflow-hidden pl-[94px] pr-[38px]"
           >
             <div className="relative">
-              <button
-                type="button"
-                onClick={() => setDetailPreview((v) => !v)}
-                className={`absolute right-1.5 top-1.5 z-10 p-0.5 rounded transition-colors ${
-                  detailPreview ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                }`}
-                title={detailPreview ? "编辑" : "预览"}
-              >
-                {detailPreview ? <Pencil className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-              </button>
-              {detailPreview ? (
-                <div className="min-h-[60px] max-h-[120px] overflow-y-auto rounded-lg border border-muted bg-muted/40 px-2.5 py-1.5 text-xs prose-compact">
-                  <Markdown remarkPlugins={[remarkGfm]}>{detailValue || "*无内容*"}</Markdown>
-                </div>
-              ) : (
-                <textarea
-                  value={detailValue}
-                  onChange={(e) => setDetailValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && e.metaKey) {
-                      e.preventDefault()
-                      handleSubmit()
-                    }
-                  }}
-                  placeholder="支持 Markdown 格式..."
-                  rows={2}
-                  className="w-full min-h-[60px] max-h-[120px] resize-y rounded-lg border border-muted bg-muted/40 px-2.5 py-1.5 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-              )}
+              <MarkdownEditor
+                value={detailValue}
+                onChange={setDetailValue}
+                placeholder="输入详情（支持 Markdown）..."
+                minHeight={60}
+              />
             </div>
           </motion.div>
         )}

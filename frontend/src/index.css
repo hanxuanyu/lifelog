@@ -63,6 +63,186 @@
   scrollbar-width: none;
 }
 
+/* ===== MDXEditor theme overrides ===== */
+
+/* Override MDXEditor internal CSS variables to match our theme */
+.mdx-editor-root {
+  --basePageBg: var(--background);
+  --baseBase: var(--background);
+  --baseBgSubtle: var(--muted);
+  --baseBg: var(--muted);
+  --baseBgHover: var(--accent);
+  --baseBgActive: var(--accent);
+  --baseLine: var(--border);
+  --baseBorder: var(--border);
+  --baseBorderHover: var(--border);
+  --baseSolid: var(--muted-foreground);
+  --baseSolidHover: var(--foreground);
+  --baseText: var(--muted-foreground);
+  --baseTextContrast: var(--foreground);
+  --accentBase: var(--primary);
+  --accentBgSubtle: color-mix(in srgb, var(--primary) 8%, transparent);
+  --accentBg: color-mix(in srgb, var(--primary) 12%, transparent);
+  --accentBgHover: color-mix(in srgb, var(--primary) 18%, transparent);
+  --accentBgActive: color-mix(in srgb, var(--primary) 25%, transparent);
+  --accentLine: var(--border);
+  --accentBorder: var(--primary);
+  --accentBorderHover: var(--primary);
+  --accentSolid: var(--primary);
+  --accentSolidHover: var(--primary);
+  --accentText: var(--primary);
+  --accentTextContrast: var(--primary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  font-size: 0.875rem;
+}
+
+/* Toolbar — compact spacing, wrap allowed */
+.mdx-editor-root [role="toolbar"] {
+  background: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding: 2px 4px;
+  gap: 2px;
+  flex-wrap: wrap;
+  min-height: 0;
+}
+
+/* Toolbar buttons — explicit dark‑safe colors */
+.mdx-editor-root [role="toolbar"] button,
+.mdx-editor-root [role="toolbar"] [data-toolbar-item] {
+  color: var(--foreground);
+  border-radius: 0.25rem;
+  padding: 3px 5px;
+}
+
+.mdx-editor-root [role="toolbar"] svg {
+  color: var(--foreground);
+}
+
+.mdx-editor-root [role="toolbar"] button:hover,
+.mdx-editor-root [role="toolbar"] [data-toolbar-item]:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.mdx-editor-root [role="toolbar"] button[data-state="on"],
+.mdx-editor-root [role="toolbar"] [data-active="true"],
+.mdx-editor-root [role="toolbar"] button:active,
+.mdx-editor-root [role="toolbar"] [data-state="on"] {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
+
+.mdx-editor-root [role="toolbar"] button[data-state="on"] svg,
+.mdx-editor-root [role="toolbar"] button:active svg,
+.mdx-editor-root [role="toolbar"] [data-state="on"] svg {
+  color: var(--primary-foreground) !important;
+}
+
+/* Separators */
+.mdx-editor-root [role="toolbar"] div[role="separator"] {
+  border-color: var(--border);
+  margin: 4px 2px;
+  height: 16px;
+}
+
+/* Compact toolbar: hide separators and reduce padding */
+.mdx-compact .mdx-editor-root [role="toolbar"] {
+  padding: 1px 2px;
+  gap: 1px;
+}
+
+.mdx-compact .mdx-editor-root [role="toolbar"] button,
+.mdx-compact .mdx-editor-root [role="toolbar"] [data-toolbar-item] {
+  padding: 2px 4px;
+}
+
+.mdx-compact .mdx-editor-root [role="toolbar"] div[role="separator"] {
+  margin: 3px 1px;
+  height: 14px;
+}
+
+/* Content area */
+.mdx-content {
+  padding: 0.5rem 0.75rem;
+  min-height: var(--mdx-min-height, 120px);
+  max-height: 300px;
+  overflow-y: auto;
+  line-height: 1.5;
+  color: var(--foreground);
+}
+
+.mdx-fullscreen .mdx-content {
+  max-height: none;
+  min-height: 0;
+  flex: 1;
+  padding: 1rem 1.5rem;
+}
+
+.mdx-fullscreen .mdx-editor-root {
+  border: none;
+  border-radius: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.mdx-fullscreen .mdx-editor-root > div:last-child {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Block select dropdown / code language select */
+.mdx-editor-root select,
+.mdx-editor-root [role="listbox"] {
+  background: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+}
+
+/* Dropdown containers (block type, code lang, etc.) */
+[class*="_toolbarNodeKindSelectContainer"],
+[class*="_toolbarButtonDropdownContainer"],
+[class*="_toolbarCodeBlockLanguageSelectContent"],
+[class*="_selectContainer"] {
+  background-color: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.375rem !important;
+}
+
+[class*="_selectItem"]:hover,
+[class*="_selectItem"][data-highlighted] {
+  background-color: var(--accent) !important;
+  color: var(--foreground) !important;
+}
+
+/* Link dialog popover */
+[class*="popoverSurface"],
+[class*="linkDialogPopoverContent"] {
+  background: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.5rem !important;
+}
+
+/* Link dialog inputs */
+[class*="linkDialogPopoverContent"] input {
+  background: var(--background) !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.375rem !important;
+}
+
+/* Placeholder */
+.mdx-editor-root [data-lexical-editor] [data-placeholder]::before {
+  color: var(--muted-foreground);
+  opacity: 0.6;
+}
+
 /* Compact markdown prose style */
 .prose-compact {
   line-height: 1.5;

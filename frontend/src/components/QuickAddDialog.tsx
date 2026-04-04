@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Send, Clock, Tag } from "lucide-react"
+import { X, Send, Clock, Tag, FileText } from "lucide-react"
 import { format } from "date-fns"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { MobileTimePicker } from "@/components/MobileTimePicker"
+import { MarkdownEditor } from "@/components/MarkdownEditor"
 import { createLog, getCategories, getEventTypes, getTimeline } from "@/api"
 import type { Category } from "@/types"
 import { toast } from "sonner"
@@ -22,6 +23,8 @@ export function QuickAddDialog({ open, onClose, onCreated }: QuickAddDialogProps
 
   const [timeValue, setTimeValue] = useState(`${h}:${m}`)
   const [eventValue, setEventValue] = useState("")
+  const [detailValue, setDetailValue] = useState("")
+  const [showDetail, setShowDetail] = useState(false)
   const [showTimePicker, setShowTimePicker] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
@@ -35,6 +38,8 @@ export function QuickAddDialog({ open, onClose, onCreated }: QuickAddDialogProps
       const n = new Date()
       setTimeValue(`${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`)
       setEventValue("")
+      setDetailValue("")
+      setShowDetail(false)
       setShowTimePicker(false)
 
       Promise.all([
@@ -76,6 +81,7 @@ export function QuickAddDialog({ open, onClose, onCreated }: QuickAddDialogProps
         log_date: dateStr,
         log_time: timeValue,
         event_type: eventValue.trim(),
+        detail: detailValue.trim() || undefined,
       })
       toast.success("记录成功")
       onCreated()
@@ -167,8 +173,38 @@ export function QuickAddDialog({ open, onClose, onCreated }: QuickAddDialogProps
                     placeholder="做了什么..."
                     className="h-10 rounded-xl bg-accent/50 border-0 text-base"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowDetail(!showDetail)}
+                    className={`p-1.5 rounded-lg transition-colors shrink-0 ${
+                      showDetail ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    }`}
+                    title="添加详情"
+                  >
+                    <FileText className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
+
+              {/* Detail editor */}
+              <AnimatePresence>
+                {showDetail && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden mb-3"
+                  >
+                    <MarkdownEditor
+                      value={detailValue}
+                      onChange={setDetailValue}
+                      placeholder="输入详情（支持 Markdown）..."
+                      minHeight={100}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Suggestion tags */}
               {filteredTags.length > 0 && (
