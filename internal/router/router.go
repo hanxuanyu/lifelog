@@ -53,6 +53,7 @@ func Setup(r *gin.Engine, staticFS fs.FS) {
 			stats.GET("/daily", handler.GetDailyStatistics)
 			stats.GET("/weekly", handler.GetWeeklyStatistics)
 			stats.GET("/monthly", handler.GetMonthlyStatistics)
+			stats.GET("/trend", handler.GetTrendStatistics)
 		}
 
 		// 设置

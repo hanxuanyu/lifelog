@@ -90,36 +90,7 @@ func getPeriodStatistics(startDate, endDate string) (*model.PeriodStatistics, er
 
 	for i, date := range dates {
 		dayEntries := dayGroups[date]
-		var prevEntry *model.LogEntry
-		var nextEntry *model.LogEntry
-
-		// 始终获取前一天衔接
-		if i > 0 {
-			prevDayEntries := dayGroups[dates[i-1]]
-			if len(prevDayEntries) > 0 {
-				last := prevDayEntries[len(prevDayEntries)-1]
-				prevEntry = &last
-			}
-		} else {
-			prev, err := repository.GetLastEntryBefore(date)
-			if err == nil {
-				prevEntry = prev
-			}
-		}
-
-		// 始终获取后一天衔接
-		if i < len(dates)-1 {
-			nextDayEntries := dayGroups[dates[i+1]]
-			if len(nextDayEntries) > 0 {
-				first := nextDayEntries[0]
-				nextEntry = &first
-			}
-		} else {
-			next, err := repository.GetFirstEntryAfter(date)
-			if err == nil {
-				nextEntry = next
-			}
-		}
+		prevEntry, nextEntry := resolveAdjacentEntries(dayGroups, dates, i)
 
 		items := calculateDurations(dayEntries, date, prevEntry, nextEntry)
 		allItems = append(allItems, items...)
@@ -133,7 +104,80 @@ func getPeriodStatistics(startDate, endDate string) (*model.PeriodStatistics, er
 		Summary:    summary,
 		TotalKnown: totalKnown,
 		DayCount:   len(dates),
+		Items:      allItems,
 	}, nil
+}
+
+// GetTrendStatistics 获取日期范围内每天的分类汇总（趋势分析）
+func GetTrendStatistics(startDate, endDate string) (*model.TrendStatistics, error) {
+	entries, err := repository.GetEntriesByDateRange(startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+
+	dayGroups := groupByDate(entries)
+
+	var dates []string
+	for d := range dayGroups {
+		dates = append(dates, d)
+	}
+	sort.Strings(dates)
+
+	days := make([]model.DayBreakdown, 0, len(dates))
+
+	for i, date := range dates {
+		dayEntries := dayGroups[date]
+		prevEntry, nextEntry := resolveAdjacentEntries(dayGroups, dates, i)
+
+		items := calculateDurations(dayEntries, date, prevEntry, nextEntry)
+		summary, totalKnown := buildSummary(items)
+
+		days = append(days, model.DayBreakdown{
+			Date:       date,
+			Summary:    summary,
+			TotalKnown: totalKnown,
+		})
+	}
+
+	return &model.TrendStatistics{
+		StartDate: startDate,
+		EndDate:   endDate,
+		Days:      days,
+	}, nil
+}
+
+// resolveAdjacentEntries 获取某天的前后衔接日志
+func resolveAdjacentEntries(dayGroups map[string][]model.LogEntry, dates []string, i int) (*model.LogEntry, *model.LogEntry) {
+	date := dates[i]
+	var prevEntry, nextEntry *model.LogEntry
+
+	if i > 0 {
+		prevDayEntries := dayGroups[dates[i-1]]
+		if len(prevDayEntries) > 0 {
+			last := prevDayEntries[len(prevDayEntries)-1]
+			prevEntry = &last
+		}
+	} else {
+		prev, err := repository.GetLastEntryBefore(date)
+		if err == nil {
+			prevEntry = prev
+		}
+	}
+
+	if i < len(dates)-1 {
+		nextDayEntries := dayGroups[dates[i+1]]
+		if len(nextDayEntries) > 0 {
+			first := nextDayEntries[0]
+			nextEntry = &first
+		}
+	} else {
+		next, err := repository.GetFirstEntryAfter(date)
+		if err == nil {
+			nextEntry = next
+		}
+	}
+
+	return prevEntry, nextEntry
 }
 
 // getEntryMode 获取单条日志记录的时间点模式

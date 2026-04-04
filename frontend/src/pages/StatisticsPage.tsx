@@ -1,37 +1,31 @@
-import React, { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { motion } from "framer-motion"
 import { format, subDays } from "date-fns"
 import { zhCN } from "date-fns/locale"
-import { ChevronLeft, ChevronRight } from "lucide-react"
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
-import { getDailyStats, getWeeklyStats, getMonthlyStats, getCategories } from "@/api"
-import type { DailyStatistics, PeriodStatistics, CategorySummary, DurationItem, Category } from "@/types"
+import {
+  getDailyStats, getWeeklyStats, getMonthlyStats,
+  getCategories, getTrendStats,
+} from "@/api"
+import type {
+  DailyStatistics, PeriodStatistics, TrendStatistics,
+  Category, DurationItem,
+} from "@/types"
+import { DateNav } from "@/components/statistics/DateNav"
+import { PieChartCard } from "@/components/statistics/PieChartCard"
+import { SummaryList } from "@/components/statistics/SummaryList"
+import { EventBarChart } from "@/components/statistics/EventBarChart"
+import { CategoryDetailDialog } from "@/components/statistics/CategoryDetailDialog"
+import { TrendChart } from "@/components/statistics/TrendChart"
+import { StackedBarChart } from "@/components/statistics/StackedBarChart"
+import { TopEventsCard } from "@/components/statistics/TopEventsCard"
+import { DailyAverageCard } from "@/components/statistics/DailyAverageCard"
 
 const FALLBACK_COLORS = [
   "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6",
   "#ef4444", "#06b6d4", "#ec4899", "#84cc16",
   "#f97316", "#6366f1",
 ]
-
-function durationToHours(seconds: number): number {
-  return Math.round((seconds / 3600) * 10) / 10
-}
 
 export function StatisticsPage() {
   const [tab, setTab] = useState("daily")
@@ -42,8 +36,17 @@ export function StatisticsPage() {
   const [dailyData, setDailyData] = useState<DailyStatistics | null>(null)
   const [weeklyData, setWeeklyData] = useState<PeriodStatistics | null>(null)
   const [monthlyData, setMonthlyData] = useState<PeriodStatistics | null>(null)
+  const [weeklyTrend, setWeeklyTrend] = useState<TrendStatistics | null>(null)
+  const [monthlyTrend, setMonthlyTrend] = useState<TrendStatistics | null>(null)
+  const [trendMode, setTrendMode] = useState<"weekly" | "monthly">("weekly")
+  const [trendDate, setTrendDate] = useState(new Date())
+  const [trendData, setTrendData] = useState<TrendStatistics | null>(null)
   const [loading, setLoading] = useState(false)
   const [catColors, setCatColors] = useState<Record<string, string>>({})
+  // PLACEHOLDER_DETAIL_STATE
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailCategory, setDetailCategory] = useState("")
+  const [detailItems, setDetailItems] = useState<DurationItem[]>([])
 
   useEffect(() => {
     getCategories()
@@ -60,180 +63,110 @@ export function StatisticsPage() {
   const getCatColor = (name: string, index: number) =>
     catColors[name] || FALLBACK_COLORS[index % FALLBACK_COLORS.length]
 
+  // Daily
   useEffect(() => {
-    if (tab === "daily") {
-      setLoading(true)
-      getDailyStats(format(dailyDate, "yyyy-MM-dd"))
-        .then(setDailyData)
-        .catch(() => setDailyData(null))
-        .finally(() => setLoading(false))
-    }
+    if (tab !== "daily") return
+    setLoading(true)
+    getDailyStats(format(dailyDate, "yyyy-MM-dd"))
+      .then(setDailyData)
+      .catch(() => setDailyData(null))
+      .finally(() => setLoading(false))
   }, [tab, dailyDate])
 
+  // Weekly + trend
   useEffect(() => {
-    if (tab === "weekly") {
-      setLoading(true)
-      getWeeklyStats(format(weeklyDate, "yyyy-MM-dd"))
-        .then(setWeeklyData)
-        .catch(() => setWeeklyData(null))
-        .finally(() => setLoading(false))
-    }
+    if (tab !== "weekly") return
+    setLoading(true)
+    const dateStr = format(weeklyDate, "yyyy-MM-dd")
+    Promise.all([
+      getWeeklyStats(dateStr).catch(() => null),
+    ]).then(([weekly]) => {
+      setWeeklyData(weekly)
+      if (weekly?.start_date && weekly?.end_date) {
+        getTrendStats(weekly.start_date, weekly.end_date)
+          .then(setWeeklyTrend)
+          .catch(() => setWeeklyTrend(null))
+      }
+    }).finally(() => setLoading(false))
   }, [tab, weeklyDate])
 
+  // Monthly + trend
   useEffect(() => {
-    if (tab === "monthly") {
-      setLoading(true)
-      getMonthlyStats(monthYear, monthMonth)
-        .then(setMonthlyData)
-        .catch(() => setMonthlyData(null))
-        .finally(() => setLoading(false))
-    }
+    if (tab !== "monthly") return
+    setLoading(true)
+    getMonthlyStats(monthYear, monthMonth)
+      .then((monthly) => {
+        setMonthlyData(monthly)
+        if (monthly?.start_date && monthly?.end_date) {
+          getTrendStats(monthly.start_date, monthly.end_date)
+            .then(setMonthlyTrend)
+            .catch(() => setMonthlyTrend(null))
+        }
+      })
+      .catch(() => setMonthlyData(null))
+      .finally(() => setLoading(false))
   }, [tab, monthYear, monthMonth])
-
-  const renderPieChart = (summary: CategorySummary[]) => {
-    if (!summary || summary.length === 0) {
-      return <p className="text-center text-muted-foreground py-8 text-sm">暂无数据</p>
+  // PLACEHOLDER_TREND_EFFECT
+  // Trend tab
+  useEffect(() => {
+    if (tab !== "trend") return
+    setLoading(true)
+    const d = trendDate
+    let startDate: string, endDate: string
+    if (trendMode === "weekly") {
+      const day = d.getDay() || 7
+      const monday = new Date(d)
+      monday.setDate(d.getDate() - day + 1)
+      const sunday = new Date(monday)
+      sunday.setDate(monday.getDate() + 6)
+      startDate = format(monday, "yyyy-MM-dd")
+      endDate = format(sunday, "yyyy-MM-dd")
+    } else {
+      startDate = format(new Date(d.getFullYear(), d.getMonth(), 1), "yyyy-MM-dd")
+      endDate = format(new Date(d.getFullYear(), d.getMonth() + 1, 0), "yyyy-MM-dd")
     }
-    const data = summary.map((s) => ({
-      name: s.category,
-      value: durationToHours(s.duration),
-      percentage: s.percentage,
-      display: s.display,
-    }))
+    getTrendStats(startDate, endDate)
+      .then(setTrendData)
+      .catch(() => setTrendData(null))
+      .finally(() => setLoading(false))
+  }, [tab, trendDate, trendMode])
 
-    return (
-      <ResponsiveContainer width="100%" height={280}>
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={100}
-            paddingAngle={2}
-            dataKey="value"
-          >
-            {data.map((d, i) => (
-              <Cell key={i} fill={getCatColor(d.name, i)} />
-            ))}
-          </Pie>
-          <Tooltip
-            formatter={(value, name, props) => [
-              `${(props as any).payload?.display || value + "h"} (${(props as any).payload?.percentage?.toFixed(1)}%)`,
-              name as string,
-            ]}
-          />
-          <Legend />
-        </PieChart>
-      </ResponsiveContainer>
-    )
+  // Collect all unique categories from trend data for chart keys
+  const collectCategories = (days: { summary: { category: string }[] }[]) => {
+    const set = new Set<string>()
+    for (const day of days) {
+      for (const s of day.summary) set.add(s.category)
+    }
+    return Array.from(set)
   }
 
-  const renderBarChart = (items: DurationItem[]) => {
-    if (!items || items.length === 0) {
-      return <p className="text-center text-muted-foreground py-8 text-sm">暂无数据</p>
-    }
-    const data = items.map((item) => ({
-      name: item.event_type.length > 6 ? item.event_type.slice(0, 6) + "…" : item.event_type,
-      fullName: item.event_type,
-      hours: durationToHours(item.duration),
-      category: item.category,
-      display: item.display,
-    }))
+  const trendCategories = useMemo(
+    () => collectCategories(trendData?.days || []),
+    [trendData]
+  )
+  const weeklyTrendCategories = useMemo(
+    () => collectCategories(weeklyTrend?.days || []),
+    [weeklyTrend]
+  )
+  const monthlyTrendCategories = useMemo(
+    () => collectCategories(monthlyTrend?.days || []),
+    [monthlyTrend]
+  )
 
-    return (
-      <ResponsiveContainer width="100%" height={Math.max(280, items.length * 36)}>
-        <BarChart data={data} layout="vertical" margin={{ left: 10, right: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-          <XAxis type="number" unit="h" tick={{ fontSize: 12 }} />
-          <YAxis
-            type="category"
-            dataKey="name"
-            width={70}
-            tick={{ fontSize: 11 }}
-          />
-          <Tooltip
-            formatter={(value, _, props) => [
-              (props as any).payload?.display || `${value}h`,
-              (props as any).payload?.fullName || "",
-            ]}
-          />
-          <Bar dataKey="hours" radius={[0, 4, 4, 0]}>
-            {data.map((d, i) => (
-              <Cell
-                key={i}
-                fill={getCatColor(d.category, i)}
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    )
+  const openCategoryDetail = (category: string, items: DurationItem[]) => {
+    setDetailCategory(category)
+    setDetailItems(items)
+    setDetailOpen(true)
   }
 
-  const renderSummaryList = (summary: CategorySummary[], totalKnown: string) => (
-    <div className="space-y-2">
-      {summary?.map((s, i) => (
-        <motion.div
-          key={s.category}
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: i * 0.05 }}
-          className="flex items-center justify-between"
-        >
-          <div className="flex items-center gap-2">
-            <div
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: getCatColor(s.category, i) }}
-            />
-            <span className="text-sm">{s.category}</span>
-          </div>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>{s.display}</span>
-            <span className="w-12 text-right">{s.percentage.toFixed(1)}%</span>
-          </div>
-        </motion.div>
-      ))}
-      {totalKnown && (
-        <>
-          <Separator className="my-2" />
-          <div className="flex items-center justify-between text-sm font-medium">
-            <span>有效统计</span>
-            <span>{totalKnown}</span>
-          </div>
-        </>
-      )}
-    </div>
-  )
-
-  const DateNav = ({
-    onPrev,
-    onNext,
-    label,
-  }: {
-    onPrev: () => void
-    onNext: () => void
-    label: string
-  }) => (
-    <div className="flex items-center justify-center gap-2 mb-4">
-      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onPrev}>
-        <ChevronLeft className="h-4 w-4" />
-      </Button>
-      <span className="text-sm font-medium min-w-[140px] text-center">{label}</span>
-      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onNext}>
-        <ChevronRight className="h-4 w-4" />
-      </Button>
-    </div>
-  )
+  const detailColor = getCatColor(detailCategory, 0)
+  // PLACEHOLDER_RENDER
 
   return (
     <div className="h-full overflow-y-auto">
     <div className="max-w-5xl mx-auto px-4 pb-20 sm:pb-4">
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pt-4 pb-3">
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-lg font-semibold">数据统计</h1>
         </motion.div>
       </div>
@@ -243,6 +176,7 @@ export function StatisticsPage() {
           <TabsTrigger value="daily" className="flex-1">日统计</TabsTrigger>
           <TabsTrigger value="weekly" className="flex-1">周统计</TabsTrigger>
           <TabsTrigger value="monthly" className="flex-1">月统计</TabsTrigger>
+          <TabsTrigger value="trend" className="flex-1">趋势</TabsTrigger>
         </TabsList>
 
         <div className="mt-4">
@@ -256,144 +190,147 @@ export function StatisticsPage() {
             </div>
           ) : (
             <>
+              {/* Daily Tab */}
               <TabsContent value="daily" className="mt-0 space-y-4">
                 <DateNav
                   onPrev={() => setDailyDate((d) => subDays(d, 1))}
-                  onNext={() => setDailyDate((d) => {
-                    const next = new Date(d)
-                    next.setDate(next.getDate() + 1)
-                    return next
-                  })}
+                  onNext={() => setDailyDate((d) => { const n = new Date(d); n.setDate(n.getDate() + 1); return n })}
                   label={format(dailyDate, "yyyy年M月d日", { locale: zhCN })}
                 />
-
                 {dailyData ? (
                   <>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm">分类占比</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          {renderPieChart(dailyData.summary)}
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm">汇总</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          {renderSummaryList(dailyData.summary, dailyData.total_known)}
-                        </CardContent>
-                      </Card>
+                      <PieChartCard
+                        title="分类占比"
+                        summary={dailyData.summary}
+                        getCatColor={getCatColor}
+                        onCategoryClick={(cat) => openCategoryDetail(cat, dailyData.items)}
+                      />
+                      <SummaryList
+                        summary={dailyData.summary}
+                        totalKnown={dailyData.total_known}
+                        getCatColor={getCatColor}
+                        onCategoryClick={(cat) => openCategoryDetail(cat, dailyData.items)}
+                      />
                     </div>
+                    <EventBarChart items={dailyData.items} getCatColor={getCatColor} />
+                  </>
+                ) : (
+                  <p className="text-center text-muted-foreground py-12 text-sm">暂无数据</p>
+                )}
+              </TabsContent>
+              {/* PLACEHOLDER_WEEKLY_TAB */}
 
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">事项时长</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {renderBarChart(dailyData.items)}
-                      </CardContent>
-                    </Card>
+              {/* Weekly Tab */}
+              <TabsContent value="weekly" className="mt-0 space-y-4">
+                <DateNav
+                  onPrev={() => setWeeklyDate((d) => subDays(d, 7))}
+                  onNext={() => setWeeklyDate((d) => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })}
+                  label={weeklyData ? `${weeklyData.start_date} ~ ${weeklyData.end_date}` : format(weeklyDate, "yyyy年 第w周", { locale: zhCN })}
+                />
+                {weeklyData ? (
+                  <>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <PieChartCard
+                        title="分类占比"
+                        subtitle={`共 ${weeklyData.day_count} 天`}
+                        summary={weeklyData.summary}
+                        getCatColor={getCatColor}
+                        onCategoryClick={(cat) => openCategoryDetail(cat, weeklyData.items || [])}
+                      />
+                      <SummaryList
+                        summary={weeklyData.summary}
+                        totalKnown={weeklyData.total_known}
+                        getCatColor={getCatColor}
+                        onCategoryClick={(cat) => openCategoryDetail(cat, weeklyData.items || [])}
+                      />
+                    </div>
+                    {weeklyTrend && weeklyTrend.days.length > 0 && (
+                      <StackedBarChart
+                        days={weeklyTrend.days}
+                        categories={weeklyTrendCategories}
+                        getCatColor={getCatColor}
+                      />
+                    )}
+                    {weeklyData.items && weeklyData.items.length > 0 && (
+                      <TopEventsCard items={weeklyData.items} getCatColor={getCatColor} />
+                    )}
                   </>
                 ) : (
                   <p className="text-center text-muted-foreground py-12 text-sm">暂无数据</p>
                 )}
               </TabsContent>
 
-              <TabsContent value="weekly" className="mt-0 space-y-4">
+              {/* Monthly Tab */}
+              <TabsContent value="monthly" className="mt-0 space-y-4">
                 <DateNav
-                  onPrev={() => setWeeklyDate((d) => subDays(d, 7))}
-                  onNext={() => setWeeklyDate((d) => {
-                    const next = new Date(d)
-                    next.setDate(next.getDate() + 7)
-                    return next
-                  })}
-                  label={
-                    weeklyData
-                      ? `${weeklyData.start_date} ~ ${weeklyData.end_date}`
-                      : format(weeklyDate, "yyyy年 第w周", { locale: zhCN })
-                  }
+                  onPrev={() => { if (monthMonth === 1) { setMonthYear((y) => y - 1); setMonthMonth(12) } else { setMonthMonth((m) => m - 1) } }}
+                  onNext={() => { if (monthMonth === 12) { setMonthYear((y) => y + 1); setMonthMonth(1) } else { setMonthMonth((m) => m + 1) } }}
+                  label={`${monthYear}年${monthMonth}月`}
                 />
-
-                {weeklyData ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">
-                          分类占比
-                          <span className="text-xs text-muted-foreground ml-2">
-                            共 {weeklyData.day_count} 天
-                          </span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {renderPieChart(weeklyData.summary)}
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">汇总</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {renderSummaryList(weeklyData.summary, weeklyData.total_known)}
-                      </CardContent>
-                    </Card>
-                  </div>
+                {monthlyData ? (
+                  <>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <PieChartCard
+                        title="分类占比"
+                        subtitle={`共 ${monthlyData.day_count} 天`}
+                        summary={monthlyData.summary}
+                        getCatColor={getCatColor}
+                        onCategoryClick={(cat) => openCategoryDetail(cat, monthlyData.items || [])}
+                      />
+                      <SummaryList
+                        summary={monthlyData.summary}
+                        totalKnown={monthlyData.total_known}
+                        getCatColor={getCatColor}
+                        onCategoryClick={(cat) => openCategoryDetail(cat, monthlyData.items || [])}
+                      />
+                    </div>
+                    {monthlyTrend && monthlyTrend.days.length > 0 && (
+                      <StackedBarChart
+                        days={monthlyTrend.days}
+                        categories={monthlyTrendCategories}
+                        getCatColor={getCatColor}
+                      />
+                    )}
+                    {monthlyData.items && monthlyData.items.length > 0 && (
+                      <TopEventsCard items={monthlyData.items} getCatColor={getCatColor} />
+                    )}
+                  </>
                 ) : (
                   <p className="text-center text-muted-foreground py-12 text-sm">暂无数据</p>
                 )}
               </TabsContent>
 
-              <TabsContent value="monthly" className="mt-0 space-y-4">
+              {/* Trend Tab */}
+              <TabsContent value="trend" className="mt-0 space-y-4">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <button
+                    className={`px-3 py-1 rounded-full text-xs transition-colors ${trendMode === "weekly" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+                    onClick={() => setTrendMode("weekly")}
+                  >
+                    按周
+                  </button>
+                  <button
+                    className={`px-3 py-1 rounded-full text-xs transition-colors ${trendMode === "monthly" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+                    onClick={() => setTrendMode("monthly")}
+                  >
+                    按月
+                  </button>
+                </div>
                 <DateNav
-                  onPrev={() => {
-                    if (monthMonth === 1) {
-                      setMonthYear((y) => y - 1)
-                      setMonthMonth(12)
-                    } else {
-                      setMonthMonth((m) => m - 1)
-                    }
-                  }}
-                  onNext={() => {
-                    if (monthMonth === 12) {
-                      setMonthYear((y) => y + 1)
-                      setMonthMonth(1)
-                    } else {
-                      setMonthMonth((m) => m + 1)
-                    }
-                  }}
-                  label={`${monthYear}年${monthMonth}月`}
+                  onPrev={() => setTrendDate((d) => trendMode === "weekly" ? subDays(d, 7) : new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+                  onNext={() => setTrendDate((d) => trendMode === "weekly" ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7) : new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+                  label={trendData ? `${trendData.start_date} ~ ${trendData.end_date}` : format(trendDate, "yyyy年M月", { locale: zhCN })}
                 />
-
-                {monthlyData ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">
-                          分类占比
-                          <span className="text-xs text-muted-foreground ml-2">
-                            共 {monthlyData.day_count} 天
-                          </span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {renderPieChart(monthlyData.summary)}
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">汇总</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {renderSummaryList(monthlyData.summary, monthlyData.total_known)}
-                      </CardContent>
-                    </Card>
-                  </div>
+                {trendData && trendData.days.length > 0 ? (
+                  <>
+                    <TrendChart
+                      days={trendData.days}
+                      categories={trendCategories}
+                      getCatColor={getCatColor}
+                    />
+                    <DailyAverageCard days={trendData.days} getCatColor={getCatColor} />
+                  </>
                 ) : (
                   <p className="text-center text-muted-foreground py-12 text-sm">暂无数据</p>
                 )}
@@ -402,6 +339,14 @@ export function StatisticsPage() {
           )}
         </div>
       </Tabs>
+
+      <CategoryDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        category={detailCategory}
+        items={detailItems}
+        color={detailColor}
+      />
     </div>
     </div>
   )

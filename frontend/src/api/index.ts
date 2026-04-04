@@ -7,6 +7,7 @@ import type {
   Category,
   DailyStatistics,
   PeriodStatistics,
+  TrendStatistics,
   Settings,
   UpdateSettingsRequest,
   UpdateSettingsResponse,
@@ -138,6 +139,13 @@ export async function getWeeklyStats(date: string) {
 export async function getMonthlyStats(year: number, month: number) {
   const res = await http.get<ApiResponse<PeriodStatistics>>("/statistics/monthly", {
     params: { year, month },
+  })
+  return res.data.data
+}
+
+export async function getTrendStats(startDate: string, endDate: string) {
+  const res = await http.get<ApiResponse<TrendStatistics>>("/statistics/trend", {
+    params: { start_date: startDate, end_date: endDate },
   })
   return res.data.data
 }

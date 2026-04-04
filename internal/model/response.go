@@ -86,4 +86,19 @@ type PeriodStatistics struct {
 	Summary    []CategorySummary `json:"summary"`
 	TotalKnown int               `json:"total_known"`
 	DayCount   int               `json:"day_count"`
+	Items      []DurationItem    `json:"items,omitempty"`
+}
+
+// DayBreakdown 单日分类汇总（用于趋势分析）
+type DayBreakdown struct {
+	Date       string            `json:"date"`
+	Summary    []CategorySummary `json:"summary"`
+	TotalKnown int               `json:"total_known"`
+}
+
+// TrendStatistics 趋势统计
+type TrendStatistics struct {
+	StartDate string         `json:"start_date"`
+	EndDate   string         `json:"end_date"`
+	Days      []DayBreakdown `json:"days"`
 }

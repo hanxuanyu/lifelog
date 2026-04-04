@@ -4,6 +4,7 @@ import { X, Send, Clock, Tag, FileText } from "lucide-react"
 import { format } from "date-fns"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { MobileTimePicker } from "@/components/MobileTimePicker"
 import { MarkdownEditor } from "@/components/MarkdownEditor"
 import { createLog, getCategories, getEventTypes, getTimeline } from "@/api"
@@ -117,29 +118,32 @@ export function QuickAddDialog({ open, onClose, onCreated }: QuickAddDialogProps
             {/* Fixed header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b shrink-0">
               <h3 className="text-base font-semibold">快速记录</h3>
-              <button
+              <Button
+                size="icon-xs"
+                variant="ghost"
                 onClick={onClose}
-                className="p-1 rounded-full hover:bg-accent transition-colors text-muted-foreground"
+                className="rounded-full text-muted-foreground"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
 
             {/* Scrollable content */}
             <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
               {/* Time section */}
               <div className="mb-4">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => setShowTimePicker(!showTimePicker)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-accent/50 hover:bg-accent transition-colors w-full"
+                  className="flex items-center gap-2 px-3 py-2 h-auto rounded-xl bg-accent/50 hover:bg-accent w-full justify-start"
                 >
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   <span className="font-mono text-lg font-medium">{timeValue}</span>
                   <span className="text-xs text-muted-foreground ml-auto">
                     {showTimePicker ? "收起" : "点击选择时间"}
                   </span>
-                </button>
+                </Button>
 
                 <AnimatePresence>
                   {showTimePicker && (
@@ -173,16 +177,18 @@ export function QuickAddDialog({ open, onClose, onCreated }: QuickAddDialogProps
                     placeholder="做了什么..."
                     className="h-10 rounded-xl bg-accent/50 border-0 text-base"
                   />
-                  <button
+                  <Button
                     type="button"
+                    size="icon-sm"
+                    variant="ghost"
                     onClick={() => setShowDetail(!showDetail)}
-                    className={`p-1.5 rounded-lg transition-colors shrink-0 ${
-                      showDetail ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    className={`shrink-0 ${
+                      showDetail ? "text-primary bg-primary/10" : "text-muted-foreground"
                     }`}
                     title="添加详情"
                   >
                     <FileText className="h-4 w-4" />
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -218,24 +224,29 @@ export function QuickAddDialog({ open, onClose, onCreated }: QuickAddDialogProps
                     )
                     const isSelected = eventValue === s
                     return (
-                      <button
+                      <Badge
                         key={s}
-                        type="button"
-                        onClick={() => setEventValue(isSelected ? "" : s)}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors border ${
+                        asChild
+                        variant={isSelected ? "default" : "outline"}
+                        className={`cursor-pointer h-auto py-1 px-2.5 gap-1.5 ${
                           isSelected
-                            ? "bg-primary text-primary-foreground border-primary"
+                            ? ""
                             : "bg-accent/60 text-secondary-foreground border-transparent hover:bg-accent hover:border-border"
                         }`}
                       >
-                        {cat && (
-                          <span
-                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ backgroundColor: isSelected ? undefined : cat.color }}
-                          />
-                        )}
-                        {s}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => setEventValue(isSelected ? "" : s)}
+                        >
+                          {cat && (
+                            <span
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{ backgroundColor: isSelected ? undefined : cat.color }}
+                            />
+                          )}
+                          {s}
+                        </button>
+                      </Badge>
                     )
                   })}
                 </div>

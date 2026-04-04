@@ -123,12 +123,14 @@ export function HomePage() {
             </button>
           </PopoverTrigger>
           {!isToday(currentDate) && (
-            <button
+            <Button
+              variant="link"
+              size="xs"
               onClick={(e) => { e.stopPropagation(); goToday() }}
-              className="text-[10px] text-primary font-medium ml-0.5 hover:underline"
+              className="text-[10px] ml-0.5 p-0 h-auto"
             >
               回今天
-            </button>
+            </Button>
           )}
           <PopoverContent className="w-auto p-0" align="center">
             <Calendar

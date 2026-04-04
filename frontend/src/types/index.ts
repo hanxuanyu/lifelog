@@ -60,6 +60,19 @@ export interface PeriodStatistics {
   summary: CategorySummary[]
   total_known: string
   day_count: number
+  items?: DurationItem[]
+}
+
+export interface DayBreakdown {
+  date: string
+  summary: CategorySummary[]
+  total_known: number
+}
+
+export interface TrendStatistics {
+  start_date: string
+  end_date: string
+  days: DayBreakdown[]
 }
 
 export interface PageResult<T> {

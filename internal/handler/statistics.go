@@ -90,3 +90,28 @@ func GetMonthlyStatistics(c *gin.Context) {
 
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "ok", Data: stats})
 }
+
+// GetTrendStatistics 趋势统计
+// @Summary 获取日期范围内每天的分类汇总
+// @Tags 统计
+// @Produce json
+// @Param start_date query string true "开始日期 YYYY-MM-DD"
+// @Param end_date query string true "结束日期 YYYY-MM-DD"
+// @Success 200 {object} model.Response{data=model.TrendStatistics}
+// @Router /api/statistics/trend [get]
+func GetTrendStatistics(c *gin.Context) {
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+	if startDate == "" || endDate == "" {
+		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "start_date 和 end_date 参数必填"})
+		return
+	}
+
+	stats, err := service.GetTrendStatistics(startDate, endDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "ok", Data: stats})
+}
