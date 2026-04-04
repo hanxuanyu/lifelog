@@ -28,28 +28,111 @@ categories:
       - type: fixed
         pattern: "开会"
       - type: fixed
-        pattern: "写代码"
-      - type: regex
-        pattern: "^(需求|开发|测试|部署).*"
-  - name: "学习"
+        pattern: "写文档"
+      - type: fixed
+        pattern: "编程"
+      - type: fixed
+        pattern: "沟通"
+      - type: fixed
+        pattern: "汇报"
+      - type: fixed
+        pattern: "工单"
+  - name: "成长"
     color: "#10b981"
     rules:
       - type: fixed
-        pattern: "读书"
-      - type: regex
-        pattern: "^学习.*"
-  - name: "生活"
-    color: "#f59e0b"
-    rules:
-      - type: regex
-        pattern: "^(吃饭|午餐|晚餐|早餐|做饭)$"
+        pattern: "学习"
+      - type: fixed
+        pattern: "阅读"
+      - type: fixed
+        pattern: "课程"
+      - type: fixed
+        pattern: "健身"
+      - type: fixed
+        pattern: "考试"
   - name: "休息"
-    color: "#06b6d4"
+    color: "#8b5cf6"
     rules:
+      - type: regex
+        pattern: "^(睡觉|午睡)$"
+      - type: fixed
+        pattern: "午睡"
       - type: fixed
         pattern: "睡觉"
       - type: fixed
-        pattern: "午休"
+        pattern: "放松"
+      - type: fixed
+        pattern: "发呆"
+  - name: "交通"
+    color: "#0ea5e9"
+    rules:
+      - type: regex
+        pattern: "^(步行|打车|地铁|公交|高铁|飞机|骑车)$"
+      - type: fixed
+        pattern: "步行"
+      - type: fixed
+        pattern: "飞机"
+      - type: fixed
+        pattern: "高铁"
+      - type: fixed
+        pattern: "打车"
+      - type: fixed
+        pattern: "骑车"
+      - type: fixed
+        pattern: "地铁"
+      - type: fixed
+        pattern: "开车"
+      - type: fixed
+        pattern: "通勤"
+      - type: fixed
+        pattern: "候机"
+      - type: fixed
+        pattern: "候车"
+  - name: "吃喝"
+    color: "#f97316"
+    rules:
+      - type: fixed
+        pattern: "早饭"
+      - type: fixed
+        pattern: "晚饭"
+      - type: fixed
+        pattern: "午饭"
+      - type: fixed
+        pattern: "饭"
+      - type: fixed
+        pattern: "聚餐"
+      - type: fixed
+        pattern: "下午茶"
+      - type: fixed
+        pattern: "夜宵"
+      - type: fixed
+        pattern: "零食"
+  - name: "玩乐"
+    color: "#ec4899"
+    rules:
+      - type: fixed
+        pattern: "游戏"
+      - type: fixed
+        pattern: "视频"
+      - type: fixed
+        pattern: "追剧"
+      - type: fixed
+        pattern: "逛街"
+      - type: fixed
+        pattern: "兴趣活动"
+  - name: "家务"
+    color: "#78716c"
+    rules:
+      - type: fixed
+        pattern: "打扫"
+      - type: fixed
+        pattern: "洗衣"
+      - type: fixed
+        pattern: "收纳"
+      - type: fixed
+        pattern: "修理"
+      - type: fixed
+        pattern: "做饭"
 `
 
 var (
