@@ -37,14 +37,15 @@ export function QuickAddDialog({ open, onClose, onCreated }: QuickAddDialogProps
       setEventValue("")
       setShowTimePicker(false)
 
-      getCategories().then(setCategories).catch(() => {})
       Promise.all([
+        getCategories().catch(() => [] as Category[]),
         getEventTypes().catch(() => [] as string[]),
         getTimeline(dateStr).catch(() => []),
-      ]).then(([types, entries]) => {
+      ]).then(([cats, types, entries]) => {
+        setCategories(cats || [])
         const recent = [...new Set(entries.map((e) => e.event_type))].reverse()
         const fixedEvents: string[] = []
-        categories.forEach((cat) =>
+        ;(cats || []).forEach((cat) =>
           cat.rules.forEach((r) => {
             if (r.type === "fixed") fixedEvents.push(r.pattern)
           })
