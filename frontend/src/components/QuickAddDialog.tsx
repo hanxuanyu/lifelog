@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { MobileTimePicker } from "@/components/MobileTimePicker"
 import { createLog, getCategories, getEventTypes, getTimeline } from "@/api"
 import type { Category } from "@/types"
-import { toast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 
 interface QuickAddDialogProps {
   open: boolean
@@ -66,7 +66,7 @@ export function QuickAddDialog({ open, onClose, onCreated }: QuickAddDialogProps
 
   const handleSubmit = async () => {
     if (!timeValue.trim() || !eventValue.trim()) {
-      toast({ title: "请填写完整", description: "时间和事项不能为空", variant: "destructive" })
+      toast.error("请填写完整", { description: "时间和事项不能为空" })
       return
     }
     setSubmitting(true)
@@ -76,12 +76,12 @@ export function QuickAddDialog({ open, onClose, onCreated }: QuickAddDialogProps
         log_time: timeValue,
         event_type: eventValue.trim(),
       })
-      toast({ title: "记录成功" })
+      toast.success("记录成功")
       onCreated()
       onClose()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "提交失败"
-      toast({ title: "错误", description: msg, variant: "destructive" })
+      toast.error("提交失败", { description: msg })
     } finally {
       setSubmitting(false)
     }

@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -19,7 +18,7 @@ import {
   updateSettings, updateCategories,
 } from "@/api"
 import type { Category } from "@/types"
-import { toast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { getShortcut, setShortcut, formatShortcut } from "@/hooks/use-shortcut"
 
 export function SettingsPage() {
@@ -70,7 +69,7 @@ export function SettingsPage() {
     setShortcutValue(newShortcut)
     setShortcut(newShortcut)
     setRecordingShortcut(false)
-    toast({ title: "快捷键已更新", description: formatShortcut(newShortcut) })
+    toast.success("快捷键已更新", { description: formatShortcut(newShortcut) })
   }, [recordingShortcut])
 
   useEffect(() => {
@@ -116,13 +115,13 @@ export function SettingsPage() {
       setOrigSettings({ timePointMode, serverPort, dbPath, jwtExpireHours })
 
       if (needRestart) {
-        toast({ title: "配置已保存", description: "端口、数据库路径或JWT过期时间的变更需要重启服务后生效" })
+        toast.success("配置已保存", { description: "端口、数据库路径或JWT过期时间的变更需要重启服务后生效" })
       } else {
-        toast({ title: "配置已保存并实时生效" })
+        toast.success("配置已保存并实时生效")
       }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "保存失败"
-      toast({ title: "错误", description: msg, variant: "destructive" })
+      toast.error("保存失败", { description: msg })
     } finally {
       setSavingSettings(false)
     }
@@ -133,10 +132,10 @@ export function SettingsPage() {
     try {
       await updateCategories(categories)
       setOrigCategories(JSON.parse(JSON.stringify(categories)))
-      toast({ title: "分类规则已保存并实时生效" })
+      toast.success("分类规则已保存并实时生效")
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "保存失败"
-      toast({ title: "错误", description: msg, variant: "destructive" })
+      toast.error("保存失败", { description: msg })
     } finally {
       setSavingCategories(false)
     }
@@ -144,18 +143,18 @@ export function SettingsPage() {
 
   const handlePasswordChange = async () => {
     if (!newPassword || newPassword.length < 4) {
-      toast({ title: "新密码至少4位", variant: "destructive" })
+      toast.error("新密码至少4位")
       return
     }
     setChangingPw(true)
     try {
       await setPassword(oldPassword, newPassword)
-      toast({ title: "密码修改成功" })
+      toast.success("密码修改成功")
       setOldPassword("")
       setNewPassword("")
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "修改失败"
-      toast({ title: "错误", description: msg, variant: "destructive" })
+      toast.error("修改失败", { description: msg })
     } finally {
       setChangingPw(false)
     }
@@ -220,18 +219,18 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-col h-full px-4 pt-4 pb-20 sm:pb-4">
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-4 max-w-5xl mx-auto w-full"
-      >
-        <h1 className="text-lg font-semibold">设置</h1>
-      </motion.div>
+    <div className="h-full overflow-y-auto">
+    <div className="max-w-5xl mx-auto px-4 pb-20 sm:pb-4">
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pt-4 pb-3">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="text-lg font-semibold">设置</h1>
+        </motion.div>
+      </div>
 
-      <ScrollArea className="flex-1">
-        <div className="max-w-5xl mx-auto w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4">
             {/* Left column: Settings */}
             <div className="space-y-4">
               {/* Time Point Mode */}
@@ -458,7 +457,7 @@ export function SettingsPage() {
                           setShortcutValue(defaultKey)
                           setShortcut(defaultKey)
                           setRecordingShortcut(false)
-                          toast({ title: "已恢复默认快捷键" })
+                          toast.success("已恢复默认快捷键")
                         }}
                       >
                         重置
@@ -496,25 +495,26 @@ export function SettingsPage() {
                       <AnimatePresence mode="popLayout">
                         {categories.map((cat, catIdx) => (
                           <motion.div
-                            key={catIdx}
-                            layout
+                            key={cat.name || `cat-${catIdx}`}
+                            layout="position"
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
                             className="rounded-lg border p-3 space-y-3"
                           >
                             <div className="flex items-center gap-2">
-                              <label
-                                className="w-8 h-8 rounded-md border border-input cursor-pointer shrink-0 shadow-sm"
-                                style={{ backgroundColor: cat.color || "#6b7280" }}
-                              >
+                              <div className="relative w-8 h-8 shrink-0">
+                                <div
+                                  className="w-8 h-8 rounded-md border border-input shadow-sm"
+                                  style={{ backgroundColor: cat.color || "#6b7280" }}
+                                />
                                 <input
                                   type="color"
                                   value={cat.color || "#6b7280"}
                                   onChange={(e) => updateCategoryColor(catIdx, e.target.value)}
-                                  className="sr-only"
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 />
-                              </label>
+                              </div>
                               <Input
                                 value={cat.name}
                                 onChange={(e) => updateCategoryName(catIdx, e.target.value)}
@@ -602,8 +602,7 @@ export function SettingsPage() {
               </AnimatePresence>
             </div>
           </div>
-        </div>
-      </ScrollArea>
+    </div>
     </div>
   )
 }

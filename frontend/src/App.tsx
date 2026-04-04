@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-ro
 import { motion, AnimatePresence } from "framer-motion"
 import { BarChart3, Settings, Home, Plus, Sun, Moon } from "lucide-react"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from "@/components/ui/sonner"
 import { getSettings } from "@/api"
 import { HomePage } from "@/pages/HomePage"
 import { StatisticsPage } from "@/pages/StatisticsPage"

@@ -7,7 +7,7 @@ import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { createLog, getCategories, getEventTypes, getTimeline } from "@/api"
 import type { Category, LogEntry } from "@/types"
-import { toast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 
 interface LogInputProps {
   onLogCreated: () => void
@@ -167,11 +167,7 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
 
   const handleSubmit = async () => {
     if (!timeValue.trim() || !eventValue.trim()) {
-      toast({
-        title: "请填写完整",
-        description: "时间和事项不能为空",
-        variant: "destructive",
-      })
+      toast.error("请填写完整", { description: "时间和事项不能为空" })
       return
     }
 
@@ -183,7 +179,7 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
         event_type: eventValue.trim(),
         detail: detailValue.trim() || undefined,
       })
-      toast({ title: "记录成功" })
+      toast.success("记录成功")
       setTimeValue("")
       setEventValue("")
       setDetailValue("")
@@ -198,7 +194,7 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
       timeInputRef.current?.focus()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "提交失败"
-      toast({ title: "错误", description: msg, variant: "destructive" })
+      toast.error("提交失败", { description: msg })
     } finally {
       setSubmitting(false)
     }

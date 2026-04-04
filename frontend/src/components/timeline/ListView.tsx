@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { updateLog, createLog } from "@/api"
 import type { LogEntry, DurationItem } from "@/types"
-import { toast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import {
@@ -240,11 +240,11 @@ export function ListView({
         event_type: editingEntry.event,
         detail: editingEntry.detail || undefined,
       })
-      toast({ title: "更新成功" })
+      toast.success("更新成功")
       setEditingEntry(null)
       onUpdate()
     } catch {
-      toast({ title: "更新失败", variant: "destructive" })
+      toast.error("更新失败")
     }
   }
 
@@ -258,11 +258,11 @@ export function ListView({
         event_type: quickCreate.event.trim(),
         detail: quickCreate.detail || undefined,
       })
-      toast({ title: "创建成功" })
+      toast.success("创建成功")
       setQuickCreate(null)
       onUpdate()
     } catch {
-      toast({ title: "创建失败", variant: "destructive" })
+      toast.error("创建失败")
     } finally {
       setSaving(false)
     }

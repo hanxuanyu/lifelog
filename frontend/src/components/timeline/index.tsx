@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { deleteLog } from "@/api"
 import type { LogEntry, Category, DurationItem } from "@/types"
-import { toast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { getCategoryColorFn } from "./shared"
 import { ListView } from "./ListView"
 
@@ -70,11 +70,11 @@ export function Timeline({
     if (deleteTarget === null) return
     try {
       await deleteLog(deleteTarget)
-      toast({ title: "已删除" })
+      toast.success("已删除")
       setDeleteTarget(null)
       onUpdate()
     } catch {
-      toast({ title: "删除失败", variant: "destructive" })
+      toast.error("删除失败")
     }
   }
 

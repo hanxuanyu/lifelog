@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react"
 import { format, addDays, subDays, isToday } from "date-fns"
 import { zhCN } from "date-fns/locale"
-import { LogInput } from "@/components/LogInput"
 import { Timeline } from "@/components/timeline"
 import { getTimeline, getCategories, getDailyStats } from "@/api"
 import type { LogEntry, Category, DurationItem } from "@/types"
@@ -65,7 +64,6 @@ export function HomePage() {
 
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
-  const timeInputRef = useRef<HTMLInputElement>(null)
 
   // Listen for global shortcut event
   useEffect(() => {
@@ -82,12 +80,6 @@ export function HomePage() {
       // Skip if user is typing in an input/textarea
       const tag = (e.target as HTMLElement)?.tagName
       const isInputFocused = tag === "INPUT" || tag === "TEXTAREA"
-
-      if (e.key === "/" && !isInputFocused) {
-        e.preventDefault()
-        timeInputRef.current?.focus()
-        return
-      }
 
       if (isInputFocused) return
 
@@ -111,13 +103,14 @@ export function HomePage() {
   }, [currentDate])
 
   return (
-    <div className="flex flex-col h-full max-w-2xl mx-auto px-4 pt-4 pb-20 sm:pb-4">
-      {/* Date navigation */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-1 mb-3"
-      >
+    <div className="flex flex-col h-full max-w-2xl mx-auto px-4">
+      {/* Date navigation — sticky */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pt-4 pb-3 shrink-0">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-1"
+        >
         <Button size="icon" variant="ghost" onClick={goPrev} className="h-7 w-7">
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -154,24 +147,20 @@ export function HomePage() {
           </PopoverContent>
         </Popover>
 
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={goNext}
-          className="h-7 w-7"
-          disabled={isToday(currentDate)}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </motion.div>
-
-      {/* Log input */}
-      <div className="mb-4">
-        <LogInput onLogCreated={loadTimeline} date={dateStr} ref={timeInputRef} />
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={goNext}
+            className="h-7 w-7"
+            disabled={isToday(currentDate)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </motion.div>
       </div>
 
       {/* Timeline — fills remaining space */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 pb-20 sm:pb-4">
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <motion.div

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { login } from "@/api"
-import { toast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 
 interface LoginPageProps {
   onLogin: (token: string) => void
@@ -25,7 +25,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       localStorage.setItem("token", data.token)
       onLogin(data.token)
     } catch {
-      toast({ title: "登录失败", description: "密码错误", variant: "destructive" })
+      toast.error("登录失败", { description: "密码错误" })
     } finally {
       setLoading(false)
     }

@@ -19,7 +19,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { getDailyStats, getWeeklyStats, getMonthlyStats, getCategories } from "@/api"
 import type { DailyStatistics, PeriodStatistics, CategorySummary, DurationItem, Category } from "@/types"
@@ -228,23 +227,25 @@ export function StatisticsPage() {
   )
 
   return (
-    <div className="flex flex-col h-full px-4 pt-4 pb-20 sm:pb-4">
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-4 max-w-5xl mx-auto w-full"
-      >
-        <h1 className="text-lg font-semibold">数据统计</h1>
-      </motion.div>
+    <div className="h-full overflow-y-auto">
+    <div className="max-w-5xl mx-auto px-4 pb-20 sm:pb-4">
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pt-4 pb-3">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="text-lg font-semibold">数据统计</h1>
+        </motion.div>
+      </div>
 
-      <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col min-h-0 max-w-5xl mx-auto w-full">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full">
           <TabsTrigger value="daily" className="flex-1">日统计</TabsTrigger>
           <TabsTrigger value="weekly" className="flex-1">周统计</TabsTrigger>
           <TabsTrigger value="monthly" className="flex-1">月统计</TabsTrigger>
         </TabsList>
 
-        <ScrollArea className="flex-1 mt-4">
+        <div className="mt-4">
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <motion.div
@@ -399,8 +400,9 @@ export function StatisticsPage() {
               </TabsContent>
             </>
           )}
-        </ScrollArea>
+        </div>
       </Tabs>
+    </div>
     </div>
   )
 }
