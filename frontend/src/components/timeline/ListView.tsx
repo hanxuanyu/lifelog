@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Pencil, Trash2, Check, X, Plus, Maximize2 } from "lucide-react"
+import { Pencil, Trash2, Check, X, Plus, Maximize2, CalendarPlus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { updateLog, createLog } from "@/api"
@@ -720,9 +720,9 @@ export function ListView({
             animate={{ opacity: 1 }}
             className="flex flex-col items-center text-muted-foreground"
           >
-            <div className="text-4xl mb-3">📝</div>
-            <p className="text-sm">今天还没有记录</p>
-            <p className="text-xs mt-1">点击时间轴创建记录，或在上方输入</p>
+            <CalendarPlus className="w-10 h-10 mb-3 stroke-[1.2]" />
+            <p className="text-sm">当前日期暂无生活记录</p>
+            <p className="text-xs mt-1">点击左侧时间轴、右上角 + 按钮或使用快捷键创建</p>
           </motion.div>
         </div>
       </div>
