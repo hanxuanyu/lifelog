@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react"
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Pencil, Trash2, Check, X, Plus, Maximize2, CalendarPlus, Copy, Tag } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -78,7 +78,8 @@ export function ListView({
   } | null>(null)
   const [railHeight, setRailHeight] = useState(0)
   const [cardPositions, setCardPositions] = useState<{top: number, bottom: number}[]>([])
-
+  const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
+  const highlightSourceRef = useRef<"rail" | "card" | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const railRef = useRef<HTMLDivElement>(null)
   const cardsScrollRef = useRef<HTMLDivElement>(null)
@@ -142,6 +143,35 @@ export function ListView({
     },
     [usableHeight]
   )
+
+  // Map durationItems index → entries index for rail↔card highlight linking
+  const durationToEntryMap = useMemo(() => {
+    const map = new Map<number, number>()
+    entries.forEach((_, i) => {
+      const dur = getDurationForEntry(i)
+      if (dur) {
+        const durIdx = durationItems.indexOf(dur)
+        if (durIdx >= 0) map.set(durIdx, i)
+      }
+    })
+    return map
+  }, [entries, durationItems, getDurationForEntry])
+
+  // Reverse map: entry index → durationItems index
+  const entryToDurationMap = useMemo(() => {
+    const map = new Map<number, number>()
+    durationToEntryMap.forEach((entryIdx, durIdx) => map.set(entryIdx, durIdx))
+    return map
+  }, [durationToEntryMap])
+
+  // Scroll highlighted card into view when highlight comes from rail
+  useEffect(() => {
+    if (highlightIndex === null || highlightSourceRef.current !== "rail") return
+    const entry = entries[highlightIndex]
+    if (!entry) return
+    const el = cardRefs.current.get(entry.id)
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" })
+  }, [highlightIndex, entries])
 
   // Track scroll position — update curves via rAF, no React state
   const updateCurvePaths = useCallback(() => {
@@ -550,6 +580,8 @@ export function ListView({
         {entries.map((entry, i) => {
           const color = getCategoryColor(entry.category)
           const durItem = getDurationForEntry(i)
+          const isHl = highlightIndex === i
+          const dimmed = highlightIndex !== null && highlightIndex !== i
 
           if (durItem && !durItem.unknown && durItem.start_time && durItem.end_time) {
             return (
@@ -558,10 +590,9 @@ export function ListView({
                   data-curve-index={i}
                   d=""
                   fill={color}
-                  fillOpacity={0.06}
-                  stroke={color}
-                  strokeWidth={0.5}
-                  strokeOpacity={0.15}
+                  fillOpacity={isHl ? 0.18 : dimmed ? 0.02 : 0.06}
+                  stroke="none"
+                  style={{ transition: "fill-opacity 0.15s" }}
                 />
               </g>
             )
@@ -574,17 +605,19 @@ export function ListView({
                 d=""
                 fill="none"
                 stroke={color}
-                strokeWidth={1}
-                strokeOpacity={0.25}
+                strokeWidth={isHl ? 1.5 : 1}
+                strokeOpacity={isHl ? 0.6 : dimmed ? 0.1 : 0.25}
                 strokeDasharray="3 2"
+                style={{ transition: "stroke-opacity 0.15s, stroke-width 0.15s" }}
               />
               <circle
                 data-circle-index={i}
                 cx={curveEndX}
                 cy={0}
-                r={2}
+                r={isHl ? 3 : 2}
                 fill={color}
-                fillOpacity={0.3}
+                fillOpacity={isHl ? 0.7 : dimmed ? 0.1 : 0.3}
+                style={{ transition: "fill-opacity 0.15s" }}
               />
             </g>
           )
@@ -608,12 +641,23 @@ export function ListView({
         {durationItems.map((item, i) => {
           if (item.unknown || !item.start_time || !item.end_time) return null
           const color = getCategoryColor(item.category)
+          const entryIdx = durationToEntryMap.get(i)
+          const isHl = entryIdx !== undefined && highlightIndex === entryIdx
+          const segHover = {
+            pointerEvents: "auto" as const,
+            cursor: "pointer" as const,
+            onMouseEnter: () => {
+              if (entryIdx !== undefined) {
+                highlightSourceRef.current = "rail"
+                setHighlightIndex(entryIdx)
+              }
+            },
+            onMouseLeave: () => {
+              if (highlightSourceRef.current === "rail") setHighlightIndex(null)
+            },
+          }
 
           if (item.cross_day) {
-            // Cross-day task: in "end" mode, start_time is from previous day,
-            // so on THIS day's rail we render from 00:00 to end_time.
-            // In "start" mode, end_time is from next day,
-            // so on THIS day's rail we render from start_time to 24:00 (end of day).
             if (timePointMode === "end") {
               const y1 = timeToRailY("00:00")
               const y2 = timeToRailY(formatTime(item.end_time))
@@ -627,7 +671,12 @@ export function ListView({
                   height={y2 - y1}
                   rx={4}
                   fill={color}
-                  fillOpacity={0.45}
+                  fillOpacity={isHl ? 0.85 : 0.45}
+                  stroke={isHl ? color : "none"}
+                  strokeWidth={isHl ? 1.5 : 0}
+                  strokeOpacity={0.8}
+                  style={{ transition: "fill-opacity 0.15s, stroke-width 0.15s" }}
+                  {...segHover}
                 />
               )
             } else {
@@ -643,7 +692,12 @@ export function ListView({
                   height={y2 - y1}
                   rx={4}
                   fill={color}
-                  fillOpacity={0.45}
+                  fillOpacity={isHl ? 0.85 : 0.45}
+                  stroke={isHl ? color : "none"}
+                  strokeWidth={isHl ? 1.5 : 0}
+                  strokeOpacity={0.8}
+                  style={{ transition: "fill-opacity 0.15s, stroke-width 0.15s" }}
+                  {...segHover}
                 />
               )
             }
@@ -662,7 +716,12 @@ export function ListView({
               height={y2 - y1}
               rx={4}
               fill={color}
-              fillOpacity={0.6}
+              fillOpacity={isHl ? 0.9 : 0.6}
+              stroke={isHl ? color : "none"}
+              strokeWidth={isHl ? 1.5 : 0}
+              strokeOpacity={0.8}
+              style={{ transition: "fill-opacity 0.15s, stroke-width 0.15s" }}
+              {...segHover}
             />
           )
         })}
@@ -702,8 +761,29 @@ export function ListView({
           if (durItem && !durItem.unknown && durItem.start_time && durItem.end_time) return null
           const dotY = timeToRailY(formatTime(entry.log_time))
           const color = getCategoryColor(entry.category)
+          const isHl = highlightIndex === i
           return (
-            <circle key={entry.id} cx={cx} cy={dotY} r={3} fill={color} fillOpacity={0.7} />
+            <circle
+              key={entry.id}
+              cx={cx}
+              cy={dotY}
+              r={isHl ? 5 : 3}
+              fill={color}
+              fillOpacity={isHl ? 1 : 0.7}
+              stroke={isHl ? color : "none"}
+              strokeWidth={isHl ? 2 : 0}
+              strokeOpacity={0.4}
+              pointerEvents="auto"
+              cursor="pointer"
+              style={{ transition: "r 0.15s, fill-opacity 0.15s" }}
+              onMouseEnter={() => {
+                highlightSourceRef.current = "rail"
+                setHighlightIndex(i)
+              }}
+              onMouseLeave={() => {
+                if (highlightSourceRef.current === "rail") setHighlightIndex(null)
+              }}
+            />
           )
         })}
 
@@ -810,7 +890,10 @@ export function ListView({
           className="relative shrink-0 cursor-crosshair touch-none"
           style={{ width: RAIL_WIDTH }}
           onMouseMove={handleRailHover}
-          onMouseLeave={() => setHoverTime(null)}
+          onMouseLeave={() => {
+          setHoverTime(null)
+          if (highlightSourceRef.current === "rail") setHighlightIndex(null)
+        }}
           onClick={handleRailClick}
         >
           {renderRail()}
@@ -841,7 +924,10 @@ export function ListView({
         className="relative shrink-0 cursor-crosshair touch-none"
         style={{ width: RAIL_WIDTH }}
         onMouseMove={handleRailHover}
-        onMouseLeave={() => setHoverTime(null)}
+        onMouseLeave={() => {
+          setHoverTime(null)
+          if (highlightSourceRef.current === "rail") setHighlightIndex(null)
+        }}
         onClick={handleRailClick}
       >
         {renderRail()}
@@ -951,14 +1037,41 @@ export function ListView({
                     </div>
                   ) : (
                     <motion.div
-                      whileTap={{ scale: 0.99 }}
-                      className="group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm hover:brightness-95 transition-all cursor-pointer select-none"
-                      style={{ backgroundColor: `${color}10`, borderColor: `${color}20`, WebkitTouchCallout: "none", touchAction: "pan-y" }}
+                      whileTap={{ opacity: 0.85 }}
+                      className={`group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm transition-all cursor-pointer select-none ${
+                        highlightIndex === index
+                          ? "brightness-95 shadow-md"
+                          : "hover:brightness-95"
+                      }`}
+                      style={{
+                        backgroundColor: highlightIndex === index ? `${color}20` : `${color}10`,
+                        borderColor: highlightIndex === index ? `${color}50` : `${color}20`,
+                        WebkitTouchCallout: "none",
+                        touchAction: "pan-y",
+                      }}
                       onClick={() => handleCardClick(entry)}
                       onContextMenu={(e) => handleCardContextMenu(e, entry)}
-                      onTouchStart={(e) => handleCardTouchStart(e, entry)}
-                      onTouchMove={handleCardTouchMove}
-                      onTouchEnd={handleCardTouchEnd}
+                      onMouseEnter={() => {
+                        highlightSourceRef.current = "card"
+                        setHighlightIndex(index)
+                      }}
+                      onMouseLeave={() => {
+                        if (highlightSourceRef.current === "card") setHighlightIndex(null)
+                      }}
+                      onTouchStart={(e) => {
+                        highlightSourceRef.current = "card"
+                        setHighlightIndex(index)
+                        handleCardTouchStart(e, entry)
+                      }}
+                      onTouchMove={(e) => {
+                        handleCardTouchMove(e)
+                      }}
+                      onTouchEnd={() => {
+                        handleCardTouchEnd()
+                        setTimeout(() => {
+                          if (highlightSourceRef.current === "card") setHighlightIndex(null)
+                        }, 150)
+                      }}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex-1 min-w-0">
