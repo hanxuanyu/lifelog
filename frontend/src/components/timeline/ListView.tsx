@@ -802,7 +802,7 @@ export function ListView({
   // ==================== EMPTY STATE ====================
   if (entries.length === 0 && !quickCreate) {
     return (
-      <div ref={wrapperRef} className="flex h-full">
+      <div ref={wrapperRef} className="flex flex-1 min-h-0">
         {/* Fixed rail */}
         <div
           ref={railRef}
@@ -833,7 +833,7 @@ export function ListView({
 
   // ==================== MAIN RENDER ====================
   return (
-    <div ref={wrapperRef} className="flex h-full relative">
+    <div ref={wrapperRef} className="flex flex-1 min-h-0 relative">
       {/* Fixed rail */}
       <div
         ref={railRef}
@@ -852,8 +852,8 @@ export function ListView({
       {/* Scrollable cards area */}
       <div
         ref={cardsScrollRef}
-        className="flex-1 min-w-0 overflow-y-auto py-2 pr-1"
-        style={{ marginLeft: GAP }}
+        className="flex-1 min-w-0 overflow-y-auto pt-2 pr-1"
+        style={{ marginLeft: GAP, paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
       >
         <AnimatePresence mode="popLayout">
           {entries.map((entry, index) => {

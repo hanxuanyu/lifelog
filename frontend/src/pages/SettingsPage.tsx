@@ -304,7 +304,7 @@ export function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center app-min-view-height">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
@@ -315,9 +315,9 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="h-full flex flex-col">
-    <div className="max-w-5xl mx-auto px-4 w-full flex flex-col h-full">
-      <div className="shrink-0 pt-4 pb-3">
+    <div>
+    <div className="fixed top-0 left-0 right-0 z-40 bg-background" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      <div className="max-w-5xl mx-auto px-4 w-full pt-4 pb-3">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -325,8 +325,11 @@ export function SettingsPage() {
           <h1 className="text-lg font-semibold">设置</h1>
         </motion.div>
       </div>
-
-      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
+    </div>
+    {/* Spacer for fixed header */}
+    <div className="pt-14" />
+    <div className="max-w-5xl mx-auto px-4 w-full">
+      <div style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4">
             {/* Left column: Settings */}
             <div className="space-y-4">

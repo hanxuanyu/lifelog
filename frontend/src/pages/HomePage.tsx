@@ -109,7 +109,7 @@ export function HomePage() {
   }, [currentDate])
 
   return (
-    <div className="flex flex-col h-full max-w-2xl mx-auto px-4 overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0 max-w-2xl mx-auto w-full px-4 overflow-hidden">
       {/* Date navigation — fixed at top, same height as other pages' titles */}
       <div className="shrink-0 pt-4 pb-3">
         <motion.div
@@ -170,7 +170,7 @@ export function HomePage() {
       </div>
 
       {/* Timeline — fills remaining space */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 flex flex-col">
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <motion.div

@@ -54,32 +54,42 @@
   }
 }
 
-/* PWA safe area — ensure status bar area matches background */
-html, body, #root {
+/* PWA / iOS safe-area layout */
+html {
   height: 100%;
-  overscroll-behavior: none;
 }
-html, body {
+body {
+  min-height: 100%;
+  min-height: 100dvh;
+  overscroll-behavior-y: none;
+  /* body scrolling is allowed by default (Statistics / Settings pages);
+     HomePage toggles .no-scroll to lock it. */
+}
+body.no-scroll {
   overflow: hidden;
 }
-@supports (padding-top: env(safe-area-inset-top)) {
-  body {
-    padding-top: env(safe-area-inset-top);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  /* Fixed background behind status bar to prevent content showing through */
-  body::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: env(safe-area-inset-top);
-    background: var(--background);
-    z-index: 9999;
-  }
+#root {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+/* Solid cover behind the status-bar / notch */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--background);
+  z-index: 9999;
+}
+/* Reusable height helper — accounts for top safe-area */
+.app-view-height {
+  height: calc(100dvh - env(safe-area-inset-top, 0px));
+}
+.app-min-view-height {
+  min-height: calc(100dvh - env(safe-area-inset-top, 0px));
 }
 
 /* Hide scrollbar for time picker wheels */

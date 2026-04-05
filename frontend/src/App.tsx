@@ -126,11 +126,22 @@ function GlobalShortcutListener() {
 }
 
 function AppLayout() {
+  const location = useLocation()
+  const isHome = location.pathname === "/"
+
+  // Lock body scroll on HomePage (contained layout);
+  // allow it on other pages so iOS Safari address-bar reacts to scroll.
+  useEffect(() => {
+    document.body.classList.toggle("no-scroll", isHome)
+    if (!isHome) window.scrollTo(0, 0)
+    return () => document.body.classList.remove("no-scroll")
+  }, [isHome])
+
   return (
-    <div className="h-full flex flex-col">
+    <div className={`flex flex-col ${isHome ? "app-view-height overflow-hidden" : "app-min-view-height"}`}>
       <TopNav />
       <GlobalShortcutListener />
-      <main className="flex-1 min-h-0 overflow-hidden">
+      <main className={isHome ? "flex-1 min-h-0 overflow-hidden flex flex-col" : "flex-1"}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/statistics" element={<StatisticsPage />} />

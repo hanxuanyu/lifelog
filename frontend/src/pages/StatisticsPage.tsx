@@ -164,15 +164,18 @@ export function StatisticsPage() {
   // PLACEHOLDER_RENDER
 
   return (
-    <div className="h-full flex flex-col">
-    <div className="max-w-5xl mx-auto px-4 w-full flex flex-col h-full">
-      <div className="shrink-0 pt-4 pb-3">
+    <div>
+    <div className="fixed top-0 left-0 right-0 z-40 bg-background" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      <div className="max-w-5xl mx-auto px-4 w-full pt-4 pb-3">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-lg font-semibold">数据统计</h1>
         </motion.div>
       </div>
-
-      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
+    </div>
+    {/* Spacer for fixed header */}
+    <div className="pt-14" />
+    <div className="max-w-5xl mx-auto px-4 w-full">
+      <div style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full">
           <TabsTrigger value="daily" className="flex-1">日统计</TabsTrigger>
