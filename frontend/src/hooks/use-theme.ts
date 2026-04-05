@@ -14,6 +14,10 @@ function getStoredTheme(): Theme | null {
 
 function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", theme === "dark")
+  const color = theme === "dark" ? "#212121" : "#ffffff"
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    meta.setAttribute("content", color)
+  })
 }
 
 export function useTheme() {

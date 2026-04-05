@@ -50,7 +50,21 @@
     @apply bg-background text-foreground;
   }
   html {
-    @apply font-sans;
+    @apply font-sans bg-background;
+  }
+}
+
+/* PWA safe area — ensure status bar area matches background */
+html, body {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+@supports (padding-top: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 
