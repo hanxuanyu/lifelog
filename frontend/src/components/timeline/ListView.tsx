@@ -283,11 +283,12 @@ export function ListView({
     longPressFiredRef.current = false
     const touch = e.touches[0]
     touchStartPos.current = { x: touch.clientX, y: touch.clientY }
+    // Capture the DOM element now — React's synthetic event (and currentTarget)
+    // will be nullified by the time the timeout fires.
+    const target = e.currentTarget as HTMLElement
     longPressTimerRef.current = setTimeout(() => {
       longPressFiredRef.current = true
-      // Prevent iOS default context menu / text selection
-      e.preventDefault()
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      const rect = target.getBoundingClientRect()
       setContextMenu({
         entry,
         x: rect.left + rect.width / 2,

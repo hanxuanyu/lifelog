@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom"
+import { createBrowserRouter, RouterProvider, useNavigate, useLocation, useBlocker, Outlet } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { BarChart3, Settings, Home, Plus, Sun, Moon } from "lucide-react"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -23,7 +23,11 @@ function TopNav() {
   const isSettings = location.pathname === "/settings"
 
   const navTo = (path: string) => {
-    navigate(path, { replace: !isHome })
+    if (path === "/") {
+      navigate(path, { replace: true })
+    } else {
+      navigate(path, { replace: !isHome })
+    }
   }
 
   const btnClass = "flex h-8 w-8 items-center justify-center rounded-full bg-secondary/80 text-secondary-foreground shadow-md hover:shadow-lg transition-shadow border backdrop-blur-sm"
@@ -137,20 +141,41 @@ function AppLayout() {
     return () => document.body.classList.remove("no-scroll")
   }, [isHome])
 
+  // Block browser back / swipe-back on home page to prevent exiting PWA.
+  // useBlocker works within React Router's own history management, avoiding
+  // conflicts that raw pushState/popstate listeners would cause.
+  const blocker = useBlocker(({ historyAction }) => {
+    return isHome && historyAction === "POP"
+  })
+
+  // When the blocker fires, silently reset it so the app stays on home.
+  useEffect(() => {
+    if (blocker.state === "blocked") {
+      blocker.reset()
+    }
+  }, [blocker])
+
   return (
     <div className={`flex flex-col ${isHome ? "app-view-height overflow-hidden" : "app-min-view-height"}`}>
       <TopNav />
       <GlobalShortcutListener />
       <main className={isHome ? "flex-1 min-h-0 overflow-hidden flex flex-col" : "flex-1"}>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/statistics" element={<StatisticsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Routes>
+        <Outlet />
       </main>
     </div>
   )
 }
+
+const router = createBrowserRouter([
+  {
+    element: <AppLayout />,
+    children: [
+      { path: "/", element: <HomePage /> },
+      { path: "/statistics", element: <StatisticsPage /> },
+      { path: "/settings", element: <SettingsPage /> },
+    ],
+  },
+])
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
@@ -189,11 +214,9 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
-      <TooltipProvider>
-        <AppLayout />
-        <Toaster />
-      </TooltipProvider>
-    </BrowserRouter>
+    <TooltipProvider>
+      <RouterProvider router={router} />
+      <Toaster />
+    </TooltipProvider>
   )
 }
