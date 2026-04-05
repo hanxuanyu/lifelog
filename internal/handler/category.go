@@ -55,6 +55,7 @@ func GetSettings(c *gin.Context) {
 		"time_point_mode": config.GetTimePointMode(),
 		"server":          config.GetServerConfig(),
 		"auth":            config.GetAuthConfig(),
+		"mcp":             config.GetMCPConfig(),
 	}
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "ok", Data: settings})
 }
@@ -72,6 +73,8 @@ func UpdateSettings(c *gin.Context) {
 		ServerPort     *int    `json:"server_port"`
 		ServerDBPath   *string `json:"server_db_path"`
 		JWTExpireHours *int    `json:"jwt_expire_hours"`
+		MCPEnabled     *bool   `json:"mcp_enabled"`
+		MCPPort        *int    `json:"mcp_port"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "参数格式错误: " + err.Error()})
@@ -115,6 +118,16 @@ func UpdateSettings(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: "保存失败: " + err.Error()})
 			return
 		}
+	}
+
+	// MCP 配置（需重启）
+	if req.MCPEnabled != nil || req.MCPPort != nil {
+		needRestart = true
+		if err := config.SetMCPConfig(req.MCPEnabled, req.MCPPort); err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: "保存失败: " + err.Error()})
+			return
+		}
+		slog.Info("MCP 配置已更新", "enabled", req.MCPEnabled, "port", req.MCPPort)
 	}
 
 	msg := "配置已保存"

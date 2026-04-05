@@ -12,6 +12,8 @@
 - **bcrypt** — 密码哈希（golang.org/x/crypto）
 - **Swagger** — API 文档自动生成（swaggo）
 - **embed** — 前端静态文件嵌入二进制
+- **MCP** — Model Context Protocol 服务端（mark3labs/mcp-go，SSE 传输）
+- **slog + lumberjack** — 结构化日志，双输出（控制台 + 文件轮转）
 
 ### 前端
 
@@ -74,6 +76,10 @@ lifelog/
 │   │   ├── log_entry.go       # 日志业务逻辑
 │   │   ├── category.go        # 分类匹配（fixed/regex，正则缓存）
 │   │   └── statistics.go      # 统计计算（时长、跨天、趋势）
+│   ├── logger/
+│   │   └── logger.go          # 结构化日志（slog + lumberjack 轮转）
+│   ├── mcp/
+│   │   └── server.go          # MCP 服务端（SSE 传输，5 个工具）
 │   └── util/
 │       ├── time_parser.go     # 时间格式解析工具
 │       └── time_parser_test.go
@@ -171,6 +177,33 @@ Repository（数据库 CRUD）    Config（YAML 配置读写）
 SQLite                      config.yaml（fsnotify 热重载）
 ```
 
+### MCP 服务
+
+Lifelog 内置 MCP（Model Context Protocol）服务端，与主 HTTP 服务并行运行，通过 SSE 传输协议对外提供数据查询能力。
+
+```text
+MCP Client（Claude Desktop / Cursor / ...）
+    ↓ SSE
+MCP Server（mark3labs/mcp-go）
+    ↓
+Tool Handlers（参数解析、日志记录）
+    ↓
+Service / Repository / Config（复用后端业务层）
+```
+
+启动流程：
+
+1. `main.go` 检查 `config.GetMCPEnabled()`，若启用则在独立 goroutine 中启动
+2. 注册 5 个工具（query_logs、get_daily_statistics、get_period_statistics、get_categories、get_event_types）
+3. 每个工具调用通过 `withLog` 包装，记录参数和耗时
+4. SSE Server 监听配置端口（默认 8081），客户端通过 `/sse` 端点连接
+
+添加新工具：
+
+1. 在 `internal/mcp/server.go` 的 `tools` 切片中添加 `toolDef`
+2. 实现对应的 handler 函数，使用 `withLog` 包装
+3. handler 内部复用 `service` 或 `repository` 层的现有逻辑
+
 ### 前端构建嵌入
 
 前端 `npm run build` 输出到 `web/` 目录，Go 通过 `//go:embed web/*` 将其编译进单一二进制文件。生产部署只需要一个可执行文件 + `config.yaml`。
@@ -249,6 +282,20 @@ SQLite                      config.yaml（fsnotify 热重载）
 | `PUT` | `/api/settings` | 更新设置 | 是 |
 | `GET` | `/api/data/export` | 导出数据（ZIP） | 是 |
 | `POST` | `/api/data/import` | 导入数据（ZIP） | 是 |
+
+### MCP 接口（独立端口）
+
+MCP 服务运行在独立端口（默认 8081），通过 SSE 传输协议提供以下工具：
+
+| 工具名 | 说明 |
+| ---- | ---- |
+| `query_logs` | 查询日志记录（日期、事项类型、关键词筛选） |
+| `get_daily_statistics` | 获取某天的分类统计数据 |
+| `get_period_statistics` | 获取日期范围内的分类趋势 |
+| `get_categories` | 获取所有分类规则 |
+| `get_event_types` | 获取所有不重复的事项类型 |
+
+SSE 端点：`http://localhost:8081/sse`
 
 ## CI/CD
 

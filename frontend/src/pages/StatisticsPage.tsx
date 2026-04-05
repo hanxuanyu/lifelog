@@ -164,14 +164,15 @@ export function StatisticsPage() {
   // PLACEHOLDER_RENDER
 
   return (
-    <div className="h-full overflow-y-auto">
-    <div className="max-w-5xl mx-auto px-4 pb-4">
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pt-4 pb-3">
+    <div className="h-full flex flex-col">
+    <div className="max-w-5xl mx-auto px-4 w-full flex flex-col h-full">
+      <div className="shrink-0 pt-4 pb-3">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-lg font-semibold">数据统计</h1>
         </motion.div>
       </div>
 
+      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full">
           <TabsTrigger value="daily" className="flex-1">日统计</TabsTrigger>
@@ -354,6 +355,7 @@ export function StatisticsPage() {
         items={detailItems}
         color={detailColor}
       />
+      </div>
     </div>
     </div>
   )

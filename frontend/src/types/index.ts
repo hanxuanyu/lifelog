@@ -97,6 +97,10 @@ export interface Settings {
   auth: {
     jwt_expire_hours: number
   }
+  mcp: {
+    enabled: boolean
+    port: number
+  }
 }
 
 export interface UpdateSettingsRequest {
@@ -104,6 +108,8 @@ export interface UpdateSettingsRequest {
   server_port?: number
   server_db_path?: string
   jwt_expire_hours?: number
+  mcp_enabled?: boolean
+  mcp_port?: number
 }
 
 export interface UpdateSettingsResponse {

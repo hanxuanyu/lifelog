@@ -55,9 +55,12 @@
 }
 
 /* PWA safe area — ensure status bar area matches background */
+html, body, #root {
+  height: 100%;
+  overscroll-behavior: none;
+}
 html, body {
-  min-height: 100vh;
-  min-height: 100dvh;
+  overflow: hidden;
 }
 @supports (padding-top: env(safe-area-inset-top)) {
   body {
@@ -65,6 +68,17 @@ html, body {
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
     padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* Fixed background behind status bar to prevent content showing through */
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top);
+    background: var(--background);
+    z-index: 9999;
   }
 }
 

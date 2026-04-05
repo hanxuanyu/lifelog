@@ -108,6 +108,8 @@ make build-all
 | `auth.jwt_expire_hours` | 登录有效期（小时） | `168`（7天） | 否 |
 | `time_point_mode` | 时间点模式（`start` 或 `end`） | `end` | 是 |
 | `categories` | 分类规则配置 | 预设 7 个分类 | 是 |
+| `mcp.enabled` | 是否启用 MCP 服务 | `false` | 否 |
+| `mcp.port` | MCP 服务端口 | `8081` | 否 |
 
 ### 默认分类
 
@@ -120,6 +122,68 @@ make build-all
 | 吃喝 | 橙色 `#f97316` | 早饭、午饭、晚饭、聚餐、下午茶、夜宵 |
 | 玩乐 | 粉色 `#ec4899` | 游戏、视频、追剧、逛街、兴趣活动 |
 | 家务 | 石灰 `#78716c` | 打扫、洗衣、收纳、修理、做饭 |
+
+## MCP 服务
+
+Lifelog 内置 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 服务端，允许 AI 助手（如 Claude Desktop、Cursor 等）直接查询你的生活日志数据。
+
+### 启用 MCP
+
+在 `config.yaml` 中开启：
+
+```yaml
+mcp:
+  enabled: true
+  port: 8081
+```
+
+重启服务后，MCP 服务将通过 SSE 传输在指定端口启动。
+
+### 可用工具
+
+| 工具名 | 说明 | 主要参数 |
+|--------|------|----------|
+| `query_logs` | 查询日志记录，支持按日期、事项类型、关键词筛选 | `date`、`start_date`、`end_date`、`event_type`、`keyword`、`page`、`size` |
+| `get_daily_statistics` | 获取某天的统计数据，包含各分类时长占比 | `date`（必填） |
+| `get_period_statistics` | 获取日期范围内每天的分类统计趋势 | `start_date`、`end_date`（必填） |
+| `get_categories` | 获取所有分类规则 | 无 |
+| `get_event_types` | 获取所有不重复的事项类型 | 无 |
+
+### 客户端配置
+
+#### Claude Desktop
+
+编辑 Claude Desktop 配置文件（macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`）：
+
+```json
+{
+  "mcpServers": {
+    "lifelog": {
+      "url": "http://localhost:8081/sse"
+    }
+  }
+}
+```
+
+#### Cursor
+
+在 Cursor 设置中添加 MCP 服务器，或编辑 `.cursor/mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "lifelog": {
+      "url": "http://localhost:8081/sse"
+    }
+  }
+}
+```
+
+配置完成后，AI 助手即可通过自然语言查询你的日志数据，例如：
+
+- "我今天做了什么？"
+- "上周工作时间有多少？"
+- "最近一个月的作息趋势如何？"
 
 ## API 文档
 

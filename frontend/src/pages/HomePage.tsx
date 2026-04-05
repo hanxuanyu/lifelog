@@ -109,9 +109,9 @@ export function HomePage() {
   }, [currentDate])
 
   return (
-    <div className="flex flex-col h-full max-w-2xl mx-auto px-4">
-      {/* Date navigation — sticky */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pt-4 pb-3 shrink-0">
+    <div className="flex flex-col h-full max-w-2xl mx-auto px-4 overflow-hidden">
+      {/* Date navigation — fixed at top, same height as other pages' titles */}
+      <div className="shrink-0 pt-4 pb-3">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -170,7 +170,7 @@ export function HomePage() {
       </div>
 
       {/* Timeline — fills remaining space */}
-      <div className="flex-1 min-h-0 pb-4">
+      <div className="flex-1 min-h-0">
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <motion.div

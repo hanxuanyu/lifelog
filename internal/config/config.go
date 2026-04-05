@@ -133,6 +133,10 @@ categories:
         pattern: "修理"
       - type: fixed
         pattern: "做饭"
+
+mcp:
+  enabled: false
+  port: 8081
 `
 
 var (
@@ -330,6 +334,25 @@ func GetMCPPort() int {
 		return 8081
 	}
 	return p
+}
+
+// GetMCPConfig 获取MCP配置
+func GetMCPConfig() map[string]interface{} {
+	return map[string]interface{}{
+		"enabled": GetMCPEnabled(),
+		"port":    GetMCPPort(),
+	}
+}
+
+// SetMCPConfig 设置MCP配置（需重启生效）
+func SetMCPConfig(enabled *bool, port *int) error {
+	if enabled != nil {
+		viper.Set("mcp.enabled", *enabled)
+	}
+	if port != nil && *port > 0 {
+		viper.Set("mcp.port", *port)
+	}
+	return viper.WriteConfig()
 }
 
 // GetServerConfig 获取服务器配置（端口、数据库路径）

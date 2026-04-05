@@ -29,7 +29,7 @@ function TopNav() {
   const btnClass = "flex h-8 w-8 items-center justify-center rounded-full bg-secondary/80 text-secondary-foreground shadow-md hover:shadow-lg transition-shadow border backdrop-blur-sm"
 
   return (
-    <div className="fixed top-4 right-4 sm:top-5 sm:right-6 z-50 flex items-center gap-2">
+    <div className="fixed top-4 right-4 sm:top-5 sm:right-6 z-50 flex items-center gap-2" style={{ top: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}>
       {/* Quick add (home only) */}
       {isHome && (
         <motion.button
@@ -127,10 +127,10 @@ function GlobalShortcutListener() {
 
 function AppLayout() {
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-full flex flex-col">
       <TopNav />
       <GlobalShortcutListener />
-      <main className="flex-1 min-h-0">
+      <main className="flex-1 min-h-0 overflow-hidden">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/statistics" element={<StatisticsPage />} />

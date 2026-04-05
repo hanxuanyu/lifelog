@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   Plus, Trash2, Save, Lock, Eye, EyeOff,
   Server, Clock, Shield, Tag, X, Keyboard,
-  Download, Upload, Database,
+  Download, Upload, Database, Plug,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,7 +32,11 @@ export function SettingsPage() {
   const [serverPort, setServerPort] = useState(8080)
   const [dbPath, setDbPath] = useState("./data/lifelog.db")
   const [jwtExpireHours, setJwtExpireHours] = useState(168)
-  const [origSettings, setOrigSettings] = useState({ timePointMode: "end", serverPort: 8080, dbPath: "", jwtExpireHours: 168 })
+  const [origSettings, setOrigSettings] = useState({ timePointMode: "end", serverPort: 8080, dbPath: "", jwtExpireHours: 168, mcpEnabled: false, mcpPort: 8081 })
+
+  // MCP state
+  const [mcpEnabled, setMcpEnabled] = useState(false)
+  const [mcpPort, setMcpPort] = useState(8081)
 
   // Password state
   const [oldPassword, setOldPassword] = useState("")
@@ -94,11 +98,15 @@ export function SettingsPage() {
         setServerPort(settings?.server?.port || 8080)
         setDbPath(settings?.server?.db_path || "./data/lifelog.db")
         setJwtExpireHours(settings?.auth?.jwt_expire_hours || 168)
+        setMcpEnabled(settings?.mcp?.enabled || false)
+        setMcpPort(settings?.mcp?.port || 8081)
         setOrigSettings({
           timePointMode: settings?.time_point_mode || "end",
           serverPort: settings?.server?.port || 8080,
           dbPath: settings?.server?.db_path || "./data/lifelog.db",
           jwtExpireHours: settings?.auth?.jwt_expire_hours || 168,
+          mcpEnabled: settings?.mcp?.enabled || false,
+          mcpPort: settings?.mcp?.port || 8081,
         })
       })
       .catch(() => {})
@@ -109,7 +117,9 @@ export function SettingsPage() {
     timePointMode !== origSettings.timePointMode ||
     serverPort !== origSettings.serverPort ||
     dbPath !== origSettings.dbPath ||
-    jwtExpireHours !== origSettings.jwtExpireHours
+    jwtExpireHours !== origSettings.jwtExpireHours ||
+    mcpEnabled !== origSettings.mcpEnabled ||
+    mcpPort !== origSettings.mcpPort
 
   const categoriesDirty = JSON.stringify(categories) !== JSON.stringify(origCategories)
 
@@ -121,10 +131,12 @@ export function SettingsPage() {
       if (serverPort !== origSettings.serverPort) req.server_port = serverPort
       if (dbPath !== origSettings.dbPath) req.server_db_path = dbPath
       if (jwtExpireHours !== origSettings.jwtExpireHours) req.jwt_expire_hours = jwtExpireHours
+      if (mcpEnabled !== origSettings.mcpEnabled) req.mcp_enabled = mcpEnabled
+      if (mcpPort !== origSettings.mcpPort) req.mcp_port = mcpPort
 
       const res = await updateSettings(req)
       const needRestart = res.data?.need_restart
-      setOrigSettings({ timePointMode, serverPort, dbPath, jwtExpireHours })
+      setOrigSettings({ timePointMode, serverPort, dbPath, jwtExpireHours, mcpEnabled, mcpPort })
 
       if (needRestart) {
         toast.success("配置已保存", { description: "端口、数据库路径或JWT过期时间的变更需要重启服务后生效" })
@@ -269,11 +281,15 @@ export function SettingsPage() {
           setServerPort(settings?.server?.port || 8080)
           setDbPath(settings?.server?.db_path || "./data/lifelog.db")
           setJwtExpireHours(settings?.auth?.jwt_expire_hours || 168)
+          setMcpEnabled(settings?.mcp?.enabled || false)
+          setMcpPort(settings?.mcp?.port || 8081)
           setOrigSettings({
             timePointMode: settings?.time_point_mode || "end",
             serverPort: settings?.server?.port || 8080,
             dbPath: settings?.server?.db_path || "./data/lifelog.db",
             jwtExpireHours: settings?.auth?.jwt_expire_hours || 168,
+            mcpEnabled: settings?.mcp?.enabled || false,
+            mcpPort: settings?.mcp?.port || 8081,
           })
         })
         .catch(() => {})
@@ -299,9 +315,9 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-    <div className="max-w-5xl mx-auto px-4 pb-4">
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pt-4 pb-3">
+    <div className="h-full flex flex-col">
+    <div className="max-w-5xl mx-auto px-4 w-full flex flex-col h-full">
+      <div className="shrink-0 pt-4 pb-3">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -310,6 +326,7 @@ export function SettingsPage() {
         </motion.div>
       </div>
 
+      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4">
             {/* Left column: Settings */}
             <div className="space-y-4">
@@ -431,6 +448,46 @@ export function SettingsPage() {
                         修改后需要重启生效，当前约 {Math.round(jwtExpireHours / 24)} 天
                       </p>
                     </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* MCP 配置 */}
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Plug className="h-4 w-4" /> MCP 服务
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Model Context Protocol 服务，允许 AI 助手查询日志数据
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">启用 MCP 服务</Label>
+                      <Switch checked={mcpEnabled} onCheckedChange={setMcpEnabled} />
+                    </div>
+                    {mcpEnabled && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">MCP 端口</Label>
+                        <Input
+                          type="number"
+                          value={mcpPort}
+                          onChange={(e) => setMcpPort(parseInt(e.target.value) || 8081)}
+                          min={1}
+                          max={65535}
+                        />
+                        <p className="text-[10px] text-muted-foreground">
+                          SSE 端点: http://localhost:{mcpPort}/sse，修改后需重启生效
+                        </p>
+                        {mcpEnabled && (
+                          <p className="text-[10px] text-muted-foreground">
+                            已设置密码时，MCP 连接需携带 Bearer Token 认证
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
@@ -783,6 +840,7 @@ export function SettingsPage() {
               </AnimatePresence>
             </div>
           </div>
+      </div>
     </div>
     </div>
   )

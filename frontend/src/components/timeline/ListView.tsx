@@ -285,12 +285,16 @@ export function ListView({
     touchStartPos.current = { x: touch.clientX, y: touch.clientY }
     longPressTimerRef.current = setTimeout(() => {
       longPressFiredRef.current = true
+      // Prevent iOS default context menu / text selection
+      e.preventDefault()
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
       setContextMenu({
         entry,
         x: rect.left + rect.width / 2,
         y: rect.top,
       })
+      // Haptic feedback if available
+      if (navigator.vibrate) navigator.vibrate(10)
     }, 500)
   }
 
@@ -948,7 +952,7 @@ export function ListView({
                     <motion.div
                       whileTap={{ scale: 0.99 }}
                       className="group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm hover:brightness-95 transition-all cursor-pointer select-none"
-                      style={{ backgroundColor: `${color}10`, borderColor: `${color}20` }}
+                      style={{ backgroundColor: `${color}10`, borderColor: `${color}20`, WebkitTouchCallout: "none", touchAction: "pan-y" }}
                       onClick={() => handleCardClick(entry)}
                       onContextMenu={(e) => handleCardContextMenu(e, entry)}
                       onTouchStart={(e) => handleCardTouchStart(e, entry)}
