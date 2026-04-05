@@ -121,7 +121,7 @@ func StartMCPServer(port int) {
 	slog.Info("MCP 服务就绪", "tools_count", len(tools), "endpoint", fmt.Sprintf("http://localhost:%d/sse", port))
 
 	sseServer := mcpserver.NewSSEServer(s)
-	addr := fmt.Sprintf(":%d", port)
+	addr := fmt.Sprintf("0.0.0.0:%d", port)
 
 	// 使用自定义 HTTP 服务器包装认证中间件
 	httpServer := &http.Server{
