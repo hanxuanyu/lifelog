@@ -136,8 +136,9 @@ categories:
 `
 
 var (
-	mu         sync.RWMutex
-	categories []model.Category
+	mu          sync.RWMutex
+	categories  []model.Category
+	aiProviders []model.AIProvider
 )
 
 // Init 初始化配置，如果 config.yaml 不存在则创建默认配置
@@ -154,10 +155,12 @@ func Init() {
 	}
 
 	loadCategories()
+	loadAIProviders()
 
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		slog.Info("配置文件已变更，重新加载", "file", e.Name)
 		loadCategories()
+		loadAIProviders()
 	})
 	viper.WatchConfig()
 
@@ -264,6 +267,69 @@ func SetCategoriesConfig(cats []model.Category) error {
 	// 主动触发重新加载
 	loadCategories()
 	return nil
+}
+
+func loadAIProviders() {
+	mu.Lock()
+	defer mu.Unlock()
+
+	var providers []model.AIProvider
+	if err := viper.UnmarshalKey("ai.providers", &providers); err != nil {
+		slog.Error("解析AI配置失败", "error", err)
+		return
+	}
+	aiProviders = providers
+	slog.Info("AI配置已加载", "count", len(aiProviders))
+}
+
+// GetAIProviders 获取AI服务提供商列表（并发安全）
+func GetAIProviders() []model.AIProvider {
+	mu.RLock()
+	defer mu.RUnlock()
+	result := make([]model.AIProvider, len(aiProviders))
+	copy(result, aiProviders)
+	return result
+}
+
+// SetAIProviders 设置AI服务提供商并写入配置文件
+func SetAIProviders(providers []model.AIProvider) error {
+	viper.Set("ai.providers", providers)
+	if err := viper.WriteConfig(); err != nil {
+		return err
+	}
+	loadAIProviders()
+	return nil
+}
+
+// GetDefaultAIProvider 获取默认AI服务提供商
+func GetDefaultAIProvider() *model.AIProvider {
+	mu.RLock()
+	defer mu.RUnlock()
+	for _, p := range aiProviders {
+		if p.Default {
+			cp := p
+			return &cp
+		}
+	}
+	if len(aiProviders) > 0 {
+		cp := aiProviders[0]
+		return &cp
+	}
+	return nil
+}
+
+// GetMCPEnabled 获取MCP是否启用
+func GetMCPEnabled() bool {
+	return viper.GetBool("mcp.enabled")
+}
+
+// GetMCPPort 获取MCP服务端口
+func GetMCPPort() int {
+	p := viper.GetInt("mcp.port")
+	if p <= 0 {
+		return 8081
+	}
+	return p
 }
 
 // GetServerConfig 获取服务器配置（端口、数据库路径）

@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useEffect, useRef } from "react"
 import MarkdownIt from "markdown-it"
 
 const md = MarkdownIt({ html: true, linkify: true, typographer: true })
@@ -31,9 +31,32 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
   const html = useMemo(() => sanitizeHtml(md.render(content)), [content])
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    const pres = containerRef.current.querySelectorAll("pre")
+    pres.forEach((pre) => {
+      if (pre.querySelector(".code-copy-btn")) return
+      const btn = document.createElement("button")
+      btn.className = "code-copy-btn"
+      btn.textContent = "复制"
+      btn.addEventListener("click", () => {
+        const code = pre.querySelector("code")
+        const text = code ? code.textContent || "" : pre.textContent || ""
+        navigator.clipboard.writeText(text).then(() => {
+          btn.textContent = "已复制"
+          setTimeout(() => { btn.textContent = "复制" }, 1500)
+        })
+      })
+      pre.appendChild(btn)
+    })
+  }, [html])
+
   return (
     <div
-      className={className}
+      ref={containerRef}
+      className={`prose-compact ${className || ""}`}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   )

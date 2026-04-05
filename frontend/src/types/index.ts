@@ -109,3 +109,26 @@ export interface UpdateSettingsRequest {
 export interface UpdateSettingsResponse {
   need_restart: boolean
 }
+
+export interface AIProvider {
+  name: string
+  endpoint: string
+  api_key: string
+  model: string
+  default: boolean
+}
+
+export interface AIChatMessage {
+  role: "user" | "assistant"
+  content: string
+}
+
+export interface AIChatRequest {
+  provider_name?: string
+  start_date: string
+  end_date: string
+  message: string
+  history: AIChatMessage[]
+  system_prompt?: string
+  categories?: string[]
+}

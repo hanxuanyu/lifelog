@@ -66,6 +66,18 @@ func Setup(r *gin.Engine, staticFS fs.FS) {
 			data.GET("/export", handler.ExportData)
 			data.POST("/import", handler.ImportData)
 		}
+
+		// AI
+		ai := protected.Group("/ai")
+		{
+			ai.GET("/providers", handler.GetAIProviders)
+			ai.POST("/providers", handler.AddAIProvider)
+			ai.PUT("/providers/:name", handler.UpdateAIProvider)
+			ai.DELETE("/providers/:name", handler.DeleteAIProvider)
+			ai.POST("/providers/test", handler.TestAIProvider)
+			ai.POST("/models", handler.FetchModels)
+			ai.POST("/chat", handler.AIChat)
+		}
 	}
 
 	// 静态文件服务 - 嵌入前端构建产物

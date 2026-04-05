@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hxuanyu/lifelog/internal/config"
+	lifelogmcp "github.com/hxuanyu/lifelog/internal/mcp"
 	"github.com/hxuanyu/lifelog/internal/repository"
 	"github.com/hxuanyu/lifelog/internal/router"
 )
@@ -30,6 +31,11 @@ func main() {
 	r := gin.Default()
 	staticFS, _ := fs.Sub(webFS, "web")
 	router.Setup(r, staticFS)
+
+	// 启动 MCP 服务
+	if config.GetMCPEnabled() {
+		go lifelogmcp.StartMCPServer(config.GetMCPPort())
+	}
 
 	port := config.GetPort()
 	slog.Info("服务启动", "port", port)

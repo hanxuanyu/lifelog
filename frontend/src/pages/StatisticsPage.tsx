@@ -20,6 +20,7 @@ import { TrendChart } from "@/components/statistics/TrendChart"
 import { StackedBarChart } from "@/components/statistics/StackedBarChart"
 import { TopEventsCard } from "@/components/statistics/TopEventsCard"
 import { DailyAverageCard } from "@/components/statistics/DailyAverageCard"
+import { AISummaryChat } from "@/components/statistics/AISummaryChat"
 
 const FALLBACK_COLORS = [
   "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6",
@@ -164,7 +165,7 @@ export function StatisticsPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-    <div className="max-w-5xl mx-auto px-4 pb-20 sm:pb-4">
+    <div className="max-w-5xl mx-auto px-4 pb-4">
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pt-4 pb-3">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-lg font-semibold">数据统计</h1>
@@ -177,6 +178,7 @@ export function StatisticsPage() {
           <TabsTrigger value="weekly" className="flex-1">周统计</TabsTrigger>
           <TabsTrigger value="monthly" className="flex-1">月统计</TabsTrigger>
           <TabsTrigger value="trend" className="flex-1">趋势</TabsTrigger>
+          <TabsTrigger value="ai" className="flex-1">AI 总结</TabsTrigger>
         </TabsList>
 
         <div className="mt-4">
@@ -334,6 +336,11 @@ export function StatisticsPage() {
                 ) : (
                   <p className="text-center text-muted-foreground py-12 text-sm">暂无数据</p>
                 )}
+              </TabsContent>
+
+              {/* AI Summary Tab */}
+              <TabsContent value="ai" className="mt-0">
+                <AISummaryChat />
               </TabsContent>
             </>
           )}

@@ -1,7 +1,55 @@
 basePath: /
 definitions:
+  model.AIChatMessage:
+    properties:
+      content:
+        type: string
+      role:
+        type: string
+    type: object
+  model.AIChatRequest:
+    properties:
+      categories:
+        description: 可选，筛选指定分类的日志
+        items:
+          type: string
+        type: array
+      end_date:
+        type: string
+      history:
+        items:
+          $ref: '#/definitions/model.AIChatMessage'
+        type: array
+      message:
+        type: string
+      provider_name:
+        type: string
+      start_date:
+        type: string
+      system_prompt:
+        type: string
+    required:
+    - end_date
+    - message
+    - start_date
+    type: object
+  model.AIProvider:
+    properties:
+      api_key:
+        type: string
+      default:
+        type: boolean
+      endpoint:
+        type: string
+      model:
+        type: string
+      name:
+        type: string
+    type: object
   model.Category:
     properties:
+      color:
+        type: string
       name:
         type: string
       rules:
@@ -42,25 +90,58 @@ definitions:
         items:
           $ref: '#/definitions/model.CategorySummary'
         type: array
+      time_point_mode:
+        type: string
       total_known:
         description: 已知时长总秒数
+        type: integer
+    type: object
+  model.DayBreakdown:
+    properties:
+      date:
+        type: string
+      summary:
+        items:
+          $ref: '#/definitions/model.CategorySummary'
+        type: array
+      total_known:
         type: integer
     type: object
   model.DurationItem:
     properties:
       category:
         type: string
+      cross_day:
+        description: 跨天任务
+        type: boolean
       display:
         description: 可读格式 "1h30m"
         type: string
       duration:
         description: 秒
         type: integer
+      end_time:
+        description: HH:mm
+        type: string
       event_type:
+        type: string
+      start_time:
+        description: HH:mm
         type: string
       unknown:
         description: 首条/末条未知时长
         type: boolean
+    type: object
+  model.FetchModelsRequest:
+    properties:
+      api_key:
+        type: string
+      endpoint:
+        type: string
+      name:
+        type: string
+    required:
+    - endpoint
     type: object
   model.LogEntryRequest:
     properties:
@@ -91,6 +172,8 @@ definitions:
       log_date:
         type: string
       log_time:
+        type: string
+      time_point_mode:
         type: string
     type: object
   model.LoginRequest:
@@ -131,6 +214,10 @@ definitions:
         type: integer
       end_date:
         type: string
+      items:
+        items:
+          $ref: '#/definitions/model.DurationItem'
+        type: array
       start_date:
         type: string
       summary:
@@ -148,6 +235,17 @@ definitions:
       message:
         type: string
     type: object
+  model.TrendStatistics:
+    properties:
+      days:
+        items:
+          $ref: '#/definitions/model.DayBreakdown'
+        type: array
+      end_date:
+        type: string
+      start_date:
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -155,6 +253,178 @@ info:
   title: Lifelog API
   version: "1.0"
 paths:
+  /api/ai/chat:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 对话请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.AIChatRequest'
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: SSE 流式响应
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: AI 流式对话（SSE）
+      tags:
+      - AI
+  /api/ai/models:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 提供商接口信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.FetchModelsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  items:
+                    type: string
+                  type: array
+              type: object
+      summary: 获取AI提供商的可用模型列表
+      tags:
+      - AI
+  /api/ai/providers:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.AIProvider'
+                  type: array
+              type: object
+      summary: 获取AI服务提供商列表
+      tags:
+      - AI
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 提供商信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.AIProvider'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 添加AI服务提供商
+      tags:
+      - AI
+  /api/ai/providers/{name}:
+    delete:
+      parameters:
+      - description: 提供商名称
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 删除AI服务提供商
+      tags:
+      - AI
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 提供商名称
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: 提供商信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.AIProvider'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 更新AI服务提供商
+      tags:
+      - AI
+  /api/ai/providers/test:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 提供商信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.AIProvider'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 测试AI服务提供商连接
+      tags:
+      - AI
   /api/auth/login:
     post:
       consumes:
@@ -233,6 +503,68 @@ paths:
       summary: 获取所有大类及其匹配规则
       tags:
       - 大类
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 分类列表
+        in: body
+        name: categories
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/model.Category'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 更新分类规则
+      tags:
+      - 大类
+  /api/data/export:
+    get:
+      produces:
+      - application/zip
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      summary: 导出数据
+      tags:
+      - 数据管理
+  /api/data/import:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: 导出的 zip 文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: 是否合并日志（true=合并，false=替换）
+        in: formData
+        name: merge_logs
+        type: boolean
+      - description: 是否导入配置
+        in: formData
+        name: import_config
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 导入数据
+      tags:
+      - 数据管理
   /api/logs:
     get:
       parameters:
@@ -392,6 +724,25 @@ paths:
       summary: 修改日志条目
       tags:
       - 日志
+  /api/logs/event-types:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  items:
+                    type: string
+                  type: array
+              type: object
+      summary: 获取所有事项类型
+      tags:
+      - 日志
   /api/logs/timeline:
     get:
       parameters:
@@ -427,6 +778,19 @@ paths:
           schema:
             $ref: '#/definitions/model.Response'
       summary: 获取系统配置
+      tags:
+      - 设置
+    put:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 更新系统配置
       tags:
       - 设置
   /api/statistics/daily:
@@ -478,6 +842,34 @@ paths:
                   $ref: '#/definitions/model.PeriodStatistics'
               type: object
       summary: 获取某月的统计数据
+      tags:
+      - 统计
+  /api/statistics/trend:
+    get:
+      parameters:
+      - description: 开始日期 YYYY-MM-DD
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: 结束日期 YYYY-MM-DD
+        in: query
+        name: end_date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.TrendStatistics'
+              type: object
+      summary: 获取日期范围内每天的分类汇总
       tags:
       - 统计
   /api/statistics/weekly:

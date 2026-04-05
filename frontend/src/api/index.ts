@@ -11,6 +11,8 @@ import type {
   Settings,
   UpdateSettingsRequest,
   UpdateSettingsResponse,
+  AIProvider,
+  AIChatRequest,
 } from "@/types"
 
 const http = axios.create({
@@ -181,4 +183,107 @@ export async function importData(file: File, mergeLogs: boolean, importConfig: b
     timeout: 60000,
   })
   return res.data
+}
+
+// AI Providers
+export async function getAIProviders() {
+  const res = await http.get<ApiResponse<AIProvider[]>>("/ai/providers")
+  return res.data.data
+}
+
+export async function addAIProvider(provider: AIProvider) {
+  const res = await http.post<ApiResponse>("/ai/providers", provider)
+  return res.data
+}
+
+export async function updateAIProvider(name: string, provider: AIProvider) {
+  const res = await http.put<ApiResponse>(`/ai/providers/${encodeURIComponent(name)}`, provider)
+  return res.data
+}
+
+export async function deleteAIProvider(name: string) {
+  const res = await http.delete<ApiResponse>(`/ai/providers/${encodeURIComponent(name)}`)
+  return res.data
+}
+
+export async function testAIProvider(provider: AIProvider) {
+  const res = await http.post<ApiResponse>("/ai/providers/test", provider)
+  return res.data
+}
+
+export async function fetchAIModels(endpoint: string, apiKey: string, name?: string) {
+  const res = await http.post<ApiResponse<string[]>>("/ai/models", { endpoint, api_key: apiKey, name })
+  return res.data
+}
+
+// AI Chat (SSE streaming via fetch)
+export function streamAIChat(
+  req: AIChatRequest,
+  onChunk: (content: string) => void,
+  onDone: () => void,
+  onError: (err: string) => void,
+  signal?: AbortSignal,
+) {
+  const token = localStorage.getItem("token")
+  fetch("/api/ai/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(req),
+    signal,
+  })
+    .then(async (resp) => {
+      if (!resp.ok) {
+        const text = await resp.text()
+        try {
+          const json = JSON.parse(text)
+          onError(json.message || `请求失败 (${resp.status})`)
+        } catch {
+          onError(`请求失败 (${resp.status})`)
+        }
+        return
+      }
+      const reader = resp.body?.getReader()
+      if (!reader) {
+        onError("无法读取响应流")
+        return
+      }
+      const decoder = new TextDecoder()
+      let buffer = ""
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split("\n")
+        buffer = lines.pop() || ""
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue
+          const data = line.slice(6)
+          if (data === "[DONE]") {
+            onDone()
+            return
+          }
+          try {
+            const parsed = JSON.parse(data)
+            if (parsed.error) {
+              onError(parsed.error)
+              return
+            }
+            if (parsed.content) {
+              onChunk(parsed.content)
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
+      }
+      onDone()
+    })
+    .catch((err) => {
+      if (err.name !== "AbortError") {
+        onError(err.message || "请求失败")
+      }
+    })
 }

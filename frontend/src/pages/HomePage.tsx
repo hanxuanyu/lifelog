@@ -162,7 +162,7 @@ export function HomePage() {
       </div>
 
       {/* Timeline — fills remaining space */}
-      <div className="flex-1 min-h-0 pb-20 sm:pb-4">
+      <div className="flex-1 min-h-0 pb-4">
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <motion.div

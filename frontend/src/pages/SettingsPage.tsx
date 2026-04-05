@@ -22,6 +22,7 @@ import type { Category } from "@/types"
 import { toast } from "sonner"
 import { getShortcut, setShortcut, formatShortcut } from "@/hooks/use-shortcut"
 import { Switch } from "@/components/ui/switch"
+import { AIProviderSettings } from "@/components/settings/AIProviderSettings"
 
 export function SettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -299,7 +300,7 @@ export function SettingsPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-    <div className="max-w-5xl mx-auto px-4 pb-20 sm:pb-4">
+    <div className="max-w-5xl mx-auto px-4 pb-4">
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pt-4 pb-3">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -596,6 +597,9 @@ export function SettingsPage() {
                   </CardContent>
                 </Card>
               </motion.div>
+
+              {/* AI Provider Settings */}
+              <AIProviderSettings />
 
               {/* Import confirmation dialog */}
               <AlertDialog open={importDialogOpen} onOpenChange={(open) => {

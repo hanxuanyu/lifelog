@@ -111,7 +111,7 @@ func ExportData(c *gin.Context) {
 // @Tags 数据管理
 // @Accept multipart/form-data
 // @Produce json
-// @Param file formance file true "导出的 zip 文件"
+// @Param file formData file true "导出的 zip 文件"
 // @Param merge_logs formData bool false "是否合并日志（true=合并，false=替换）"
 // @Param import_config formData bool false "是否导入配置"
 // @Success 200 {object} model.Response
