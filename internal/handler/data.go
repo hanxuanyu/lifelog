@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -103,6 +104,7 @@ func ExportData(c *gin.Context) {
 
 	filename := fmt.Sprintf("lifelog-export-%s.zip", time.Now().Format("20060102-150405"))
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	slog.Info("数据导出完成", "logs_count", len(logs), "filename", filename)
 	c.Data(http.StatusOK, "application/zip", buf.Bytes())
 }
 
@@ -255,4 +257,5 @@ func ImportData(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "导入完成", Data: result})
+	slog.Info("数据导入完成", "merge", mergeLogs, "import_config", importConfig, "result", result)
 }

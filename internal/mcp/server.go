@@ -65,6 +65,7 @@ func toJSON(v interface{}) string {
 }
 
 func handleQueryLogs(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	slog.Debug("MCP: query_logs 调用")
 	q := repository.LogEntryQuery{
 		Date:      request.GetString("date", ""),
 		StartDate: request.GetString("start_date", ""),
@@ -84,6 +85,7 @@ func handleQueryLogs(_ context.Context, request mcp.CallToolRequest) (*mcp.CallT
 
 func handleGetDailyStatistics(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	date := request.GetString("date", "")
+	slog.Debug("MCP: get_daily_statistics 调用", "date", date)
 	if date == "" {
 		return mcp.NewToolResultError("date 参数必填"), nil
 	}
@@ -97,6 +99,7 @@ func handleGetDailyStatistics(_ context.Context, request mcp.CallToolRequest) (*
 func handleGetPeriodStatistics(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	startDate := request.GetString("start_date", "")
 	endDate := request.GetString("end_date", "")
+	slog.Debug("MCP: get_period_statistics 调用", "start", startDate, "end", endDate)
 	if startDate == "" || endDate == "" {
 		return mcp.NewToolResultError("start_date 和 end_date 参数必填"), nil
 	}
@@ -108,11 +111,13 @@ func handleGetPeriodStatistics(_ context.Context, request mcp.CallToolRequest) (
 }
 
 func handleGetCategories(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	slog.Debug("MCP: get_categories 调用")
 	cats := config.GetCategories()
 	return mcp.NewToolResultText(toJSON(cats)), nil
 }
 
 func handleGetEventTypes(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	slog.Debug("MCP: get_event_types 调用")
 	types, err := repository.GetDistinctEventTypes()
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("查询失败: %v", err)), nil

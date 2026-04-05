@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -30,13 +31,16 @@ func GetCategories(c *gin.Context) {
 func UpdateCategories(c *gin.Context) {
 	var cats []model.Category
 	if err := c.ShouldBindJSON(&cats); err != nil {
+		slog.Warn("更新分类参数错误", "error", err)
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "参数格式错误: " + err.Error()})
 		return
 	}
 	if err := config.SetCategoriesConfig(cats); err != nil {
+		slog.Error("保存分类配置失败", "error", err)
 		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: "保存失败: " + err.Error()})
 		return
 	}
+	slog.Info("分类规则已更新", "count", len(cats))
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "分类规则已更新（已热重载）"})
 }
 
@@ -79,9 +83,11 @@ func UpdateSettings(c *gin.Context) {
 	// 时间点模式（热重载）
 	if req.TimePointMode != nil {
 		if err := config.SetTimePointMode(*req.TimePointMode); err != nil {
+			slog.Error("设置时间模式失败", "error", err, "mode", *req.TimePointMode)
 			c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: "保存失败: " + err.Error()})
 			return
 		}
+		slog.Info("时间模式已更新", "mode", *req.TimePointMode)
 	}
 
 	// 服务器配置（需重启）

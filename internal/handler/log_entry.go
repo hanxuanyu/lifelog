@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -28,11 +29,13 @@ func CreateLogEntry(c *gin.Context) {
 
 	entry, err := service.CreateLogEntry(req)
 	if err != nil {
+		slog.Error("创建日志失败", "error", err, "event_type", req.EventType)
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: err.Error()})
 		return
 	}
 
 	resp := service.ToResponse(entry)
+	slog.Debug("日志已创建", "id", entry.ID, "date", entry.LogDate, "event_type", entry.EventType)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "创建成功", Data: resp})
 }
 
@@ -83,11 +86,13 @@ func UpdateLogEntry(c *gin.Context) {
 
 	entry, err := service.UpdateLogEntry(id, req)
 	if err != nil {
+		slog.Error("更新日志失败", "error", err, "id", id)
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: err.Error()})
 		return
 	}
 
 	resp := service.ToResponse(entry)
+	slog.Debug("日志已更新", "id", id, "event_type", entry.EventType)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "更新成功", Data: resp})
 }
 
@@ -106,10 +111,12 @@ func DeleteLogEntry(c *gin.Context) {
 	}
 
 	if err := service.DeleteLogEntry(id); err != nil {
+		slog.Error("删除日志失败", "error", err, "id", id)
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "删除失败: " + err.Error()})
 		return
 	}
 
+	slog.Info("日志已删除", "id", id)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "删除成功"})
 }
 

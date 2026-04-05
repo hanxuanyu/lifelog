@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -13,13 +14,16 @@ import (
 func Login(password string) (string, error) {
 	hash := config.GetPasswordHash()
 	if hash == "" {
+		slog.Warn("登录失败: 尚未设置密码")
 		return "", fmt.Errorf("尚未设置密码，请先设置密码")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+		slog.Warn("登录失败: 密码错误")
 		return "", fmt.Errorf("密码错误")
 	}
 
+	slog.Debug("密码验证通过，生成token")
 	return generateToken()
 }
 
@@ -36,9 +40,11 @@ func SetPassword(oldPassword, newPassword string) error {
 
 	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
+		slog.Error("密码加密失败", "error", err)
 		return fmt.Errorf("密码加密失败: %w", err)
 	}
 
+	slog.Info("密码已更新")
 	return config.SetPasswordHash(string(newHash))
 }
 

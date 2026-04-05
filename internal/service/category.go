@@ -1,6 +1,7 @@
 package service
 
 import (
+	"log/slog"
 	"regexp"
 	"sync"
 
@@ -86,6 +87,7 @@ func getCompiledRegex(pattern string) *regexp.Regexp {
 	}
 	compiled, err := regexp.Compile(pattern)
 	if err != nil {
+		slog.Warn("正则表达式编译失败", "pattern", pattern, "error", err)
 		return nil
 	}
 	regexCache[pattern] = compiled

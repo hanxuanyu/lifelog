@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -67,9 +68,11 @@ func AddAIProvider(c *gin.Context) {
 	}
 	providers = append(providers, req)
 	if err := config.SetAIProviders(providers); err != nil {
+		slog.Error("保存AI提供商失败", "error", err, "name", req.Name)
 		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: "保存失败: " + err.Error()})
 		return
 	}
+	slog.Info("AI提供商已添加", "name", req.Name, "endpoint", req.Endpoint, "model", req.Model)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "添加成功"})
 }
 
@@ -115,9 +118,11 @@ func UpdateAIProvider(c *gin.Context) {
 		return
 	}
 	if err := config.SetAIProviders(providers); err != nil {
+		slog.Error("更新AI提供商失败", "error", err, "name", name)
 		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: "保存失败: " + err.Error()})
 		return
 	}
+	slog.Info("AI提供商已更新", "name", name)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "更新成功"})
 }
 
@@ -146,9 +151,11 @@ func DeleteAIProvider(c *gin.Context) {
 		return
 	}
 	if err := config.SetAIProviders(newProviders); err != nil {
+		slog.Error("删除AI提供商失败", "error", err, "name", name)
 		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: "保存失败: " + err.Error()})
 		return
 	}
+	slog.Info("AI提供商已删除", "name", name)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "删除成功"})
 }
 
@@ -176,9 +183,11 @@ func TestAIProvider(c *gin.Context) {
 		}
 	}
 	if err := service.TestProvider(req); err != nil {
+		slog.Warn("AI提供商连接测试失败", "name", req.Name, "endpoint", req.Endpoint, "error", err)
 		c.JSON(http.StatusOK, model.Response{Code: 500, Message: "连接失败: " + err.Error()})
 		return
 	}
+	slog.Info("AI提供商连接测试成功", "name", req.Name)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "连接成功"})
 }
 
@@ -207,9 +216,11 @@ func FetchModels(c *gin.Context) {
 	}
 	models, err := service.FetchModels(req.Endpoint, req.APIKey)
 	if err != nil {
+		slog.Warn("获取模型列表失败", "endpoint", req.Endpoint, "error", err)
 		c.JSON(http.StatusOK, model.Response{Code: 500, Message: "获取模型列表失败: " + err.Error()})
 		return
 	}
+	slog.Debug("获取模型列表成功", "endpoint", req.Endpoint, "count", len(models))
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "ok", Data: models})
 }
 
@@ -244,9 +255,12 @@ func AIChat(c *gin.Context) {
 		provider = config.GetDefaultAIProvider()
 	}
 	if provider == nil {
+		slog.Warn("AI对话失败: 未配置提供商")
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "未配置AI服务提供商"})
 		return
 	}
+
+	slog.Info("AI对话请求", "provider", provider.Name, "model", provider.Model, "start", req.StartDate, "end", req.EndDate)
 
 	// 构建日志上下文
 	logContext, err := service.BuildLogContext(req.StartDate, req.EndDate, req.Categories)

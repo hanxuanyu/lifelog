@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hxuanyu/lifelog/internal/config"
+	"github.com/hxuanyu/lifelog/internal/logger"
 	lifelogmcp "github.com/hxuanyu/lifelog/internal/mcp"
 	"github.com/hxuanyu/lifelog/internal/repository"
 	"github.com/hxuanyu/lifelog/internal/router"
@@ -25,6 +26,7 @@ var webFS embed.FS
 // @in header
 // @name Authorization
 func main() {
+	logger.Init("./logs")
 	config.Init()
 	repository.InitDB(config.GetDBPath())
 

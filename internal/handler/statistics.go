@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -25,6 +26,7 @@ func GetDailyStatistics(c *gin.Context) {
 
 	stats, err := service.GetDailyStatistics(date)
 	if err != nil {
+		slog.Error("获取日统计失败", "error", err, "date", date)
 		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: err.Error()})
 		return
 	}
@@ -48,6 +50,7 @@ func GetWeeklyStatistics(c *gin.Context) {
 
 	stats, err := service.GetWeeklyStatistics(date)
 	if err != nil {
+		slog.Error("获取周统计失败", "error", err, "date", date)
 		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: err.Error()})
 		return
 	}
@@ -84,6 +87,7 @@ func GetMonthlyStatistics(c *gin.Context) {
 
 	stats, err := service.GetMonthlyStatistics(year, month)
 	if err != nil {
+		slog.Error("获取月统计失败", "error", err, "year", year, "month", month)
 		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: err.Error()})
 		return
 	}
@@ -109,6 +113,7 @@ func GetTrendStatistics(c *gin.Context) {
 
 	stats, err := service.GetTrendStatistics(startDate, endDate)
 	if err != nil {
+		slog.Error("获取趋势统计失败", "error", err, "start", startDate, "end", endDate)
 		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: err.Error()})
 		return
 	}

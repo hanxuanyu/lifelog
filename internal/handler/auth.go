@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -20,16 +21,19 @@ import (
 func Login(c *gin.Context) {
 	var req model.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		slog.Warn("登录参数错误", "error", err, "ip", c.ClientIP())
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "参数错误: " + err.Error()})
 		return
 	}
 
 	token, err := service.Login(req.Password)
 	if err != nil {
+		slog.Warn("登录失败", "error", err, "ip", c.ClientIP())
 		c.JSON(http.StatusUnauthorized, model.Response{Code: 401, Message: err.Error()})
 		return
 	}
 
+	slog.Info("登录成功", "ip", c.ClientIP())
 	c.JSON(http.StatusOK, model.Response{
 		Code:    200,
 		Message: "登录成功",
@@ -55,10 +59,12 @@ func SetPassword(c *gin.Context) {
 
 	token, err := service.SetPasswordAndLogin(req.OldPassword, req.NewPassword)
 	if err != nil {
+		slog.Warn("密码修改失败", "error", err, "ip", c.ClientIP())
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: err.Error()})
 		return
 	}
 
+	slog.Info("密码修改成功", "ip", c.ClientIP())
 	c.JSON(http.StatusOK, model.Response{
 		Code:    200,
 		Message: "密码设置成功",

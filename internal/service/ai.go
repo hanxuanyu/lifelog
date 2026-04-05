@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -18,8 +19,10 @@ import (
 func BuildLogContext(startDate, endDate string, categories []string) (string, error) {
 	entries, err := repository.GetEntriesByDateRange(startDate, endDate)
 	if err != nil {
+		slog.Error("构建日志上下文失败", "error", err, "start", startDate, "end", endDate)
 		return "", fmt.Errorf("查询日志失败: %w", err)
 	}
+	slog.Debug("构建日志上下文", "start", startDate, "end", endDate, "entries", len(entries), "categories_filter", len(categories))
 	if len(entries) == 0 {
 		return fmt.Sprintf("在 %s 至 %s 期间没有任何日志记录。", startDate, endDate), nil
 	}
@@ -90,6 +93,7 @@ func StreamChat(provider model.AIProvider, systemPrompt string, messages []model
 	client := &http.Client{Timeout: 5 * time.Minute}
 	resp, err := client.Do(req)
 	if err != nil {
+		slog.Error("AI流式请求失败", "endpoint", endpoint, "error", err)
 		return fmt.Errorf("请求AI服务失败: %w", err)
 	}
 	defer resp.Body.Close()
@@ -136,6 +140,7 @@ func StreamChat(provider model.AIProvider, systemPrompt string, messages []model
 
 // TestProvider 测试 AI 提供商连接
 func TestProvider(provider model.AIProvider) error {
+	slog.Debug("测试AI提供商连接", "name", provider.Name, "endpoint", provider.Endpoint, "model", provider.Model)
 	body, _ := json.Marshal(map[string]any{
 		"model":      provider.Model,
 		"messages":   []map[string]string{{"role": "user", "content": "Hi, reply with ok."}},
@@ -168,6 +173,7 @@ func TestProvider(provider model.AIProvider) error {
 
 // FetchModels 从 AI 提供商获取可用模型列表
 func FetchModels(endpoint, apiKey string) ([]string, error) {
+	slog.Debug("获取模型列表", "endpoint", endpoint)
 	url := strings.TrimRight(endpoint, "/") + "/models"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
