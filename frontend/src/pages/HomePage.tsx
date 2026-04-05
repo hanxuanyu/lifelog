@@ -72,7 +72,7 @@ export function HomePage() {
     return () => window.removeEventListener("openQuickAdd", handler)
   }, [])
 
-  const displayDate = format(currentDate, "M月d日 EEEE", { locale: zhCN })
+  const displayDate = format(currentDate, "M月d日 EEE", { locale: zhCN })
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -111,27 +111,17 @@ export function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center gap-1"
         >
-        <Button size="icon" variant="ghost" onClick={goPrev} className="h-7 w-7">
+        <Button size="icon" variant="ghost" onClick={goPrev} className="h-7 w-7 shrink-0">
           <ChevronLeft className="h-4 w-4" />
         </Button>
 
         <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
           <PopoverTrigger asChild>
-            <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-accent transition-colors text-sm">
-              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="font-medium">{displayDate}</span>
+            <button className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-accent transition-colors text-sm">
+              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="font-medium whitespace-nowrap">{displayDate}</span>
             </button>
           </PopoverTrigger>
-          {!isToday(currentDate) && (
-            <Button
-              variant="link"
-              size="xs"
-              onClick={(e) => { e.stopPropagation(); goToday() }}
-              className="text-[10px] ml-0.5 p-0 h-auto"
-            >
-              回今天
-            </Button>
-          )}
           <PopoverContent className="w-auto p-0" align="center">
             <Calendar
               mode="single"
@@ -149,11 +139,23 @@ export function HomePage() {
           </PopoverContent>
         </Popover>
 
+          {!isToday(currentDate) && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={goToday}
+              className="h-6 w-6 shrink-0 text-[10px] font-semibold text-primary"
+              title="回到今天"
+            >
+              今
+            </Button>
+          )}
+
           <Button
             size="icon"
             variant="ghost"
             onClick={goNext}
-            className="h-7 w-7"
+            className="h-7 w-7 shrink-0"
             disabled={isToday(currentDate)}
           >
             <ChevronRight className="h-4 w-4" />
