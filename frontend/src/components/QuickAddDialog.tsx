@@ -15,9 +15,10 @@ interface QuickAddDialogProps {
   open: boolean
   onClose: () => void
   onCreated: () => void
+  onUncategorized?: (eventType: string) => void
 }
 
-export function QuickAddDialog({ open, onClose, onCreated }: QuickAddDialogProps) {
+export function QuickAddDialog({ open, onClose, onCreated, onUncategorized }: QuickAddDialogProps) {
   const now = new Date()
   const h = String(now.getHours()).padStart(2, "0")
   const m = String(now.getMinutes()).padStart(2, "0")
@@ -78,13 +79,16 @@ export function QuickAddDialog({ open, onClose, onCreated }: QuickAddDialogProps
     }
     setSubmitting(true)
     try {
-      await createLog({
+      const entry = await createLog({
         log_date: dateStr,
         log_time: timeValue,
         event_type: eventValue.trim(),
         detail: detailValue.trim() || undefined,
       })
       toast.success("记录成功")
+      if (entry.category === "未分类") {
+        onUncategorized?.(eventValue.trim())
+      }
       onCreated()
       onClose()
     } catch (err: unknown) {

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Pencil, Trash2, Check, X, Plus, Maximize2, CalendarPlus } from "lucide-react"
+import { Pencil, Trash2, Check, X, Plus, Maximize2, CalendarPlus, Copy, Tag } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { updateLog, createLog } from "@/api"
@@ -8,6 +8,8 @@ import type { LogEntry, DurationItem } from "@/types"
 import { toast } from "sonner"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
 import { MarkdownEditor } from "@/components/MarkdownEditor"
+import { CategoryAssignDialog } from "@/components/CategoryAssignDialog"
+import { showCategoryAssignToast } from "@/lib/category-toast"
 import {
   Dialog,
   DialogContent,
@@ -64,6 +66,16 @@ export function ListView({
   const [isTouching, setIsTouching] = useState(false)
   const [saving, setSaving] = useState(false)
   const [detailDialog, setDetailDialog] = useState<{ title: string; detail: string; time: string } | null>(null)
+  const [assignDialog, setAssignDialog] = useState<{ open: boolean; eventType: string }>({
+    open: false,
+    eventType: "",
+  })
+  const [expandedEntryId, setExpandedEntryId] = useState<number | null>(null)
+  const [contextMenu, setContextMenu] = useState<{
+    entry: LogEntry
+    x: number
+    y: number
+  } | null>(null)
   const [railHeight, setRailHeight] = useState(0)
   const [cardPositions, setCardPositions] = useState<{top: number, bottom: number}[]>([])
 
@@ -79,6 +91,22 @@ export function ListView({
   const quickTimeRef = useRef<HTMLInputElement>(null)
   const editStartedRef = useRef(false)
   const quickCreateStartedRef = useRef(false)
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressFiredRef = useRef(false)
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null)
+
+  // Close context menu on outside click or scroll
+  useEffect(() => {
+    if (!contextMenu) return
+    const close = () => setContextMenu(null)
+    window.addEventListener("scroll", close, true)
+    window.addEventListener("pointerdown", close)
+    return () => {
+      window.removeEventListener("scroll", close, true)
+      window.removeEventListener("pointerdown", close)
+    }
+  }, [contextMenu])
 
   // Focus management
   useEffect(() => {
@@ -232,6 +260,70 @@ export function ListView({
 
   const cancelEdit = () => setEditingEntry(null)
 
+  // Card gesture handlers
+  const handleCardClick = (entry: LogEntry) => {
+    if (longPressFiredRef.current) return
+    if (clickTimerRef.current) {
+      // Double click — edit
+      clearTimeout(clickTimerRef.current)
+      clickTimerRef.current = null
+      startEdit(entry)
+    } else {
+      // Single click — expand/collapse detail (delayed to distinguish from double click)
+      clickTimerRef.current = setTimeout(() => {
+        clickTimerRef.current = null
+        if (entry.detail) {
+          setExpandedEntryId((prev) => (prev === entry.id ? null : entry.id))
+        }
+      }, 250)
+    }
+  }
+
+  const handleCardTouchStart = (e: React.TouchEvent, entry: LogEntry) => {
+    longPressFiredRef.current = false
+    const touch = e.touches[0]
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY }
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      setContextMenu({
+        entry,
+        x: rect.left + rect.width / 2,
+        y: rect.top,
+      })
+    }, 500)
+  }
+
+  const handleCardTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartPos.current) return
+    const touch = e.touches[0]
+    const dx = Math.abs(touch.clientX - touchStartPos.current.x)
+    const dy = Math.abs(touch.clientY - touchStartPos.current.y)
+    if (dx > 10 || dy > 10) {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current)
+        longPressTimerRef.current = null
+      }
+    }
+  }
+
+  const handleCardTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+    touchStartPos.current = null
+  }
+
+  const handleCardContextMenu = (e: React.MouseEvent, entry: LogEntry) => {
+    e.preventDefault()
+    setContextMenu({
+      entry,
+      x: e.clientX,
+      y: e.clientY,
+    })
+  }
+
   const saveEdit = async () => {
     if (!editingEntry) return
     try {
@@ -252,13 +344,19 @@ export function ListView({
     if (!quickCreate || !quickCreate.event.trim()) return
     setSaving(true)
     try {
-      await createLog({
+      const entry = await createLog({
         log_date: date,
         log_time: quickCreate.time,
         event_type: quickCreate.event.trim(),
         detail: quickCreate.detail || undefined,
       })
       toast.success("创建成功")
+      if (entry.category === "未分类") {
+        const evtType = quickCreate.event.trim()
+        showCategoryAssignToast(evtType, () => {
+          setAssignDialog({ open: true, eventType: evtType })
+        })
+      }
       setQuickCreate(null)
       onUpdate()
     } catch {
@@ -849,8 +947,13 @@ export function ListView({
                   ) : (
                     <motion.div
                       whileTap={{ scale: 0.99 }}
-                      className="group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm hover:brightness-95 transition-all cursor-default"
+                      className="group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm hover:brightness-95 transition-all cursor-pointer select-none"
                       style={{ backgroundColor: `${color}10`, borderColor: `${color}20` }}
+                      onClick={() => handleCardClick(entry)}
+                      onContextMenu={(e) => handleCardContextMenu(e, entry)}
+                      onTouchStart={(e) => handleCardTouchStart(e, entry)}
+                      onTouchMove={handleCardTouchMove}
+                      onTouchEnd={handleCardTouchEnd}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex-1 min-w-0">
@@ -859,8 +962,19 @@ export function ListView({
                               {entry.event_type}
                             </span>
                             <span
-                              className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                              className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium${
+                                entry.category === "未分类" ? " cursor-pointer hover:opacity-80 transition-opacity" : ""
+                              }`}
                               style={{ backgroundColor: color, color: getContrastText(color) }}
+                              onClick={
+                                entry.category === "未分类"
+                                  ? (e) => {
+                                      e.stopPropagation()
+                                      setAssignDialog({ open: true, eventType: entry.event_type })
+                                    }
+                                  : undefined
+                              }
+                              title={entry.category === "未分类" ? "点击分配分类" : undefined}
                             >
                               {entry.category}
                             </span>
@@ -883,11 +997,34 @@ export function ListView({
                             )}
                           </div>
                           {entry.detail && (
-                            <div className="mt-0.5">
-                              <div className="text-xs text-muted-foreground prose-compact min-w-0 [&>*]:line-clamp-2">
-                                <MarkdownRenderer content={entry.detail} />
-                              </div>
-                            </div>
+                            <AnimatePresence initial={false}>
+                              {expandedEntryId === entry.id ? (
+                                <motion.div
+                                  key="expanded"
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden mt-1"
+                                >
+                                  <div className="text-xs text-muted-foreground prose-compact min-w-0">
+                                    <MarkdownRenderer content={entry.detail} />
+                                  </div>
+                                </motion.div>
+                              ) : (
+                                <motion.div
+                                  key="collapsed"
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  className="mt-0.5"
+                                >
+                                  <div className="text-xs text-muted-foreground prose-compact min-w-0 [&>*]:line-clamp-2">
+                                    <MarkdownRenderer content={entry.detail} />
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           )}
                         </div>
                         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 sm:transition-opacity shrink-0">
@@ -896,13 +1033,14 @@ export function ListView({
                               size="icon"
                               variant="ghost"
                               className="h-6 w-6"
-                              onClick={() =>
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 setDetailDialog({
                                   title: entry.event_type,
                                   detail: entry.detail,
                                   time: formatTime(entry.log_time),
                                 })
-                              }
+                              }}
                               title="查看详情"
                             >
                               <Maximize2 className="h-3 w-3" />
@@ -912,7 +1050,10 @@ export function ListView({
                             size="icon"
                             variant="ghost"
                             className="h-6 w-6"
-                            onClick={() => startEdit(entry)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              startEdit(entry)
+                            }}
                           >
                             <Pencil className="h-3 w-3" />
                           </Button>
@@ -920,7 +1061,10 @@ export function ListView({
                             size="icon"
                             variant="ghost"
                             className="h-6 w-6 text-destructive hover:text-destructive"
-                            onClick={() => onDeleteRequest(entry.id)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onDeleteRequest(entry.id)
+                            }}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -956,6 +1100,94 @@ export function ListView({
         }
       `}</style>
 
+      {/* Context menu */}
+      <AnimatePresence>
+        {contextMenu && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.12 }}
+            className="fixed z-50 min-w-[140px] rounded-xl border bg-popover p-1 shadow-lg"
+            style={{
+              left: contextMenu.x,
+              top: contextMenu.y,
+              transform: "translate(-50%, -100%) translateY(-4px)",
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {contextMenu.entry.detail && (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-accent transition-colors"
+                onClick={() => {
+                  setDetailDialog({
+                    title: contextMenu.entry.event_type,
+                    detail: contextMenu.entry.detail,
+                    time: formatTime(contextMenu.entry.log_time),
+                  })
+                  setContextMenu(null)
+                }}
+              >
+                <Maximize2 className="h-3.5 w-3.5 text-muted-foreground" />
+                查看详情
+              </button>
+            )}
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-accent transition-colors"
+              onClick={() => {
+                startEdit(contextMenu.entry)
+                setContextMenu(null)
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              编辑
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-accent transition-colors"
+              onClick={() => {
+                const text = contextMenu.entry.detail
+                  ? `${contextMenu.entry.event_type}\n${contextMenu.entry.detail}`
+                  : contextMenu.entry.event_type
+                navigator.clipboard.writeText(text)
+                toast.success("已复制到剪贴板")
+                setContextMenu(null)
+              }}
+            >
+              <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+              复制内容
+            </button>
+            {contextMenu.entry.category === "未分类" && (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-accent transition-colors"
+                onClick={() => {
+                  setAssignDialog({ open: true, eventType: contextMenu.entry.event_type })
+                  setContextMenu(null)
+                }}
+              >
+                <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+                分配分类
+              </button>
+            )}
+            <div className="mx-2 my-1 border-t" />
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+              onClick={() => {
+                onDeleteRequest(contextMenu.entry.id)
+                setContextMenu(null)
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              删除
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Detail dialog */}
       <Dialog open={!!detailDialog} onOpenChange={(open) => !open && setDetailDialog(null)}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
@@ -971,6 +1203,14 @@ export function ListView({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Category assign dialog */}
+      <CategoryAssignDialog
+        open={assignDialog.open}
+        onOpenChange={(open) => setAssignDialog((prev) => ({ ...prev, open }))}
+        eventType={assignDialog.eventType}
+        onAssigned={() => onUpdate()}
+      />
     </div>
   )
 }

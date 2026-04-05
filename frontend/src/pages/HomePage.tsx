@@ -14,6 +14,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { QuickAddDialog } from "@/components/QuickAddDialog"
+import { CategoryAssignDialog } from "@/components/CategoryAssignDialog"
+import { showCategoryAssignToast } from "@/lib/category-toast"
 
 export function HomePage() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -64,6 +66,10 @@ export function HomePage() {
 
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [assignDialog, setAssignDialog] = useState<{ open: boolean; eventType: string }>({
+    open: false,
+    eventType: "",
+  })
 
   // Listen for global shortcut event
   useEffect(() => {
@@ -190,6 +196,20 @@ export function HomePage() {
         open={quickAddOpen}
         onClose={() => setQuickAddOpen(false)}
         onCreated={() => {
+          window.dispatchEvent(new CustomEvent("logCreated"))
+        }}
+        onUncategorized={(eventType) => {
+          showCategoryAssignToast(eventType, () => {
+            setAssignDialog({ open: true, eventType })
+          })
+        }}
+      />
+
+      <CategoryAssignDialog
+        open={assignDialog.open}
+        onOpenChange={(open) => setAssignDialog((prev) => ({ ...prev, open }))}
+        eventType={assignDialog.eventType}
+        onAssigned={() => {
           window.dispatchEvent(new CustomEvent("logCreated"))
         }}
       />
