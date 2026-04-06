@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState } from "react"
 import type { DurationItem } from "@/types"
 
 function formatDuration(seconds: number): string {
@@ -13,9 +13,11 @@ interface TopEventsCardProps {
   items: DurationItem[]
   getCatColor: (name: string, index: number) => string
   limit?: number
+  className?: string
 }
 
-export function TopEventsCard({ items, getCatColor, limit = 10 }: TopEventsCardProps) {
+export function TopEventsCard({ items, getCatColor, limit = 5, className = "" }: TopEventsCardProps) {
+  const [expanded, setExpanded] = useState(false)
   const filtered = (items || []).filter((item) => !item.unknown)
 
   const grouped = new Map<string, { duration: number; category: string }>()
@@ -31,56 +33,51 @@ export function TopEventsCard({ items, getCatColor, limit = 10 }: TopEventsCardP
   const ranked = Array.from(grouped.entries())
     .map(([name, { duration, category }]) => ({ name, duration, category }))
     .sort((a, b) => b.duration - a.duration)
-    .slice(0, limit)
 
-  if (ranked.length === 0) {
-    return (
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">事项排行</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-center text-muted-foreground py-8 text-sm">暂无数据</p>
-        </CardContent>
-      </Card>
-    )
-  }
+  if (ranked.length === 0) return null
 
   const maxDuration = ranked[0].duration
+  const visible = expanded ? ranked : ranked.slice(0, limit)
+  const hasMore = ranked.length > limit
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm">事项排行</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {ranked.map((item, i) => (
-            <div key={item.name} className="space-y-1">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground w-5 text-right text-xs">{i + 1}</span>
-                  <div
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: getCatColor(item.category, i) }}
-                  />
-                  <span className="truncate max-w-[140px]">{item.name}</span>
-                </div>
-                <span className="text-muted-foreground text-xs">{formatDuration(item.duration)}</span>
-              </div>
-              <div className="ml-7 h-1.5 rounded-full bg-muted overflow-hidden">
+    <div className={className}>
+      <div className="text-xs font-medium text-muted-foreground mb-2">事项排行</div>
+      <div className="space-y-1.5">
+        {visible.map((item, i) => (
+          <div key={item.name} className="space-y-0.5">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground w-4 text-right text-[10px]">{i + 1}</span>
                 <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${(item.duration / maxDuration) * 100}%`,
-                    backgroundColor: getCatColor(item.category, i),
-                  }}
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: getCatColor(item.category, i) }}
                 />
+                <span className="truncate max-w-[140px]">{item.name}</span>
               </div>
+              <span className="text-muted-foreground text-[11px]">{formatDuration(item.duration)}</span>
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+            <div className="ml-6 h-1 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${(item.duration / maxDuration) * 100}%`,
+                  backgroundColor: getCatColor(item.category, i),
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      {hasMore && (
+        <button
+          type="button"
+          className="w-full text-center text-[11px] text-muted-foreground hover:text-foreground transition-colors mt-2 py-1"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? "收起" : `展开全部 ${ranked.length} 项`}
+        </button>
+      )}
+    </div>
   )
 }

@@ -520,7 +520,8 @@ export function SettingsPage() {
                     </CardTitle>
                     <CardDescription className="text-xs">设置或修改访问密码</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent>
+                    <form onSubmit={(e) => { e.preventDefault(); handlePasswordChange() }} className="space-y-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs">旧密码</Label>
                       <div className="relative">
@@ -551,10 +552,11 @@ export function SettingsPage() {
                         </button>
                       </div>
                     </div>
-                    <Button size="sm" onClick={handlePasswordChange} disabled={changingPw || !newPassword} className="w-full">
+                    <Button type="submit" size="sm" disabled={changingPw || !newPassword} className="w-full">
                       <Save className="h-3.5 w-3.5 mr-1" />
                       {changingPw ? "保存中..." : "保存密码"}
                     </Button>
+                    </form>
                   </CardContent>
                 </Card>
               </motion.div>

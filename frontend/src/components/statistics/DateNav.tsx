@@ -5,11 +5,12 @@ interface DateNavProps {
   onPrev: () => void
   onNext: () => void
   label: string
+  className?: string
 }
 
-export function DateNav({ onPrev, onNext, label }: DateNavProps) {
+export function DateNav({ onPrev, onNext, label, className }: DateNavProps) {
   return (
-    <div className="flex items-center justify-center gap-2 mb-4">
+    <div className={className ?? "flex items-center justify-center gap-2 mb-4"}>
       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onPrev}>
         <ChevronLeft className="h-4 w-4" />
       </Button>
