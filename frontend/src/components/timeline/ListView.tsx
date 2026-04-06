@@ -327,18 +327,21 @@ export function ListView({
     longPressFiredRef.current = false
     const touch = e.touches[0]
     touchStartPos.current = { x: touch.clientX, y: touch.clientY }
-    // Capture the DOM element now — React's synthetic event (and currentTarget)
-    // will be nullified by the time the timeout fires.
-    const target = e.currentTarget as HTMLElement
+    // Only start long-press timer if the touch target is not inside the detail area
+    // (tapping on expanded detail content should not trigger context menu)
+    const target = e.target as HTMLElement
+    if (target.closest('.prose-compact')) {
+      return
+    }
+    const card = e.currentTarget as HTMLElement
     longPressTimerRef.current = setTimeout(() => {
       longPressFiredRef.current = true
-      const rect = target.getBoundingClientRect()
+      const rect = card.getBoundingClientRect()
       setContextMenu({
         entry,
         x: rect.left + rect.width / 2,
         y: rect.top,
       })
-      // Haptic feedback if available
       if (navigator.vibrate) navigator.vibrate(10)
     }, 500)
   }
@@ -595,7 +598,6 @@ export function ListView({
           const color = getCategoryColor(entry.category)
           const durItem = getDurationForEntry(i)
           const isHl = highlightIndex === i
-          const dimmed = highlightIndex !== null && highlightIndex !== i
 
           if (durItem && !durItem.unknown && durItem.start_time && durItem.end_time) {
             return (
@@ -604,9 +606,9 @@ export function ListView({
                   data-curve-index={i}
                   d=""
                   fill={color}
-                  fillOpacity={isHl ? 0.18 : dimmed ? 0.04 : 0.06}
+                  fillOpacity={isHl ? 0.20 : 0.10}
                   stroke="none"
-                  style={{ transition: "fill-opacity 0.15s" }}
+                  style={{ transition: "fill-opacity 0.3s" }}
                 />
               </g>
             )
@@ -620,9 +622,9 @@ export function ListView({
                 fill="none"
                 stroke={color}
                 strokeWidth={isHl ? 1.5 : 1}
-                strokeOpacity={isHl ? 0.6 : dimmed ? 0.15 : 0.25}
+                strokeOpacity={isHl ? 0.5 : 0.3}
                 strokeDasharray="3 2"
-                style={{ transition: "stroke-opacity 0.15s, stroke-width 0.15s" }}
+                style={{ transition: "stroke-opacity 0.3s, stroke-width 0.3s" }}
               />
               <circle
                 data-circle-index={i}
@@ -630,8 +632,8 @@ export function ListView({
                 cy={0}
                 r={isHl ? 3 : 2}
                 fill={color}
-                fillOpacity={isHl ? 0.7 : dimmed ? 0.2 : 0.3}
-                style={{ transition: "fill-opacity 0.15s" }}
+                fillOpacity={isHl ? 0.6 : 0.35}
+                style={{ transition: "fill-opacity 0.3s" }}
               />
             </g>
           )
@@ -657,7 +659,6 @@ export function ListView({
           const color = getCategoryColor(item.category)
           const entryIdx = durationToEntryMap.get(i)
           const isHl = entryIdx !== undefined && highlightIndex === entryIdx
-          const dimmed = highlightIndex !== null && !isHl
           const segHover = {
             pointerEvents: "auto" as const,
             cursor: "pointer" as const,
@@ -686,7 +687,7 @@ export function ListView({
                   height={y2 - y1}
                   rx={4}
                   fill={color}
-                  fillOpacity={isHl ? 0.85 : dimmed ? 0.25 : 0.45}
+                  fillOpacity={isHl ? 0.85 : 0.45}
                   stroke={isHl ? color : "none"}
                   strokeWidth={isHl ? 1.5 : 0}
                   strokeOpacity={0.8}
@@ -707,7 +708,7 @@ export function ListView({
                   height={y2 - y1}
                   rx={4}
                   fill={color}
-                  fillOpacity={isHl ? 0.85 : dimmed ? 0.25 : 0.45}
+                  fillOpacity={isHl ? 0.85 : 0.45}
                   stroke={isHl ? color : "none"}
                   strokeWidth={isHl ? 1.5 : 0}
                   strokeOpacity={0.8}
@@ -731,7 +732,7 @@ export function ListView({
               height={y2 - y1}
               rx={4}
               fill={color}
-              fillOpacity={isHl ? 0.9 : dimmed ? 0.35 : 0.6}
+              fillOpacity={isHl ? 0.9 : 0.6}
               stroke={isHl ? color : "none"}
               strokeWidth={isHl ? 1.5 : 0}
               strokeOpacity={0.8}
@@ -1059,8 +1060,8 @@ export function ListView({
                           : "hover:brightness-95"
                       }`}
                       style={{
-                        backgroundColor: highlightIndex === index ? `${color}20` : `${color}10`,
-                        borderColor: highlightIndex === index ? `${color}50` : `${color}20`,
+                        backgroundColor: highlightIndex === index ? `${color}33` : `${color}1a`,
+                        borderColor: highlightIndex === index ? `${color}50` : `${color}33`,
                         WebkitTouchCallout: "none",
                         touchAction: "pan-y",
                       }}
