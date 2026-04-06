@@ -1,0 +1,3 @@
+frontend/** linguist-vendored
+package.json linguist-vendored
+package-lock.json linguist-vendored
