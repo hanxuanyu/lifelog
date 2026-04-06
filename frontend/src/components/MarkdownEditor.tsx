@@ -186,7 +186,7 @@ export function MarkdownEditor({
         <button
           type="button"
           onClick={openFullscreen}
-          className="absolute right-1 top-1 z-10 p-1 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+          className="absolute right-1 bottom-1 z-10 p-1 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
           title="全屏编辑"
         >
           <Maximize2 className="h-3.5 w-3.5" />
@@ -205,7 +205,10 @@ export function MarkdownEditor({
     {/* Fullscreen editor rendered via Portal to escape any stacking context */}
     {fullscreen &&
       createPortal(
-        <div className="fixed inset-0 z-[9999] flex flex-col bg-background">
+        <div
+          className="fixed inset-0 z-[9999] flex flex-col bg-background"
+          style={{ top: "env(safe-area-inset-top, 0px)" }}
+        >
           <div className="flex items-center justify-between px-4 py-2 border-b shrink-0">
             <span className="text-sm font-medium">编辑详情</span>
             <button

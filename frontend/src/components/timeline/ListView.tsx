@@ -292,12 +292,26 @@ export function ListView({
 
   // Card gesture handlers
   const handleCardClick = (entry: LogEntry) => {
-    if (longPressFiredRef.current) return
+    // Always clear long-press timer on click to prevent stale fires
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false
+      return
+    }
     if (clickTimerRef.current) {
-      // Double click — edit
+      // Double click — show toast to confirm edit
       clearTimeout(clickTimerRef.current)
       clickTimerRef.current = null
-      startEdit(entry)
+      toast("编辑此记录？", {
+        action: {
+          label: "编辑",
+          onClick: () => startEdit(entry),
+        },
+        duration: 3000,
+      })
     } else {
       // Single click — expand/collapse detail (delayed to distinguish from double click)
       clickTimerRef.current = setTimeout(() => {
@@ -590,7 +604,7 @@ export function ListView({
                   data-curve-index={i}
                   d=""
                   fill={color}
-                  fillOpacity={isHl ? 0.18 : dimmed ? 0.02 : 0.06}
+                  fillOpacity={isHl ? 0.18 : dimmed ? 0.04 : 0.06}
                   stroke="none"
                   style={{ transition: "fill-opacity 0.15s" }}
                 />
@@ -606,7 +620,7 @@ export function ListView({
                 fill="none"
                 stroke={color}
                 strokeWidth={isHl ? 1.5 : 1}
-                strokeOpacity={isHl ? 0.6 : dimmed ? 0.1 : 0.25}
+                strokeOpacity={isHl ? 0.6 : dimmed ? 0.15 : 0.25}
                 strokeDasharray="3 2"
                 style={{ transition: "stroke-opacity 0.15s, stroke-width 0.15s" }}
               />
@@ -616,7 +630,7 @@ export function ListView({
                 cy={0}
                 r={isHl ? 3 : 2}
                 fill={color}
-                fillOpacity={isHl ? 0.7 : dimmed ? 0.1 : 0.3}
+                fillOpacity={isHl ? 0.7 : dimmed ? 0.2 : 0.3}
                 style={{ transition: "fill-opacity 0.15s" }}
               />
             </g>
@@ -643,6 +657,7 @@ export function ListView({
           const color = getCategoryColor(item.category)
           const entryIdx = durationToEntryMap.get(i)
           const isHl = entryIdx !== undefined && highlightIndex === entryIdx
+          const dimmed = highlightIndex !== null && !isHl
           const segHover = {
             pointerEvents: "auto" as const,
             cursor: "pointer" as const,
@@ -671,7 +686,7 @@ export function ListView({
                   height={y2 - y1}
                   rx={4}
                   fill={color}
-                  fillOpacity={isHl ? 0.85 : 0.45}
+                  fillOpacity={isHl ? 0.85 : dimmed ? 0.25 : 0.45}
                   stroke={isHl ? color : "none"}
                   strokeWidth={isHl ? 1.5 : 0}
                   strokeOpacity={0.8}
@@ -692,7 +707,7 @@ export function ListView({
                   height={y2 - y1}
                   rx={4}
                   fill={color}
-                  fillOpacity={isHl ? 0.85 : 0.45}
+                  fillOpacity={isHl ? 0.85 : dimmed ? 0.25 : 0.45}
                   stroke={isHl ? color : "none"}
                   strokeWidth={isHl ? 1.5 : 0}
                   strokeOpacity={0.8}
@@ -716,7 +731,7 @@ export function ListView({
               height={y2 - y1}
               rx={4}
               fill={color}
-              fillOpacity={isHl ? 0.9 : 0.6}
+              fillOpacity={isHl ? 0.9 : dimmed ? 0.35 : 0.6}
               stroke={isHl ? color : "none"}
               strokeWidth={isHl ? 1.5 : 0}
               strokeOpacity={0.8}
