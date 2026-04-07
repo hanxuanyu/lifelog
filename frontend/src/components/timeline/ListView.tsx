@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Pencil, Trash2, Check, X, Plus, Maximize2, CalendarPlus, Copy, Tag } from "lucide-react"
+import { Pencil, Trash2, Check, Plus, Maximize2, CalendarPlus, Copy, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { updateLog, createLog, getEventTypes } from "@/api"
 import type { LogEntry, DurationItem, Category, CrossDayHint } from "@/types"
@@ -30,6 +30,7 @@ const RAIL_WIDTH = 56 // Fixed rail column width (wider for left-side labels)
 const GAP = 4 // Gap between rail and cards
 const RAIL_PADDING = 12 // Top/bottom padding so dots aren't clipped
 const RAIL_LINE_X = 42 // X position of the rail line (right side, leaving space for labels)
+const SWIPE_ACTION_WIDTH = 84 // Width for swipe action buttons area
 
 interface ListViewProps {
   entries: LogEntry[]
@@ -90,7 +91,6 @@ export function ListView({
   const [cardPositions, setCardPositions] = useState<{top: number, bottom: number}[]>([])
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const highlightSourceRef = useRef<"rail" | "card" | null>(null)
-  const wrapperRef = useRef<HTMLDivElement>(null)
   const railRef = useRef<HTMLDivElement>(null)
   const cardsScrollRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map())
@@ -109,7 +109,6 @@ export function ListView({
   const swipeXRef = useRef(0)
   const swipingRef = useRef(false)
   const swipeActionsRef = useRef<HTMLDivElement | null>(null)
-  const SWIPE_ACTION_WIDTH = 84 // width for swipe action buttons area
 
   // Fetch event types for suggestions
   useEffect(() => {
@@ -140,7 +139,7 @@ export function ListView({
   // Close context menu on outside click or scroll
   useEffect(() => {
     if (!contextMenu) return
-    const close = () => { setContextMenu(null); setMenuPos(null) }
+    const close = closeContextMenu
     window.addEventListener("scroll", close, true)
     window.addEventListener("pointerdown", close)
     return () => {
@@ -225,13 +224,6 @@ export function ListView({
     })
     return map
   }, [entries, durationItems, getDurationForEntry])
-
-  // Reverse map: entry index → durationItems index
-  const entryToDurationMap = useMemo(() => {
-    const map = new Map<number, number>()
-    durationToEntryMap.forEach((entryIdx, durIdx) => map.set(entryIdx, durIdx))
-    return map
-  }, [durationToEntryMap])
 
   // Scroll highlighted card into view when highlight comes from rail
   useEffect(() => {
@@ -512,6 +504,8 @@ export function ListView({
     swipeActionsRef.current = null
   }
 
+  const closeContextMenu = () => { closeContextMenu() }
+
   const handleCardContextMenu = (e: React.MouseEvent, entry: LogEntry) => {
     e.preventDefault()
     setContextMenu({
@@ -652,6 +646,39 @@ export function ListView({
   const currentTimeRailY = isToday ? timeToRailY(currentTime) : -1
   const hoverRailY = hoverTime ? timeToRailY(hoverTime) : -1
 
+  // Ghost card for cross-day hints
+  const renderGhostCard = (hint: CrossDayHint, i: number, direction: "prev" | "next") => {
+    const color = getCategoryColor(hint.category)
+    return (
+      <motion.div
+        key={`ghost-${direction}-${i}`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="mb-1.5"
+      >
+        <div
+          className="rounded-r-xl border-y border-r border-l-0 border-dashed px-2.5 py-1.5 opacity-50"
+          style={{
+            backgroundColor: `${color}0d`,
+            borderColor: `${color}33`,
+          }}
+        >
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-medium text-sm truncate text-muted-foreground">
+              {hint.event_type}
+            </span>
+            <span className="text-[11px] font-mono text-muted-foreground">
+              {formatTime(hint.start_time)}~{formatTime(hint.end_time)}
+            </span>
+            <span className="text-[10px] text-muted-foreground/60 italic">
+              {direction === "prev" ? "接续上一天" : "延续至下一天"}
+            </span>
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
+
   // Quick create form
   const renderQuickCreateForm = (
     ref?: React.RefObject<HTMLInputElement | null>
@@ -772,51 +799,27 @@ export function ListView({
           }
 
           if (item.cross_day) {
-            // Use the duration item's own mode to determine which portion is on this day
             const entryMode = item.time_point_mode || (entryIdx !== undefined ? getEntryMode(entries[entryIdx]) : timePointMode)
-            if (entryMode === "end") {
-              const y1 = timeToRailY("00:00")
-              const y2 = timeToRailY(formatTime(item.end_time))
-              if (y2 <= y1) return null
-              return (
-                <rect
-                  key={`seg-${i}`}
-                  x={cx - 4}
-                  y={y1}
-                  width={8}
-                  height={y2 - y1}
-                  rx={4}
-                  fill={color}
-                  fillOpacity={isHl ? 0.85 : 0.45}
-                  stroke={isHl ? color : "none"}
-                  strokeWidth={isHl ? 1.5 : 0}
-                  strokeOpacity={0.8}
-                  style={{ transition: "fill-opacity 0.15s, stroke-width 0.15s" }}
-                  {...segHover}
-                />
-              )
-            } else {
-              const y1 = timeToRailY(formatTime(item.start_time))
-              const y2 = timeToRailY("23:59")
-              if (y2 <= y1) return null
-              return (
-                <rect
-                  key={`seg-${i}`}
-                  x={cx - 4}
-                  y={y1}
-                  width={8}
-                  height={y2 - y1}
-                  rx={4}
-                  fill={color}
-                  fillOpacity={isHl ? 0.85 : 0.45}
-                  stroke={isHl ? color : "none"}
-                  strokeWidth={isHl ? 1.5 : 0}
-                  strokeOpacity={0.8}
-                  style={{ transition: "fill-opacity 0.15s, stroke-width 0.15s" }}
-                  {...segHover}
-                />
-              )
-            }
+            const y1 = entryMode === "end" ? timeToRailY("00:00") : timeToRailY(formatTime(item.start_time))
+            const y2 = entryMode === "end" ? timeToRailY(formatTime(item.end_time)) : timeToRailY("23:59")
+            if (y2 <= y1) return null
+            return (
+              <rect
+                key={`seg-${i}`}
+                x={cx - 4}
+                y={y1}
+                width={8}
+                height={y2 - y1}
+                rx={4}
+                fill={color}
+                fillOpacity={isHl ? 0.85 : 0.45}
+                stroke={isHl ? color : "none"}
+                strokeWidth={isHl ? 1.5 : 0}
+                strokeOpacity={0.8}
+                style={{ transition: "fill-opacity 0.15s, stroke-width 0.15s" }}
+                {...segHover}
+              />
+            )
           }
 
           // Normal same-day segment
@@ -1023,7 +1026,7 @@ export function ListView({
   // ==================== EMPTY STATE ====================
   if (entries.length === 0 && !quickCreate) {
     return (
-      <div ref={wrapperRef} className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0">
         {/* Fixed rail */}
         <div
           ref={railRef}
@@ -1057,7 +1060,7 @@ export function ListView({
 
   // ==================== MAIN RENDER ====================
   return (
-    <div ref={wrapperRef} className="flex flex-1 min-h-0 relative">
+    <div className="flex flex-1 min-h-0 relative">
       {/* Fixed rail */}
       <div
         ref={railRef}
@@ -1086,37 +1089,7 @@ export function ListView({
           {/* Ghost cards for cross-day hints (direction: prev → top) */}
           {crossDayHints
             .filter((h) => h.direction === "prev")
-            .map((hint, i) => {
-              const color = getCategoryColor(hint.category)
-              return (
-                <motion.div
-                  key={`ghost-prev-${i}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="mb-1.5"
-                >
-                  <div
-                    className="rounded-r-xl border-y border-r border-l-0 border-dashed px-2.5 py-1.5 opacity-50"
-                    style={{
-                      backgroundColor: `${color}0d`,
-                      borderColor: `${color}33`,
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-medium text-sm truncate text-muted-foreground">
-                        {hint.event_type}
-                      </span>
-                      <span className="text-[11px] font-mono text-muted-foreground">
-                        {formatTime(hint.start_time)}~{formatTime(hint.end_time)}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground/60 italic">
-                        接续上一天
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-              )
-            })}
+            .map((hint, i) => renderGhostCard(hint, i, "prev"))}
 
           {entries.map((entry, index) => {
             const isEditing = editingEntry?.id === entry.id
@@ -1403,37 +1376,7 @@ export function ListView({
           {/* Ghost cards for cross-day hints (direction: next → bottom) */}
           {crossDayHints
             .filter((h) => h.direction === "next")
-            .map((hint, i) => {
-              const color = getCategoryColor(hint.category)
-              return (
-                <motion.div
-                  key={`ghost-next-${i}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="mb-1.5"
-                >
-                  <div
-                    className="rounded-r-xl border-y border-r border-l-0 border-dashed px-2.5 py-1.5 opacity-50"
-                    style={{
-                      backgroundColor: `${color}0d`,
-                      borderColor: `${color}33`,
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-medium text-sm truncate text-muted-foreground">
-                        {hint.event_type}
-                      </span>
-                      <span className="text-[11px] font-mono text-muted-foreground">
-                        {formatTime(hint.start_time)}~{formatTime(hint.end_time)}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground/60 italic">
-                        延续至下一天
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-              )
-            })}
+            .map((hint, i) => renderGhostCard(hint, i, "next"))}
 
         </AnimatePresence>
       </div>
@@ -1464,7 +1407,7 @@ export function ListView({
                     detail: contextMenu.entry.detail,
                     time: formatTime(contextMenu.entry.log_time),
                   })
-                  setContextMenu(null); setMenuPos(null)
+                  closeContextMenu()
                 }}
               >
                 <Maximize2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1476,7 +1419,7 @@ export function ListView({
               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-accent transition-colors"
               onClick={() => {
                 startEdit(contextMenu.entry)
-                setContextMenu(null); setMenuPos(null)
+                closeContextMenu()
               }}
             >
               <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1491,7 +1434,7 @@ export function ListView({
                   : contextMenu.entry.event_type
                 navigator.clipboard.writeText(text)
                 toast.success("已复制到剪贴板")
-                setContextMenu(null); setMenuPos(null)
+                closeContextMenu()
               }}
             >
               <Copy className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1503,7 +1446,7 @@ export function ListView({
                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-accent transition-colors"
                 onClick={() => {
                   setAssignDialog({ open: true, eventType: contextMenu.entry.event_type })
-                  setContextMenu(null); setMenuPos(null)
+                  closeContextMenu()
                 }}
               >
                 <Tag className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1516,7 +1459,7 @@ export function ListView({
               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
               onClick={() => {
                 onDeleteRequest(contextMenu.entry.id)
-                setContextMenu(null); setMenuPos(null)
+                closeContextMenu()
               }}
             >
               <Trash2 className="h-3.5 w-3.5" />
