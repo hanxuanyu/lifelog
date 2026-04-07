@@ -4,6 +4,7 @@ import { motion } from "framer-motion"
 interface TimePickerProps {
   value: string // "HH:mm"
   onChange: (value: string) => void
+  compact?: boolean
 }
 
 function WheelColumn({
@@ -11,14 +12,18 @@ function WheelColumn({
   selected,
   onSelect,
   label,
+  compact = false,
 }: {
   items: string[]
   selected: number
   onSelect: (index: number) => void
   label: string
+  compact?: boolean
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const itemHeight = 40
+  const itemHeight = compact ? 36 : 40
+  const containerHeight = compact ? 108 : 200
+  const gradientHeight = compact ? 36 : 80
   const isScrollingRef = useRef(false)
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -45,21 +50,21 @@ function WheelColumn({
 
   return (
     <div className="flex flex-col items-center">
-      <span className="text-xs text-muted-foreground mb-1">{label}</span>
-      <div className="relative h-[200px] w-[64px] overflow-hidden">
-        {/* Selection highlight — behind content */}
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[40px] bg-accent rounded-lg pointer-events-none z-0 border" />
-        {/* Gradient masks — above content */}
-        <div className="absolute inset-x-0 top-0 h-[80px] bg-gradient-to-b from-background to-transparent z-20 pointer-events-none" />
-        <div className="absolute inset-x-0 bottom-0 h-[80px] bg-gradient-to-t from-background to-transparent z-20 pointer-events-none" />
-        {/* Scrollable area — between highlight and masks */}
+      {!compact && <span className="text-xs text-muted-foreground mb-1">{label}</span>}
+      <div className="relative overflow-hidden" style={{ height: containerHeight, width: compact ? 52 : 64 }}>
+        {/* Selection highlight */}
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-accent rounded-lg pointer-events-none z-0 border" style={{ height: itemHeight }} />
+        {/* Gradient masks */}
+        <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-background to-transparent z-20 pointer-events-none" style={{ height: gradientHeight }} />
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background to-transparent z-20 pointer-events-none" style={{ height: gradientHeight }} />
+        {/* Scrollable area */}
         <div
           ref={containerRef}
           onScroll={handleScroll}
           className="relative z-10 h-full overflow-y-auto scrollbar-hide snap-y snap-mandatory"
           style={{
-            paddingTop: 80,
-            paddingBottom: 80,
+            paddingTop: containerHeight / 2 - itemHeight / 2,
+            paddingBottom: containerHeight / 2 - itemHeight / 2,
             scrollbarWidth: "none",
             msOverflowStyle: "none",
           }}
@@ -74,8 +79,8 @@ function WheelColumn({
               }}
               className={`snap-center flex items-center justify-center w-full transition-all duration-150 ${
                 i === selected
-                  ? "text-foreground font-semibold text-lg"
-                  : "text-muted-foreground text-base"
+                  ? `text-foreground font-semibold ${compact ? "text-base" : "text-lg"}`
+                  : `text-muted-foreground ${compact ? "text-sm" : "text-base"}`
               }`}
               style={{ height: itemHeight }}
             >
@@ -91,7 +96,7 @@ function WheelColumn({
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"))
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"))
 
-export function MobileTimePicker({ value, onChange }: TimePickerProps) {
+export function MobileTimePicker({ value, onChange, compact = false }: TimePickerProps) {
   const [h, m] = value.split(":").map(Number)
   const [hour, setHour] = useState(isNaN(h) ? new Date().getHours() : h)
   const [minute, setMinute] = useState(isNaN(m) ? new Date().getMinutes() : m)
@@ -113,11 +118,11 @@ export function MobileTimePicker({ value, onChange }: TimePickerProps) {
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="flex items-center justify-center gap-2 py-2"
+      className={`flex items-center justify-center gap-2 ${compact ? "py-1" : "py-2"}`}
     >
-      <WheelColumn items={HOURS} selected={hour} onSelect={setHour} label="时" />
-      <span className="text-2xl font-bold text-muted-foreground mt-5">:</span>
-      <WheelColumn items={MINUTES} selected={minute} onSelect={setMinute} label="分" />
+      <WheelColumn items={HOURS} selected={hour} onSelect={setHour} label="时" compact={compact} />
+      <span className={`${compact ? "text-xl" : "text-2xl"} font-bold text-muted-foreground ${compact ? "mt-0" : "mt-5"}`}>:</span>
+      <WheelColumn items={MINUTES} selected={minute} onSelect={setMinute} label="分" compact={compact} />
     </motion.div>
   )
 }

@@ -89,6 +89,7 @@ export function Timeline({
           onDeleteRequest={setDeleteTarget}
           getCategoryColor={getCategoryColor}
           getDurationForEntry={getDurationForEntry}
+          categories={categories}
           date={date}
           isToday={isToday}
           currentTime={currentTime}

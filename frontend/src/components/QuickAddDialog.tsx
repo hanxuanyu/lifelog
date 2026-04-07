@@ -1,12 +1,9 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Send, Clock, Tag, FileText } from "lucide-react"
+import { X, Send } from "lucide-react"
 import { format } from "date-fns"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { MobileTimePicker } from "@/components/MobileTimePicker"
-import { MarkdownEditor } from "@/components/MarkdownEditor"
+import { EventForm, type SuggestionTag } from "@/components/EventForm"
 import { createLog, getCategories, getEventTypes, getTimeline } from "@/api"
 import type { Category } from "@/types"
 import { toast } from "sonner"
@@ -26,8 +23,6 @@ export function QuickAddDialog({ open, onClose, onCreated, onUncategorized }: Qu
   const [timeValue, setTimeValue] = useState(`${h}:${m}`)
   const [eventValue, setEventValue] = useState("")
   const [detailValue, setDetailValue] = useState("")
-  const [showDetail, setShowDetail] = useState(false)
-  const [showTimePicker, setShowTimePicker] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [allEvents, setAllEvents] = useState<string[]>([])
@@ -41,8 +36,6 @@ export function QuickAddDialog({ open, onClose, onCreated, onUncategorized }: Qu
       setTimeValue(`${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`)
       setEventValue("")
       setDetailValue("")
-      setShowDetail(false)
-      setShowTimePicker(false)
 
       Promise.all([
         getCategories().catch(() => [] as Category[]),
@@ -64,13 +57,17 @@ export function QuickAddDialog({ open, onClose, onCreated, onUncategorized }: Qu
     }
   }, [open])
 
-  const filteredTags = eventValue.trim()
-    ? allEvents.filter((e) => e.toLowerCase().includes(eventValue.toLowerCase()))
-    : allEvents
-
-  const handleEventChange = (value: string) => {
-    setEventValue(value)
-  }
+  const suggestions: SuggestionTag[] = useMemo(() => {
+    return allEvents.map((name) => {
+      const cat = categories.find((c) =>
+        c.rules.some((r) => {
+          if (r.type === "fixed") return r.pattern === name
+          try { return new RegExp(r.pattern).test(name) } catch { return false }
+        })
+      )
+      return { name, categoryName: cat?.name, categoryColor: cat?.color }
+    })
+  }, [allEvents, categories])
 
   const handleSubmit = async () => {
     if (!timeValue.trim() || !eventValue.trim()) {
@@ -134,127 +131,18 @@ export function QuickAddDialog({ open, onClose, onCreated, onUncategorized }: Qu
 
             {/* Scrollable content */}
             <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
-              {/* Time section */}
-              <div className="mb-4">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setShowTimePicker(!showTimePicker)}
-                  className="flex items-center gap-2 px-3 py-2 h-auto rounded-xl bg-accent/50 hover:bg-accent w-full justify-start"
-                >
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-mono text-lg font-medium">{timeValue}</span>
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    {showTimePicker ? "收起" : "点击选择时间"}
-                  </span>
-                </Button>
-
-                <AnimatePresence>
-                  {showTimePicker && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden"
-                    >
-                      <MobileTimePicker value={timeValue} onChange={setTimeValue} />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Event input */}
-              <div className="mb-3">
-                <div className="flex items-center gap-2">
-                  <Tag className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <Input
-                    ref={eventInputRef}
-                    value={eventValue}
-                    onChange={(e) => handleEventChange(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault()
-                        handleSubmit()
-                      }
-                    }}
-                    placeholder="做了什么..."
-                    className="h-10 rounded-xl bg-accent/50 border-0 text-base"
-                  />
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={() => setShowDetail(!showDetail)}
-                    className={`shrink-0 ${
-                      showDetail ? "text-primary bg-primary/10" : "text-muted-foreground"
-                    }`}
-                    title="添加详情"
-                  >
-                    <FileText className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Detail editor */}
-              <AnimatePresence>
-                {showDetail && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="overflow-hidden mb-3"
-                  >
-                    <MarkdownEditor
-                      value={detailValue}
-                      onChange={setDetailValue}
-                      placeholder="输入详情（支持 Markdown）..."
-                      minHeight={100}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Suggestion tags */}
-              {filteredTags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {filteredTags.map((s) => {
-                    const cat = categories.find((c) =>
-                      c.rules.some((r) => {
-                        if (r.type === "fixed") return r.pattern === s
-                        try { return new RegExp(r.pattern).test(s) } catch { return false }
-                      })
-                    )
-                    const isSelected = eventValue === s
-                    return (
-                      <Badge
-                        key={s}
-                        asChild
-                        variant={isSelected ? "default" : "outline"}
-                        className={`cursor-pointer h-auto py-1 px-2.5 gap-1.5 ${
-                          isSelected
-                            ? ""
-                            : "bg-accent/60 text-secondary-foreground border-transparent hover:bg-accent hover:border-border"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setEventValue(isSelected ? "" : s)}
-                        >
-                          {cat && (
-                            <span
-                              className="w-1.5 h-1.5 rounded-full shrink-0"
-                              style={{ backgroundColor: isSelected ? undefined : cat.color }}
-                            />
-                          )}
-                          {s}
-                        </button>
-                      </Badge>
-                    )
-                  })}
-                </div>
-              )}
+              <EventForm
+                time={timeValue}
+                event={eventValue}
+                detail={detailValue}
+                onTimeChange={setTimeValue}
+                onEventChange={setEventValue}
+                onDetailChange={setDetailValue}
+                onSubmit={handleSubmit}
+                showActions={false}
+                suggestions={suggestions}
+                eventInputRef={eventInputRef}
+              />
             </div>
 
             {/* Fixed footer */}

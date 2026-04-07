@@ -1,13 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Pencil, Trash2, Check, X, Plus, Maximize2, CalendarPlus, Copy, Tag } from "lucide-react"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { updateLog, createLog } from "@/api"
-import type { LogEntry, DurationItem } from "@/types"
+import { updateLog, createLog, getEventTypes } from "@/api"
+import type { LogEntry, DurationItem, Category } from "@/types"
 import { toast } from "sonner"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
-import { MarkdownEditor } from "@/components/MarkdownEditor"
+import { EventForm, type SuggestionTag } from "@/components/EventForm"
 import { CategoryAssignDialog } from "@/components/CategoryAssignDialog"
 import { showCategoryAssignToast } from "@/lib/category-toast"
 import {
@@ -21,7 +20,6 @@ import {
   type EditState,
   type QuickCreateState,
   formatTime,
-  formatTimeInput,
   timeToMinutes,
   minutesToTime,
   getContrastText,
@@ -40,6 +38,7 @@ interface ListViewProps {
   onDeleteRequest: (id: number) => void
   getCategoryColor: (category: string) => string
   getDurationForEntry: (index: number) => DurationItem | null
+  categories?: Category[]
   date?: string
   isToday: boolean
   currentTime: string
@@ -55,6 +54,7 @@ export function ListView({
   onDeleteRequest,
   getCategoryColor,
   getDurationForEntry,
+  categories,
   date,
   isToday,
   currentTime,
@@ -70,6 +70,7 @@ export function ListView({
     open: false,
     eventType: "",
   })
+  const [allEvents, setAllEvents] = useState<string[]>([])
   const [expandedEntryId, setExpandedEntryId] = useState<number | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     entry: LogEntry
@@ -89,13 +90,38 @@ export function ListView({
   const rafIdRef = useRef(0)
   const editEventRef = useRef<HTMLInputElement>(null)
   const quickEventRef = useRef<HTMLInputElement>(null)
-  const quickTimeRef = useRef<HTMLInputElement>(null)
   const editStartedRef = useRef(false)
   const quickCreateStartedRef = useRef(false)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFiredRef = useRef(false)
   const touchStartPos = useRef<{ x: number; y: number } | null>(null)
+
+  // Fetch event types for suggestions
+  useEffect(() => {
+    getEventTypes().then(setAllEvents).catch(() => {})
+  }, [])
+
+  const suggestions: SuggestionTag[] = useMemo(() => {
+    if (!categories || categories.length === 0) return []
+    const recentEvents = [...new Set(entries.map((e) => e.event_type))].reverse()
+    const fixedEvents: string[] = []
+    categories.forEach((cat) =>
+      cat.rules.forEach((r) => {
+        if (r.type === "fixed") fixedEvents.push(r.pattern)
+      })
+    )
+    const merged = [...new Set([...recentEvents, ...fixedEvents, ...allEvents])]
+    return merged.map((name) => {
+      const cat = categories.find((c) =>
+        c.rules.some((r) => {
+          if (r.type === "fixed") return r.pattern === name
+          try { return new RegExp(r.pattern).test(name) } catch { return false }
+        })
+      )
+      return { name, categoryName: cat?.name, categoryColor: cat?.color }
+    })
+  }, [categories, allEvents, entries])
 
   // Close context menu on outside click or scroll
   useEffect(() => {
@@ -514,68 +540,21 @@ export function ListView({
     if (!quickCreate) return null
     return (
       <div className="rounded-xl border-2 border-primary/30 border-dashed bg-primary/5 p-3 shadow-sm">
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-2">
-            <Input
-              ref={quickTimeRef}
-              value={quickCreate.time}
-              onChange={(e) =>
-                setQuickCreate({
-                  ...quickCreate,
-                  time: formatTimeInput(e.target.value),
-                })
-              }
-              className="w-[80px] text-center font-mono text-sm"
-              maxLength={5}
-              placeholder="时间"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault()
-                  ;(ref || quickEventRef)?.current?.focus()
-                }
-                if (e.key === "Escape") setQuickCreate(null)
-              }}
-            />
-            <Input
-              ref={ref || quickEventRef}
-              value={quickCreate.event}
-              onChange={(e) =>
-                setQuickCreate({ ...quickCreate, event: e.target.value })
-              }
-              className="flex-1 text-sm"
-              placeholder="任务类型"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleQuickCreate()
-                if (e.key === "Escape") setQuickCreate(null)
-              }}
-            />
-          </div>
-          <MarkdownEditor
-            value={quickCreate.detail}
-            onChange={(v) =>
-              setQuickCreate({ ...quickCreate, detail: v })
-            }
-            placeholder="详情（可选，支持 Markdown）"
-            minHeight={80}
-          />
-          <div className="flex justify-end gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setQuickCreate(null)}
-            >
-              <X className="h-3.5 w-3.5 mr-1" /> 取消
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleQuickCreate}
-              disabled={saving || !quickCreate.event.trim()}
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              {saving ? "创建中..." : "创建"}
-            </Button>
-          </div>
-        </div>
+        <EventForm
+          time={quickCreate.time}
+          event={quickCreate.event}
+          detail={quickCreate.detail}
+          onTimeChange={(t) => setQuickCreate({ ...quickCreate, time: t })}
+          onEventChange={(e) => setQuickCreate({ ...quickCreate, event: e })}
+          onDetailChange={(d) => setQuickCreate({ ...quickCreate, detail: d })}
+          onSubmit={handleQuickCreate}
+          onCancel={() => setQuickCreate(null)}
+          submitting={saving}
+          submitLabel={saving ? "创建中..." : "创建"}
+          submitIcon={<Plus className="h-3.5 w-3.5" />}
+          suggestions={suggestions}
+          eventInputRef={ref || quickEventRef}
+        />
       </div>
     )
   }
@@ -990,66 +969,21 @@ export function ListView({
                 >
                   {isEditing ? (
                     <div className="rounded-xl border-2 border-primary/30 bg-card p-3 shadow-sm">
-                      <div className="flex flex-col gap-2">
-                        <div className="flex gap-2">
-                          <Input
-                            value={editingEntry.time}
-                            onChange={(e) =>
-                              setEditingEntry({
-                                ...editingEntry,
-                                time: formatTimeInput(e.target.value),
-                              })
-                            }
-                            className="w-[80px] text-center font-mono text-sm"
-                            maxLength={5}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault()
-                                editEventRef.current?.focus()
-                              }
-                              if (e.key === "Escape") cancelEdit()
-                            }}
-                          />
-                          <Input
-                            ref={editEventRef}
-                            value={editingEntry.event}
-                            onChange={(e) =>
-                              setEditingEntry({
-                                ...editingEntry,
-                                event: e.target.value,
-                              })
-                            }
-                            className="flex-1 text-sm"
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") saveEdit()
-                              if (e.key === "Escape") cancelEdit()
-                            }}
-                          />
-                        </div>
-                        <MarkdownEditor
-                          value={editingEntry.detail}
-                          onChange={(v) =>
-                            setEditingEntry({
-                              ...editingEntry,
-                              detail: v,
-                            })
-                          }
-                          placeholder="详情（可选，支持 Markdown）"
-                          minHeight={80}
-                        />
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={cancelEdit}
-                          >
-                            <X className="h-3.5 w-3.5 mr-1" /> 取消
-                          </Button>
-                          <Button size="sm" onClick={saveEdit}>
-                            <Check className="h-3.5 w-3.5 mr-1" /> 保存
-                          </Button>
-                        </div>
-                      </div>
+                      <EventForm
+                        time={editingEntry.time}
+                        event={editingEntry.event}
+                        detail={editingEntry.detail}
+                        onTimeChange={(t) => setEditingEntry({ ...editingEntry, time: t })}
+                        onEventChange={(e) => setEditingEntry({ ...editingEntry, event: e })}
+                        onDetailChange={(d) => setEditingEntry({ ...editingEntry, detail: d })}
+                        onSubmit={saveEdit}
+                        onCancel={cancelEdit}
+                        submitLabel="保存"
+                        submitIcon={<Check className="h-3.5 w-3.5" />}
+                        suggestions={suggestions}
+                        eventInputRef={editEventRef}
+                        initialDetailOpen={!!editingEntry.detail}
+                      />
                     </div>
                   ) : (
                     <motion.div
