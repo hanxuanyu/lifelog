@@ -289,7 +289,7 @@ export function ListView({
         crossDayHints={crossDayHints} getCategoryColor={getCategoryColor}
         getDurationForEntry={getDurationForEntry} highlightIndex={highlightIndex} />
 
-      <div ref={cardsScrollRef} className="flex-1 min-w-0 overflow-y-auto pt-2 pr-1"
+      <div ref={cardsScrollRef} className="flex-1 min-w-0 overflow-y-auto overscroll-none pt-2 pr-1"
         style={{ marginLeft: GAP, paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}>
         <AnimatePresence mode="popLayout">
           {crossDayHints.filter((h) => h.direction === "prev").map((hint, i) => renderGhostCard(hint, i, "prev"))}
