@@ -39,12 +39,13 @@ func MatchCategories(entries []model.LogEntry) []model.LogEntryResponse {
 	result := make([]model.LogEntryResponse, len(entries))
 	for i, e := range entries {
 		result[i] = model.LogEntryResponse{
-			ID:        e.ID,
-			LogDate:   e.LogDate,
-			LogTime:   e.LogTime,
-			EventType: e.EventType,
-			Detail:    e.Detail,
-			Category:  MatchCategory(e.EventType),
+			ID:            e.ID,
+			LogDate:       e.LogDate,
+			LogTime:       e.LogTime,
+			EventType:     e.EventType,
+			Detail:        e.Detail,
+			Category:      MatchCategory(e.EventType),
+			TimePointMode: e.TimePointMode,
 		}
 	}
 	return result

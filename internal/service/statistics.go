@@ -232,8 +232,9 @@ func calculateDurations(entries []model.LogEntry, currentDate string, prevEntry,
 	for i, e := range entries {
 		mode := getEntryMode(&e)
 		items[i] = model.DurationItem{
-			EventType: e.EventType,
-			Category:  MatchCategory(e.EventType),
+			EventType:     e.EventType,
+			Category:      MatchCategory(e.EventType),
+			TimePointMode: mode,
 		}
 
 		logTime := e.LogTime[:5] // "HH:mm"
@@ -304,7 +305,7 @@ func calculateDurations(entries []model.LogEntry, currentDate string, prevEntry,
 					}
 				} else {
 					items[i].Unknown = true
-					items[i].Display = "未知终点"
+					items[i].Display = "进行中"
 					items[i].EndTime = ""
 				}
 			} else {

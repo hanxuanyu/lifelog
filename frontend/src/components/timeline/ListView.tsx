@@ -62,6 +62,12 @@ export function ListView({
   currentTime,
   timePointMode = "end",
 }: ListViewProps) {
+  // Get effective mode for an entry: use entry's own mode if stored, fallback to global
+  const getEntryMode = useCallback(
+    (entry: LogEntry) => entry.time_point_mode || timePointMode,
+    [timePointMode]
+  )
+
   const [editingEntry, setEditingEntry] = useState<EditState | null>(null)
   const [quickCreate, setQuickCreate] = useState<QuickCreateState | null>(null)
   const [hoverTime, setHoverTime] = useState<string | null>(null)
@@ -222,7 +228,8 @@ export function ListView({
       if (durItem && !durItem.unknown && durItem.start_time && durItem.end_time) {
         let railTop: number, railBottom: number
         if (durItem.cross_day) {
-          if (timePointMode === "end") {
+          const mode = durItem.time_point_mode || getEntryMode(entry)
+          if (mode === "end") {
             railTop = timeToRailY("00:00")
             railBottom = timeToRailY(formatTime(durItem.end_time))
           } else {
@@ -249,7 +256,7 @@ export function ListView({
         if (circle) circle.setAttribute('cy', String(cardCenterY))
       }
     })
-  }, [entries, cardPositions, railHeight, getDurationForEntry, timePointMode, timeToRailY])
+  }, [entries, cardPositions, railHeight, getDurationForEntry, getEntryMode, timeToRailY])
 
   useEffect(() => {
     const el = cardsScrollRef.current
@@ -655,7 +662,9 @@ export function ListView({
           }
 
           if (item.cross_day) {
-            if (timePointMode === "end") {
+            // Use the duration item's own mode to determine which portion is on this day
+            const entryMode = item.time_point_mode || (entryIdx !== undefined ? getEntryMode(entries[entryIdx]) : timePointMode)
+            if (entryMode === "end") {
               const y1 = timeToRailY("00:00")
               const y2 = timeToRailY(formatTime(item.end_time))
               if (y2 <= y1) return null
@@ -1110,7 +1119,7 @@ export function ListView({
                             <span className="text-[11px] font-mono text-muted-foreground">
                               {durItem && !durItem.unknown && durItem.start_time && durItem.end_time
                                 ? `${formatTime(durItem.start_time)}~${formatTime(durItem.end_time)}`
-                                : `${formatTime(entry.log_time)}(${timePointMode === "end" ? "结束" : "开始"})`}
+                                : `${formatTime(entry.log_time)}(${getEntryMode(entry) === "end" ? "结束" : "开始"})`}
                             </span>
                             {durItem &&
                               !durItem.unknown &&

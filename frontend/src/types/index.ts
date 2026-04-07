@@ -37,6 +37,7 @@ export interface DurationItem {
   cross_day?: boolean
   start_time: string
   end_time: string
+  time_point_mode?: string
 }
 
 export interface CategorySummary {

@@ -52,14 +52,15 @@ type PasswordRequest struct {
 
 // DurationItem 单条时长统计项
 type DurationItem struct {
-	EventType string `json:"event_type"`
-	Category  string `json:"category"`
-	Duration  int    `json:"duration"`            // 秒
-	Display   string `json:"display"`             // 可读格式 "1h30m"
-	Unknown   bool   `json:"unknown,omitempty"`   // 首条/末条未知时长
-	CrossDay  bool   `json:"cross_day,omitempty"` // 跨天任务
-	StartTime string `json:"start_time"`          // HH:mm
-	EndTime   string `json:"end_time"`            // HH:mm
+	EventType     string `json:"event_type"`
+	Category      string `json:"category"`
+	Duration      int    `json:"duration"`                    // 秒
+	Display       string `json:"display"`                     // 可读格式 "1h30m"
+	Unknown       bool   `json:"unknown,omitempty"`           // 首条/末条未知时长
+	CrossDay      bool   `json:"cross_day,omitempty"`         // 跨天任务
+	StartTime     string `json:"start_time"`                  // HH:mm
+	EndTime       string `json:"end_time"`                    // HH:mm
+	TimePointMode string `json:"time_point_mode,omitempty"`   // 该条目创建时的模式
 }
 
 // CategorySummary 大类汇总
