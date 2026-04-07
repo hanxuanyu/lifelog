@@ -1,5 +1,13 @@
 import type { Category } from "@/types"
 
+// Layout constants
+export const RAIL_WIDTH = 56
+export const GAP = 4
+export const RAIL_PADDING = 12
+export const RAIL_LINE_X = 42
+export const SWIPE_ACTION_WIDTH = 84
+export const HOUR_MARKERS = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24]
+
 export const DEFAULT_COLORS: Record<string, string> = {
   工作: "#3b82f6",
   学习: "#10b981",
