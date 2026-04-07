@@ -34,7 +34,7 @@ function TopNav() {
 
   return (
     <div className="fixed top-4 right-4 sm:top-5 sm:right-6 z-50 flex items-center gap-2" style={{ top: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}>
-      {/* Quick add (home only) */}
+      {/* Quick add (home only, hidden on mobile — FAB replaces it) */}
       {isHome && (
         <motion.button
           initial={{ opacity: 0, y: -10 }}
@@ -43,7 +43,7 @@ function TopNav() {
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => window.dispatchEvent(new CustomEvent("openQuickAdd"))}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:shadow-lg transition-shadow"
+          className="hidden sm:flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:shadow-lg transition-shadow"
           title="快速记录"
         >
           <Plus className="h-4 w-4" />
@@ -162,6 +162,22 @@ function AppLayout() {
       <main className={isHome ? "flex-1 min-h-0 overflow-hidden flex flex-col" : "flex-1"}>
         <Outlet />
       </main>
+
+      {/* Mobile FAB — quick add (home only) */}
+      {isHome && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 300, damping: 20 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => window.dispatchEvent(new CustomEvent("openQuickAdd"))}
+          className="sm:hidden fixed right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg active:shadow-xl"
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 1.25rem)" }}
+          title="快速记录"
+        >
+          <Plus className="h-5 w-5" />
+        </motion.button>
+      )}
     </div>
   )
 }
