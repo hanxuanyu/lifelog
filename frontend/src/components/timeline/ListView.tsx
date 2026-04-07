@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Pencil, Trash2, Check, X, Plus, Maximize2, CalendarPlus, Copy, Tag } from "lucide-react"
+import { Pencil, Trash2, Check, Plus, Maximize2, CalendarPlus, Copy, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { updateLog, createLog, getEventTypes } from "@/api"
 import type { LogEntry, DurationItem, Category, CrossDayHint } from "@/types"
@@ -30,6 +30,7 @@ const RAIL_WIDTH = 56 // Fixed rail column width (wider for left-side labels)
 const GAP = 4 // Gap between rail and cards
 const RAIL_PADDING = 12 // Top/bottom padding so dots aren't clipped
 const RAIL_LINE_X = 42 // X position of the rail line (right side, leaving space for labels)
+const SWIPE_ACTION_WIDTH = 84 // Width for swipe action buttons area
 
 interface ListViewProps {
   entries: LogEntry[]
@@ -85,14 +86,16 @@ export function ListView({
     x: number
     y: number
   } | null>(null)
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null)
   const [railHeight, setRailHeight] = useState(0)
   const [cardPositions, setCardPositions] = useState<{top: number, bottom: number}[]>([])
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const highlightSourceRef = useRef<"rail" | "card" | null>(null)
-  const wrapperRef = useRef<HTMLDivElement>(null)
   const railRef = useRef<HTMLDivElement>(null)
   const cardsScrollRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+  const ghostCardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const [ghostCardPositions, setGhostCardPositions] = useState<Map<string, {top: number, bottom: number}>>(new Map())
   const curveSvgRef = useRef<SVGSVGElement>(null)
   const scrollTopRef = useRef(0)
   const rafIdRef = useRef(0)
@@ -104,6 +107,10 @@ export function ListView({
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFiredRef = useRef(false)
   const touchStartPos = useRef<{ x: number; y: number } | null>(null)
+  const [swipedEntryId, setSwipedEntryId] = useState<number | null>(null)
+  const swipeXRef = useRef(0)
+  const swipingRef = useRef(false)
+  const swipeActionsRef = useRef<HTMLDivElement | null>(null)
 
   // Fetch event types for suggestions
   useEffect(() => {
@@ -134,13 +141,42 @@ export function ListView({
   // Close context menu on outside click or scroll
   useEffect(() => {
     if (!contextMenu) return
-    const close = () => setContextMenu(null)
+    const close = closeContextMenu
     window.addEventListener("scroll", close, true)
     window.addEventListener("pointerdown", close)
     return () => {
       window.removeEventListener("scroll", close, true)
       window.removeEventListener("pointerdown", close)
     }
+  }, [contextMenu])
+
+  // Close swiped card on scroll
+  useEffect(() => {
+    if (swipedEntryId === null) return
+    const close = () => setSwipedEntryId(null)
+    window.addEventListener("scroll", close, true)
+    return () => window.removeEventListener("scroll", close, true)
+  }, [swipedEntryId])
+
+  // Compute clamped context menu position after mount
+  const contextMenuCallbackRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el || !contextMenu) return
+    requestAnimationFrame(() => {
+      const rect = el.getBoundingClientRect()
+      const pad = 8
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+
+      let left = contextMenu.x - rect.width / 2
+      if (left < pad) left = pad
+      else if (left + rect.width > vw - pad) left = vw - pad - rect.width
+
+      let top = contextMenu.y - rect.height - 4
+      if (top < pad) top = contextMenu.y + 4
+      if (top + rect.height > vh - pad) top = vh - pad - rect.height
+
+      setMenuPos({ left, top })
+    })
   }, [contextMenu])
 
   // Focus management
@@ -157,6 +193,12 @@ export function ListView({
       setTimeout(() => quickEventRef.current?.focus(), 50)
     }
   }, [quickCreate])
+
+  // Notify FAB to hide when editing/creating
+  useEffect(() => {
+    const isEditing = !!(editingEntry || quickCreate)
+    window.dispatchEvent(new CustomEvent("timelineEditing", { detail: isEditing }))
+  }, [editingEntry, quickCreate])
 
   // Track rail height
   useEffect(() => {
@@ -190,13 +232,6 @@ export function ListView({
     })
     return map
   }, [entries, durationItems, getDurationForEntry])
-
-  // Reverse map: entry index → durationItems index
-  const entryToDurationMap = useMemo(() => {
-    const map = new Map<number, number>()
-    durationToEntryMap.forEach((entryIdx, durIdx) => map.set(entryIdx, durIdx))
-    return map
-  }, [durationToEntryMap])
 
   // Scroll highlighted card into view when highlight comes from rail
   useEffect(() => {
@@ -256,7 +291,32 @@ export function ListView({
         if (circle) circle.setAttribute('cy', String(cardCenterY))
       }
     })
-  }, [entries, cardPositions, railHeight, getDurationForEntry, getEntryMode, timeToRailY])
+
+    // Update ghost hint ribbon paths
+    const ghostPaths = svg.querySelectorAll<SVGPathElement>('[data-ghost-curve-key]')
+    ghostPaths.forEach((pathEl) => {
+      const key = pathEl.dataset.ghostCurveKey
+      if (!key) return
+      const pos = ghostCardPositions.get(key)
+      if (!pos) return
+      // Parse direction and index from key (e.g. "prev-0", "next-1")
+      const [direction, idxStr] = key.split("-")
+      const idx = Number(idxStr)
+      const hintsForDir = crossDayHints.filter((h) => h.direction === direction)
+      const hint = hintsForDir[idx]
+      if (!hint) return
+
+      const railTop = timeToRailY(formatTime(hint.start_time))
+      const railBottom = timeToRailY(formatTime(hint.end_time))
+      if (railBottom <= railTop) return
+
+      const cardTop = pos.top - st
+      const cardBottom = pos.bottom - st
+      const railEdge = cx + 3
+      const midX = railEdge + (curveEndX - railEdge) * 0.5
+      pathEl.setAttribute('d', `M ${railEdge} ${railTop} C ${midX} ${railTop}, ${midX} ${cardTop}, ${curveEndX} ${cardTop} L ${curveEndX} ${cardBottom} C ${midX} ${cardBottom}, ${midX} ${railBottom}, ${railEdge} ${railBottom} Z`)
+    })
+  }, [entries, cardPositions, railHeight, getDurationForEntry, getEntryMode, timeToRailY, crossDayHints, ghostCardPositions])
 
   useEffect(() => {
     const el = cardsScrollRef.current
@@ -288,6 +348,13 @@ export function ListView({
       return { top: el.offsetTop, bottom: el.offsetTop + el.offsetHeight }
     })
     setCardPositions(positions)
+
+    // Measure ghost card positions
+    const ghostPositions = new Map<string, {top: number, bottom: number}>()
+    ghostCardRefs.current.forEach((el, key) => {
+      ghostPositions.set(key, { top: el.offsetTop, bottom: el.offsetTop + el.offsetHeight })
+    })
+    setGhostCardPositions(ghostPositions)
   }, [entries])
 
   useEffect(() => {
@@ -301,6 +368,8 @@ export function ListView({
     obs.observe(scrollEl)
     // Also observe all cards
     cardRefs.current.forEach((el) => obs.observe(el))
+    // Also observe ghost cards
+    ghostCardRefs.current.forEach((el) => obs.observe(el))
     return () => obs.disconnect()
   }, [measurePositions])
 
@@ -360,15 +429,35 @@ export function ListView({
 
   const handleCardTouchStart = (e: React.TouchEvent, entry: LogEntry) => {
     longPressFiredRef.current = false
+    swipingRef.current = false
+    swipeXRef.current = 0
     const touch = e.touches[0]
     touchStartPos.current = { x: touch.clientX, y: touch.clientY }
-    // Only start long-press timer if the touch target is not inside the detail area
-    // (tapping on expanded detail content should not trigger context menu)
+    // Close other swiped card when touching a different one
+    if (swipedEntryId !== null && swipedEntryId !== entry.id) {
+      setSwipedEntryId(null)
+    }
+    // Only skip long-press if tapping inside an *expanded* detail area
     const target = e.target as HTMLElement
-    if (target.closest('.prose-compact')) {
+    if (expandedEntryId === entry.id && target.closest('.prose-compact')) {
       return
     }
     const card = e.currentTarget as HTMLElement
+
+    // Attach native touchmove with { passive: false } to allow preventDefault during swipe
+    const onNativeTouchMove = (ev: TouchEvent) => {
+      if (swipingRef.current && ev.cancelable) ev.preventDefault()
+    }
+    card.addEventListener("touchmove", onNativeTouchMove, { passive: false })
+    // Clean up on touchend/cancel
+    const cleanup = () => {
+      card.removeEventListener("touchmove", onNativeTouchMove)
+      card.removeEventListener("touchend", cleanup)
+      card.removeEventListener("touchcancel", cleanup)
+    }
+    card.addEventListener("touchend", cleanup)
+    card.addEventListener("touchcancel", cleanup)
+
     longPressTimerRef.current = setTimeout(() => {
       longPressFiredRef.current = true
       const rect = card.getBoundingClientRect()
@@ -384,23 +473,80 @@ export function ListView({
   const handleCardTouchMove = (e: React.TouchEvent) => {
     if (!touchStartPos.current) return
     const touch = e.touches[0]
-    const dx = Math.abs(touch.clientX - touchStartPos.current.x)
+    const rawDx = touch.clientX - touchStartPos.current.x
+    const dx = Math.abs(rawDx)
     const dy = Math.abs(touch.clientY - touchStartPos.current.y)
+
+    // Cancel long-press on any movement
     if (dx > 10 || dy > 10) {
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current)
         longPressTimerRef.current = null
       }
     }
+
+    // Detect horizontal swipe (only on mobile-width screens)
+    if (!swipingRef.current && dx > 15 && dx > dy * 1.5 && window.innerWidth < 640) {
+      swipingRef.current = true
+      swipeActionsRef.current = e.currentTarget.parentElement?.querySelector('[data-swipe-actions]') as HTMLDivElement | null
+    }
+
+    if (swipingRef.current && swipeActionsRef.current) {
+      // offset: negative = swipe left (open), positive = swipe right (close)
+      let offset = rawDx
+      // If already open, adjust offset relative to open state
+      const isOpen = swipeActionsRef.current.dataset.open === "true"
+      if (isOpen) offset = offset - SWIPE_ACTION_WIDTH
+
+      // Clamp: max open = SWIPE_ACTION_WIDTH with rubber band; max close = 0
+      if (offset < -SWIPE_ACTION_WIDTH) {
+        offset = -SWIPE_ACTION_WIDTH - (Math.abs(offset) - SWIPE_ACTION_WIDTH) * 0.2
+      }
+      if (offset > 0) offset = 0
+
+      swipeXRef.current = offset
+      // Buttons slide: translateX goes from SWIPE_ACTION_WIDTH (hidden) to 0 (visible)
+      const btnTranslate = SWIPE_ACTION_WIDTH + offset // SWIPE_ACTION_WIDTH..0
+      swipeActionsRef.current.style.transform = `translateX(${btnTranslate}px)`
+      swipeActionsRef.current.style.transition = "none"
+      // Fade proportionally
+      const progress = Math.min(Math.abs(offset) / SWIPE_ACTION_WIDTH, 1)
+      swipeActionsRef.current.style.opacity = `${progress}`
+    }
   }
 
-  const handleCardTouchEnd = () => {
+  const handleCardTouchEnd = (entry: LogEntry) => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current)
       longPressTimerRef.current = null
     }
+
+    if (swipingRef.current && swipeActionsRef.current) {
+      const threshold = SWIPE_ACTION_WIDTH * 0.4
+      const transition = "transform 0.2s ease-out, opacity 0.2s ease-out"
+      if (swipeXRef.current < -threshold) {
+        // Snap open
+        swipeActionsRef.current.style.transform = "translateX(0)"
+        swipeActionsRef.current.style.opacity = "1"
+        swipeActionsRef.current.style.transition = transition
+        swipeActionsRef.current.dataset.open = "true"
+        setSwipedEntryId(entry.id)
+      } else {
+        // Snap closed
+        swipeActionsRef.current.style.transform = `translateX(${SWIPE_ACTION_WIDTH}px)`
+        swipeActionsRef.current.style.opacity = "0"
+        swipeActionsRef.current.style.transition = transition
+        swipeActionsRef.current.dataset.open = "false"
+        if (swipedEntryId === entry.id) setSwipedEntryId(null)
+      }
+    }
+
     touchStartPos.current = null
+    swipingRef.current = false
+    swipeActionsRef.current = null
   }
+
+  const closeContextMenu = () => { setContextMenu(null); setMenuPos(null) }
 
   const handleCardContextMenu = (e: React.MouseEvent, entry: LogEntry) => {
     e.preventDefault()
@@ -542,6 +688,44 @@ export function ListView({
   const currentTimeRailY = isToday ? timeToRailY(currentTime) : -1
   const hoverRailY = hoverTime ? timeToRailY(hoverTime) : -1
 
+  // Ghost card for cross-day hints
+  const renderGhostCard = (hint: CrossDayHint, i: number, direction: "prev" | "next") => {
+    const color = getCategoryColor(hint.category)
+    const refKey = `${direction}-${i}`
+    return (
+      <motion.div
+        key={`ghost-${direction}-${i}`}
+        ref={(el: HTMLDivElement | null) => {
+          if (el) ghostCardRefs.current.set(refKey, el)
+          else ghostCardRefs.current.delete(refKey)
+        }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="mb-1.5"
+      >
+        <div
+          className="rounded-r-xl border-y border-r border-l-0 border-dashed px-2.5 py-1.5 opacity-50"
+          style={{
+            backgroundColor: `${color}0d`,
+            borderColor: `${color}33`,
+          }}
+        >
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-medium text-sm truncate text-muted-foreground">
+              {hint.event_type}
+            </span>
+            <span className="text-[11px] font-mono text-muted-foreground">
+              {formatTime(hint.start_time)}~{formatTime(hint.end_time)}
+            </span>
+            <span className="text-[10px] text-muted-foreground/60 italic">
+              {direction === "prev" ? "接续上一天" : "延续至下一天"}
+            </span>
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
+
   // Quick create form
   const renderQuickCreateForm = (
     ref?: React.RefObject<HTMLInputElement | null>
@@ -596,7 +780,7 @@ export function ListView({
                   fill={color}
                   fillOpacity={isHl ? 0.20 : 0.10}
                   stroke="none"
-                  style={{ transition: "fill-opacity 0.3s" }}
+                  style={{ transition: "fill-opacity 0.15s" }}
                 />
               </g>
             )
@@ -612,7 +796,7 @@ export function ListView({
                 strokeWidth={isHl ? 1.5 : 1}
                 strokeOpacity={isHl ? 0.5 : 0.3}
                 strokeDasharray="3 2"
-                style={{ transition: "stroke-opacity 0.3s, stroke-width 0.3s" }}
+                style={{ transition: "stroke-opacity 0.15s, stroke-width 0.15s" }}
               />
               <circle
                 data-circle-index={i}
@@ -621,7 +805,26 @@ export function ListView({
                 r={isHl ? 3 : 2}
                 fill={color}
                 fillOpacity={isHl ? 0.6 : 0.35}
-                style={{ transition: "fill-opacity 0.3s" }}
+                style={{ transition: "fill-opacity 0.15s" }}
+              />
+            </g>
+          )
+        })}
+        {/* Ghost hint ribbons */}
+        {crossDayHints.map((hint, i) => {
+          const color = getCategoryColor(hint.category)
+          const key = `${hint.direction}-${i}`
+          return (
+            <g key={`ghost-curve-${key}`}>
+              <path
+                data-ghost-curve-key={key}
+                d=""
+                fill={color}
+                fillOpacity={0.06}
+                stroke={color}
+                strokeWidth={1}
+                strokeOpacity={0.2}
+                strokeDasharray="4 3"
               />
             </g>
           )
@@ -662,51 +865,27 @@ export function ListView({
           }
 
           if (item.cross_day) {
-            // Use the duration item's own mode to determine which portion is on this day
             const entryMode = item.time_point_mode || (entryIdx !== undefined ? getEntryMode(entries[entryIdx]) : timePointMode)
-            if (entryMode === "end") {
-              const y1 = timeToRailY("00:00")
-              const y2 = timeToRailY(formatTime(item.end_time))
-              if (y2 <= y1) return null
-              return (
-                <rect
-                  key={`seg-${i}`}
-                  x={cx - 4}
-                  y={y1}
-                  width={8}
-                  height={y2 - y1}
-                  rx={4}
-                  fill={color}
-                  fillOpacity={isHl ? 0.85 : 0.45}
-                  stroke={isHl ? color : "none"}
-                  strokeWidth={isHl ? 1.5 : 0}
-                  strokeOpacity={0.8}
-                  style={{ transition: "fill-opacity 0.15s, stroke-width 0.15s" }}
-                  {...segHover}
-                />
-              )
-            } else {
-              const y1 = timeToRailY(formatTime(item.start_time))
-              const y2 = timeToRailY("23:59")
-              if (y2 <= y1) return null
-              return (
-                <rect
-                  key={`seg-${i}`}
-                  x={cx - 4}
-                  y={y1}
-                  width={8}
-                  height={y2 - y1}
-                  rx={4}
-                  fill={color}
-                  fillOpacity={isHl ? 0.85 : 0.45}
-                  stroke={isHl ? color : "none"}
-                  strokeWidth={isHl ? 1.5 : 0}
-                  strokeOpacity={0.8}
-                  style={{ transition: "fill-opacity 0.15s, stroke-width 0.15s" }}
-                  {...segHover}
-                />
-              )
-            }
+            const y1 = entryMode === "end" ? timeToRailY("00:00") : timeToRailY(formatTime(item.start_time))
+            const y2 = entryMode === "end" ? timeToRailY(formatTime(item.end_time)) : timeToRailY("23:59")
+            if (y2 <= y1) return null
+            return (
+              <rect
+                key={`seg-${i}`}
+                x={cx - 4}
+                y={y1}
+                width={8}
+                height={y2 - y1}
+                rx={4}
+                fill={color}
+                fillOpacity={isHl ? 0.85 : 0.45}
+                stroke={isHl ? color : "none"}
+                strokeWidth={isHl ? 1.5 : 0}
+                strokeOpacity={0.8}
+                style={{ transition: "fill-opacity 0.15s, stroke-width 0.15s" }}
+                {...segHover}
+              />
+            )
           }
 
           // Normal same-day segment
@@ -913,7 +1092,7 @@ export function ListView({
   // ==================== EMPTY STATE ====================
   if (entries.length === 0 && !quickCreate) {
     return (
-      <div ref={wrapperRef} className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0">
         {/* Fixed rail */}
         <div
           ref={railRef}
@@ -947,7 +1126,7 @@ export function ListView({
 
   // ==================== MAIN RENDER ====================
   return (
-    <div ref={wrapperRef} className="flex flex-1 min-h-0 relative">
+    <div className="flex flex-1 min-h-0 relative">
       {/* Fixed rail */}
       <div
         ref={railRef}
@@ -976,37 +1155,7 @@ export function ListView({
           {/* Ghost cards for cross-day hints (direction: prev → top) */}
           {crossDayHints
             .filter((h) => h.direction === "prev")
-            .map((hint, i) => {
-              const color = getCategoryColor(hint.category)
-              return (
-                <motion.div
-                  key={`ghost-prev-${i}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="mb-1.5"
-                >
-                  <div
-                    className="rounded-r-xl border-y border-r border-l-0 border-dashed px-2.5 py-1.5 opacity-50"
-                    style={{
-                      backgroundColor: `${color}0d`,
-                      borderColor: `${color}33`,
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-medium text-sm truncate text-muted-foreground">
-                        {hint.event_type}
-                      </span>
-                      <span className="text-[11px] font-mono text-muted-foreground">
-                        {formatTime(hint.start_time)}~{formatTime(hint.end_time)}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground/60 italic">
-                        接续上一天
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-              )
-            })}
+            .map((hint, i) => renderGhostCard(hint, i, "prev"))}
 
           {entries.map((entry, index) => {
             const isEditing = editingEntry?.id === entry.id
@@ -1056,43 +1205,49 @@ export function ListView({
                       />
                     </div>
                   ) : (
-                    <motion.div
-                      whileTap={{ opacity: 0.85 }}
-                      className={`group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm transition-all cursor-pointer select-none ${
-                        highlightIndex === index
-                          ? "brightness-95 shadow-md"
-                          : "hover:brightness-95"
-                      }`}
-                      style={{
-                        backgroundColor: highlightIndex === index ? `${color}33` : `${color}1a`,
-                        borderColor: highlightIndex === index ? `${color}50` : `${color}33`,
-                        WebkitTouchCallout: "none",
-                        touchAction: "pan-y",
-                      }}
-                      onClick={() => handleCardClick(entry)}
-                      onContextMenu={(e) => handleCardContextMenu(e, entry)}
-                      onMouseEnter={() => {
-                        highlightSourceRef.current = "card"
-                        setHighlightIndex(index)
-                      }}
-                      onMouseLeave={() => {
-                        if (highlightSourceRef.current === "card") setHighlightIndex(null)
-                      }}
-                      onTouchStart={(e) => {
-                        highlightSourceRef.current = "card"
-                        setHighlightIndex(index)
-                        handleCardTouchStart(e, entry)
-                      }}
-                      onTouchMove={(e) => {
-                        handleCardTouchMove(e)
-                      }}
-                      onTouchEnd={() => {
-                        handleCardTouchEnd()
-                        setTimeout(() => {
+                    <div className="relative overflow-hidden rounded-r-xl">
+                      <motion.div
+                        className={`group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer select-none active:brightness-90 ${
+                          highlightIndex === index
+                            ? "brightness-95 shadow-md"
+                            : "hover:brightness-95"
+                        }`}
+                        style={{
+                          backgroundColor: highlightIndex === index ? `${color}33` : `${color}1a`,
+                          borderColor: highlightIndex === index ? `${color}50` : `${color}33`,
+                          WebkitTouchCallout: "none",
+                          touchAction: "pan-y",
+                        }}
+                        onClick={() => {
+                          if (swipedEntryId === entry.id) {
+                            setSwipedEntryId(null)
+                            return
+                          }
+                          handleCardClick(entry)
+                        }}
+                        onContextMenu={(e) => handleCardContextMenu(e, entry)}
+                        onMouseEnter={() => {
+                          highlightSourceRef.current = "card"
+                          setHighlightIndex(index)
+                        }}
+                        onMouseLeave={() => {
                           if (highlightSourceRef.current === "card") setHighlightIndex(null)
-                        }, 150)
-                      }}
-                    >
+                        }}
+                        onTouchStart={(e) => {
+                          highlightSourceRef.current = "card"
+                          setHighlightIndex(index)
+                          handleCardTouchStart(e, entry)
+                        }}
+                        onTouchMove={(e) => {
+                          handleCardTouchMove(e)
+                        }}
+                        onTouchEnd={() => {
+                          handleCardTouchEnd(entry)
+                          setTimeout(() => {
+                            if (highlightSourceRef.current === "card") setHighlightIndex(null)
+                          }, 150)
+                        }}
+                      >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -1165,7 +1320,7 @@ export function ListView({
                             </AnimatePresence>
                           )}
                         </div>
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 sm:transition-opacity shrink-0">
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 sm:transition-opacity shrink-0 max-sm:hidden">
                           {entry.detail && (
                             <Button
                               size="icon"
@@ -1209,6 +1364,61 @@ export function ListView({
                         </div>
                       </div>
                     </motion.div>
+                      {/* Swipe action buttons — mobile only, slide in from right */}
+                      <div
+                        data-swipe-actions
+                        data-open={swipedEntryId === entry.id ? "true" : "false"}
+                        className="sm:hidden absolute top-0 bottom-0 right-0 flex items-center gap-0.5 px-1"
+                        style={{
+                          transform: swipedEntryId === entry.id ? "translateX(0)" : `translateX(${SWIPE_ACTION_WIDTH}px)`,
+                          opacity: swipedEntryId === entry.id ? 1 : 0,
+                          transition: "transform 0.2s ease-out, opacity 0.2s ease-out",
+                        }}
+                      >
+                        {entry.detail && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSwipedEntryId(null)
+                              setDetailDialog({
+                                title: entry.event_type,
+                                detail: entry.detail,
+                                time: formatTime(entry.log_time),
+                              })
+                            }}
+                          >
+                            <Maximize2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSwipedEntryId(null)
+                            startEdit(entry)
+                          }}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-destructive hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSwipedEntryId(null)
+                            onDeleteRequest(entry.id)
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </motion.div>
               </div>
@@ -1232,62 +1442,25 @@ export function ListView({
           {/* Ghost cards for cross-day hints (direction: next → bottom) */}
           {crossDayHints
             .filter((h) => h.direction === "next")
-            .map((hint, i) => {
-              const color = getCategoryColor(hint.category)
-              return (
-                <motion.div
-                  key={`ghost-next-${i}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="mb-1.5"
-                >
-                  <div
-                    className="rounded-r-xl border-y border-r border-l-0 border-dashed px-2.5 py-1.5 opacity-50"
-                    style={{
-                      backgroundColor: `${color}0d`,
-                      borderColor: `${color}33`,
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-medium text-sm truncate text-muted-foreground">
-                        {hint.event_type}
-                      </span>
-                      <span className="text-[11px] font-mono text-muted-foreground">
-                        {formatTime(hint.start_time)}~{formatTime(hint.end_time)}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground/60 italic">
-                        延续至下一天
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-              )
-            })}
+            .map((hint, i) => renderGhostCard(hint, i, "next"))}
 
         </AnimatePresence>
       </div>
-
-      {/* Mobile: always show action buttons */}
-      <style>{`
-        @media (max-width: 640px) {
-          .group .opacity-0 { opacity: 1 !important; }
-        }
-      `}</style>
 
       {/* Context menu */}
       <AnimatePresence>
         {contextMenu && (
           <motion.div
+            ref={!menuPos ? contextMenuCallbackRef : undefined}
             initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
+            animate={menuPos ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.12 }}
             className="fixed z-50 min-w-[140px] rounded-xl border bg-popover p-1 shadow-lg"
-            style={{
-              left: contextMenu.x,
-              top: contextMenu.y,
-              transform: "translate(-50%, -100%) translateY(-4px)",
-            }}
+            style={menuPos
+              ? { left: menuPos.left, top: menuPos.top }
+              : { left: contextMenu.x, top: contextMenu.y, transform: "translate(-50%, -100%) translateY(-4px)", pointerEvents: "none" as const }
+            }
             onPointerDown={(e) => e.stopPropagation()}
           >
             {contextMenu.entry.detail && (
@@ -1300,7 +1473,7 @@ export function ListView({
                     detail: contextMenu.entry.detail,
                     time: formatTime(contextMenu.entry.log_time),
                   })
-                  setContextMenu(null)
+                  closeContextMenu()
                 }}
               >
                 <Maximize2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1312,7 +1485,7 @@ export function ListView({
               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-accent transition-colors"
               onClick={() => {
                 startEdit(contextMenu.entry)
-                setContextMenu(null)
+                closeContextMenu()
               }}
             >
               <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1327,7 +1500,7 @@ export function ListView({
                   : contextMenu.entry.event_type
                 navigator.clipboard.writeText(text)
                 toast.success("已复制到剪贴板")
-                setContextMenu(null)
+                closeContextMenu()
               }}
             >
               <Copy className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1339,7 +1512,7 @@ export function ListView({
                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-accent transition-colors"
                 onClick={() => {
                   setAssignDialog({ open: true, eventType: contextMenu.entry.event_type })
-                  setContextMenu(null)
+                  closeContextMenu()
                 }}
               >
                 <Tag className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1352,7 +1525,7 @@ export function ListView({
               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
               onClick={() => {
                 onDeleteRequest(contextMenu.entry.id)
-                setContextMenu(null)
+                closeContextMenu()
               }}
             >
               <Trash2 className="h-3.5 w-3.5" />

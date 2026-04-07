@@ -62,8 +62,20 @@ body {
   min-height: 100%;
   min-height: 100dvh;
   overscroll-behavior-y: none;
+  -webkit-user-select: none;
+  user-select: none;
   /* body scrolling is allowed by default (Statistics / Settings pages);
      HomePage toggles .no-scroll to lock it. */
+}
+/* Re-enable text selection for inputs, textareas, and content areas */
+input, textarea, [contenteditable="true"], pre, code {
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* Allow text selection in dialogs/modals but not in timeline cards */
+[role="dialog"] .prose-compact {
+  -webkit-user-select: text;
+  user-select: text;
 }
 body.no-scroll {
   overflow: hidden;
