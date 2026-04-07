@@ -1,14 +1,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Pencil, Trash2, Check, Plus, Maximize2, CalendarPlus, Copy, Tag } from "lucide-react"
+import { Pencil, Trash2, Maximize2, CalendarPlus, Copy, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { updateLog, createLog, getEventTypes } from "@/api"
-import type { LogEntry, DurationItem, Category, CrossDayHint } from "@/types"
+import type { LogEntry, DurationItem, CrossDayHint } from "@/types"
 import { toast } from "sonner"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
-import { EventForm, type SuggestionTag } from "@/components/EventForm"
 import { CategoryAssignDialog } from "@/components/CategoryAssignDialog"
-import { showCategoryAssignToast } from "@/lib/category-toast"
 import {
   Dialog,
   DialogContent,
@@ -17,8 +14,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  type EditState,
-  type QuickCreateState,
   formatTime,
   timeToMinutes,
   minutesToTime,
@@ -39,12 +34,12 @@ interface ListViewProps {
   onDeleteRequest: (id: number) => void
   getCategoryColor: (category: string) => string
   getDurationForEntry: (index: number) => DurationItem | null
-  categories?: Category[]
   crossDayHints?: CrossDayHint[]
-  date?: string
   isToday: boolean
   currentTime: string
   timePointMode?: string
+  onEditRequest?: (entry: LogEntry) => void
+  onRailCreate?: (time: string) => void
 }
 
 const HOUR_MARKERS = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24]
@@ -56,12 +51,12 @@ export function ListView({
   onDeleteRequest,
   getCategoryColor,
   getDurationForEntry,
-  categories,
   crossDayHints = [],
-  date,
   isToday,
   currentTime,
   timePointMode = "end",
+  onEditRequest,
+  onRailCreate,
 }: ListViewProps) {
   // Get effective mode for an entry: use entry's own mode if stored, fallback to global
   const getEntryMode = useCallback(
@@ -69,17 +64,13 @@ export function ListView({
     [timePointMode]
   )
 
-  const [editingEntry, setEditingEntry] = useState<EditState | null>(null)
-  const [quickCreate, setQuickCreate] = useState<QuickCreateState | null>(null)
   const [hoverTime, setHoverTime] = useState<string | null>(null)
   const [isTouching, setIsTouching] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [detailDialog, setDetailDialog] = useState<{ title: string; detail: string; time: string } | null>(null)
   const [assignDialog, setAssignDialog] = useState<{ open: boolean; eventType: string }>({
     open: false,
     eventType: "",
   })
-  const [allEvents, setAllEvents] = useState<string[]>([])
   const [expandedEntryId, setExpandedEntryId] = useState<number | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     entry: LogEntry
@@ -99,10 +90,6 @@ export function ListView({
   const curveSvgRef = useRef<SVGSVGElement>(null)
   const scrollTopRef = useRef(0)
   const rafIdRef = useRef(0)
-  const editEventRef = useRef<HTMLInputElement>(null)
-  const quickEventRef = useRef<HTMLInputElement>(null)
-  const editStartedRef = useRef(false)
-  const quickCreateStartedRef = useRef(false)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFiredRef = useRef(false)
@@ -111,32 +98,6 @@ export function ListView({
   const swipeXRef = useRef(0)
   const swipingRef = useRef(false)
   const swipeActionsRef = useRef<HTMLDivElement | null>(null)
-
-  // Fetch event types for suggestions
-  useEffect(() => {
-    getEventTypes().then(setAllEvents).catch(() => {})
-  }, [])
-
-  const suggestions: SuggestionTag[] = useMemo(() => {
-    if (!categories || categories.length === 0) return []
-    const recentEvents = [...new Set(entries.map((e) => e.event_type))].reverse()
-    const fixedEvents: string[] = []
-    categories.forEach((cat) =>
-      cat.rules.forEach((r) => {
-        if (r.type === "fixed") fixedEvents.push(r.pattern)
-      })
-    )
-    const merged = [...new Set([...recentEvents, ...fixedEvents, ...allEvents])]
-    return merged.map((name) => {
-      const cat = categories.find((c) =>
-        c.rules.some((r) => {
-          if (r.type === "fixed") return r.pattern === name
-          try { return new RegExp(r.pattern).test(name) } catch { return false }
-        })
-      )
-      return { name, categoryName: cat?.name, categoryColor: cat?.color }
-    })
-  }, [categories, allEvents, entries])
 
   // Close context menu on outside click or scroll
   useEffect(() => {
@@ -178,27 +139,6 @@ export function ListView({
       setMenuPos({ left, top })
     })
   }, [contextMenu])
-
-  // Focus management
-  useEffect(() => {
-    if (editingEntry && editStartedRef.current) {
-      editStartedRef.current = false
-      setTimeout(() => editEventRef.current?.focus(), 50)
-    }
-  }, [editingEntry])
-
-  useEffect(() => {
-    if (quickCreate && quickCreateStartedRef.current) {
-      quickCreateStartedRef.current = false
-      setTimeout(() => quickEventRef.current?.focus(), 50)
-    }
-  }, [quickCreate])
-
-  // Notify FAB to hide when editing/creating
-  useEffect(() => {
-    const isEditing = !!(editingEntry || quickCreate)
-    window.dispatchEvent(new CustomEvent("timelineEditing", { detail: isEditing }))
-  }, [editingEntry, quickCreate])
 
   // Track rail height
   useEffect(() => {
@@ -359,7 +299,7 @@ export function ListView({
 
   useEffect(() => {
     requestAnimationFrame(measurePositions)
-  }, [measurePositions, editingEntry, quickCreate])
+  }, [measurePositions])
 
   useEffect(() => {
     const scrollEl = cardsScrollRef.current
@@ -381,19 +321,6 @@ export function ListView({
     []
   )
 
-  // Edit handlers
-  const startEdit = (entry: LogEntry) => {
-    editStartedRef.current = true
-    setEditingEntry({
-      id: entry.id,
-      time: formatTime(entry.log_time),
-      event: entry.event_type,
-      detail: entry.detail,
-    })
-  }
-
-  const cancelEdit = () => setEditingEntry(null)
-
   // Card gesture handlers
   const handleCardClick = (entry: LogEntry) => {
     // Always clear long-press timer on click to prevent stale fires
@@ -412,7 +339,7 @@ export function ListView({
       toast("编辑此记录？", {
         action: {
           label: "编辑",
-          onClick: () => startEdit(entry),
+          onClick: () => onEditRequest?.(entry),
         },
         duration: 3000,
       })
@@ -557,58 +484,8 @@ export function ListView({
     })
   }
 
-  const saveEdit = async () => {
-    if (!editingEntry) return
-    try {
-      await updateLog(editingEntry.id, {
-        log_time: editingEntry.time,
-        event_type: editingEntry.event,
-        detail: editingEntry.detail || undefined,
-      })
-      toast.success("更新成功")
-      setEditingEntry(null)
-      onUpdate()
-    } catch {
-      toast.error("更新失败")
-    }
-  }
-
-  const handleQuickCreate = async () => {
-    if (!quickCreate || !quickCreate.event.trim()) return
-    setSaving(true)
-    try {
-      const entry = await createLog({
-        log_date: date,
-        log_time: quickCreate.time,
-        event_type: quickCreate.event.trim(),
-        detail: quickCreate.detail || undefined,
-      })
-      toast.success("创建成功")
-      if (entry.category === "未分类") {
-        const evtType = quickCreate.event.trim()
-        showCategoryAssignToast(evtType, () => {
-          setAssignDialog({ open: true, eventType: evtType })
-        })
-      }
-      setQuickCreate(null)
-      onUpdate()
-    } catch {
-      toast.error("创建失败")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const getInsertIndex = (time: string): number => {
-    for (let i = 0; i < entries.length; i++) {
-      if (formatTime(entries[i].log_time) > time) return i
-    }
-    return entries.length
-  }
-
   // Rail hover/click for quick create
   const handleRailHover = (e: React.MouseEvent) => {
-    if (editingEntry || quickCreate) return
     const rail = railRef.current
     if (!rail) return
     const rect = rail.getBoundingClientRect()
@@ -619,9 +496,8 @@ export function ListView({
   }
 
   const handleRailClick = () => {
-    if (hoverTime && !editingEntry && !quickCreate) {
-      quickCreateStartedRef.current = true
-      setQuickCreate({ time: hoverTime, event: "", detail: "" })
+    if (hoverTime) {
+      onRailCreate?.(hoverTime)
       setHoverTime(null)
     }
   }
@@ -645,7 +521,6 @@ export function ListView({
     if (!rail) return
 
     const onTouchStart = (e: TouchEvent) => {
-      if (editingEntry || quickCreate) return
       e.preventDefault()
       isTouchingRef.current = true
       setIsTouching(true)
@@ -662,12 +537,9 @@ export function ListView({
       if (!isTouchingRef.current) return
       isTouchingRef.current = false
       setIsTouching(false)
-      // Trigger quick create via a callback scheduled in a microtask
-      // so we read the latest hoverTime from DOM
       setHoverTime((prev) => {
         if (prev) {
-          quickCreateStartedRef.current = true
-          setQuickCreate({ time: prev, event: "", detail: "" })
+          onRailCreate?.(prev)
         }
         return null
       })
@@ -683,7 +555,7 @@ export function ListView({
       rail.removeEventListener("touchend", onTouchEnd)
       rail.removeEventListener("touchcancel", onTouchEnd)
     }
-  }, [editingEntry, quickCreate, getTouchTimeFromNative])
+  }, [getTouchTimeFromNative, onRailCreate])
 
   const currentTimeRailY = isToday ? timeToRailY(currentTime) : -1
   const hoverRailY = hoverTime ? timeToRailY(hoverTime) : -1
@@ -723,32 +595,6 @@ export function ListView({
           </div>
         </div>
       </motion.div>
-    )
-  }
-
-  // Quick create form
-  const renderQuickCreateForm = (
-    ref?: React.RefObject<HTMLInputElement | null>
-  ) => {
-    if (!quickCreate) return null
-    return (
-      <div className="rounded-xl border-2 border-primary/30 border-dashed bg-primary/5 p-3 shadow-sm">
-        <EventForm
-          time={quickCreate.time}
-          event={quickCreate.event}
-          detail={quickCreate.detail}
-          onTimeChange={(t) => setQuickCreate({ ...quickCreate, time: t })}
-          onEventChange={(e) => setQuickCreate({ ...quickCreate, event: e })}
-          onDetailChange={(d) => setQuickCreate({ ...quickCreate, detail: d })}
-          onSubmit={handleQuickCreate}
-          onCancel={() => setQuickCreate(null)}
-          submitting={saving}
-          submitLabel={saving ? "创建中..." : "创建"}
-          submitIcon={<Plus className="h-3.5 w-3.5" />}
-          suggestions={suggestions}
-          eventInputRef={ref || quickEventRef}
-        />
-      </div>
     )
   }
 
@@ -1090,7 +936,7 @@ export function ListView({
   }
 
   // ==================== EMPTY STATE ====================
-  if (entries.length === 0 && !quickCreate) {
+  if (entries.length === 0) {
     return (
       <div className="flex flex-1 min-h-0">
         {/* Fixed rail */}
@@ -1158,26 +1004,11 @@ export function ListView({
             .map((hint, i) => renderGhostCard(hint, i, "prev"))}
 
           {entries.map((entry, index) => {
-            const isEditing = editingEntry?.id === entry.id
             const color = getCategoryColor(entry.category)
             const durItem = getDurationForEntry(index)
-            const insertQuickHere =
-              quickCreate && getInsertIndex(quickCreate.time) === index
 
             return (
               <div key={entry.id}>
-                {insertQuickHere && (
-                  <motion.div
-                    key="quick-create"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mb-2"
-                  >
-                    {renderQuickCreateForm(quickEventRef)}
-                  </motion.div>
-                )}
-
                 <motion.div
                   ref={setCardRef(entry.id)}
                   initial={{ opacity: 0, x: -10 }}
@@ -1186,25 +1017,6 @@ export function ListView({
                   transition={{ delay: index * 0.02 }}
                   className="mb-1.5"
                 >
-                  {isEditing ? (
-                    <div className="rounded-xl border-2 border-primary/30 bg-card p-3 shadow-sm">
-                      <EventForm
-                        time={editingEntry.time}
-                        event={editingEntry.event}
-                        detail={editingEntry.detail}
-                        onTimeChange={(t) => setEditingEntry({ ...editingEntry, time: t })}
-                        onEventChange={(e) => setEditingEntry({ ...editingEntry, event: e })}
-                        onDetailChange={(d) => setEditingEntry({ ...editingEntry, detail: d })}
-                        onSubmit={saveEdit}
-                        onCancel={cancelEdit}
-                        submitLabel="保存"
-                        submitIcon={<Check className="h-3.5 w-3.5" />}
-                        suggestions={suggestions}
-                        eventInputRef={editEventRef}
-                        initialDetailOpen={!!editingEntry.detail}
-                      />
-                    </div>
-                  ) : (
                     <div className="relative overflow-hidden rounded-r-xl">
                       <motion.div
                         className={`group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer select-none active:brightness-90 ${
@@ -1345,7 +1157,7 @@ export function ListView({
                             className="h-6 w-6"
                             onClick={(e) => {
                               e.stopPropagation()
-                              startEdit(entry)
+                              onEditRequest?.(entry)
                             }}
                           >
                             <Pencil className="h-3 w-3" />
@@ -1400,7 +1212,7 @@ export function ListView({
                           onClick={(e) => {
                             e.stopPropagation()
                             setSwipedEntryId(null)
-                            startEdit(entry)
+                            onEditRequest?.(entry)
                           }}
                         >
                           <Pencil className="h-3 w-3" />
@@ -1419,25 +1231,10 @@ export function ListView({
                         </Button>
                       </div>
                     </div>
-                  )}
                 </motion.div>
               </div>
             )
           })}
-
-          {/* Quick create at end */}
-          {quickCreate &&
-            getInsertIndex(quickCreate.time) === entries.length && (
-              <motion.div
-                key="quick-create-end"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mb-2"
-              >
-                {renderQuickCreateForm()}
-              </motion.div>
-            )}
 
           {/* Ghost cards for cross-day hints (direction: next → bottom) */}
           {crossDayHints
@@ -1484,7 +1281,7 @@ export function ListView({
               type="button"
               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-accent transition-colors"
               onClick={() => {
-                startEdit(contextMenu.entry)
+                onEditRequest?.(contextMenu.entry)
                 closeContextMenu()
               }}
             >

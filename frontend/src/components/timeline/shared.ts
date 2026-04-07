@@ -1,18 +1,5 @@
 import type { Category } from "@/types"
 
-export interface EditState {
-  id: number
-  time: string
-  event: string
-  detail: string
-}
-
-export interface QuickCreateState {
-  time: string
-  event: string
-  detail: string
-}
-
 export const DEFAULT_COLORS: Record<string, string> = {
   工作: "#3b82f6",
   学习: "#10b981",

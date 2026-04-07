@@ -6,6 +6,7 @@ import { zhCN } from "date-fns/locale"
 import { Timeline } from "@/components/timeline"
 import { getTimeline, getCategories, getDailyStats } from "@/api"
 import type { LogEntry, Category, DurationItem, CrossDayHint } from "@/types"
+import { formatTime } from "@/components/timeline/shared"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -69,6 +70,13 @@ export function HomePage() {
 
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<{
+    id: number
+    time: string
+    event: string
+    detail: string
+  } | null>(null)
+  const [quickAddInitialTime, setQuickAddInitialTime] = useState<string | null>(null)
   const [assignDialog, setAssignDialog] = useState<{ open: boolean; eventType: string }>({
     open: false,
     eventType: "",
@@ -76,10 +84,20 @@ export function HomePage() {
 
   // Listen for global shortcut event
   useEffect(() => {
-    const handler = () => setQuickAddOpen(true)
+    const handler = () => {
+      const now = new Date()
+      const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
+      setQuickAddInitialTime(time)
+      setQuickAddOpen(true)
+    }
     window.addEventListener("openQuickAdd", handler)
     return () => window.removeEventListener("openQuickAdd", handler)
   }, [])
+
+  // Notify FAB to hide when dialog is open
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("timelineEditing", { detail: quickAddOpen }))
+  }, [quickAddOpen])
 
   const displayDate = format(currentDate, "M月d日 EEE", { locale: zhCN })
 
@@ -192,13 +210,30 @@ export function HomePage() {
             durationItems={durationItems}
             crossDayHints={crossDayHints}
             timePointMode={timePointMode}
+            onEditRequest={(entry) => {
+              setEditTarget({
+                id: entry.id,
+                time: formatTime(entry.log_time),
+                event: entry.event_type,
+                detail: entry.detail,
+              })
+              setQuickAddOpen(true)
+            }}
+            onRailCreate={(time) => {
+              setQuickAddInitialTime(time)
+              setQuickAddOpen(true)
+            }}
           />
         )}
       </div>
 
       <QuickAddDialog
         open={quickAddOpen}
-        onClose={() => setQuickAddOpen(false)}
+        onClose={() => {
+          setQuickAddOpen(false)
+          setEditTarget(null)
+          setQuickAddInitialTime(null)
+        }}
         onCreated={() => {
           window.dispatchEvent(new CustomEvent("logCreated"))
         }}
@@ -207,6 +242,9 @@ export function HomePage() {
             setAssignDialog({ open: true, eventType })
           })
         }}
+        date={dateStr}
+        editEntry={editTarget}
+        initialTime={quickAddInitialTime}
       />
 
       <CategoryAssignDialog
