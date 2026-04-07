@@ -287,3 +287,9 @@ export function streamAIChat(
       }
     })
 }
+
+// Version
+export async function getVersion() {
+  const res = await http.get<ApiResponse<{ version: string; commit: string }>>("/version")
+  return res.data.data
+}

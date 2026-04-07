@@ -5,7 +5,7 @@ import { format, addDays, subDays, isToday } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import { Timeline } from "@/components/timeline"
 import { getTimeline, getCategories, getDailyStats } from "@/api"
-import type { LogEntry, Category, DurationItem } from "@/types"
+import type { LogEntry, Category, DurationItem, CrossDayHint } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -22,6 +22,7 @@ export function HomePage() {
   const [entries, setEntries] = useState<LogEntry[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [durationItems, setDurationItems] = useState<DurationItem[]>([])
+  const [crossDayHints, setCrossDayHints] = useState<CrossDayHint[]>([])
   const [timePointMode, setTimePointMode] = useState("end")
   const [loading, setLoading] = useState(false)
 
@@ -36,10 +37,12 @@ export function HomePage() {
       ])
       setEntries(data || [])
       setDurationItems(stats?.items || [])
+      setCrossDayHints(stats?.cross_day_hints || [])
       if (stats?.time_point_mode) setTimePointMode(stats.time_point_mode)
     } catch {
       setEntries([])
       setDurationItems([])
+      setCrossDayHints([])
     } finally {
       setLoading(false)
     }
@@ -187,6 +190,7 @@ export function HomePage() {
             date={dateStr}
             isToday={isToday(currentDate)}
             durationItems={durationItems}
+            crossDayHints={crossDayHints}
             timePointMode={timePointMode}
           />
         )}

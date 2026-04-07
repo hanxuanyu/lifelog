@@ -35,12 +35,41 @@ func GetDailyStatistics(date string) (*model.DailyStatistics, error) {
 	items := calculateDurations(entries, date, prevEntry, nextEntry)
 	summary, totalKnown := buildSummary(items)
 
+	// 生成跨日提示
+	var hints []model.CrossDayHint
+
+	if len(entries) > 0 {
+		// 检查前一天最后一条是否跨日到本天（start 模式跨日）
+		if prevEntry != nil && prevEntry.LogDate != date && getEntryMode(prevEntry) == "start" {
+			hints = append(hints, model.CrossDayHint{
+				EventType: prevEntry.EventType,
+				Category:  MatchCategory(prevEntry.EventType),
+				StartTime: "00:00",
+				EndTime:   entries[0].LogTime[:5],
+				Direction: "prev",
+			})
+		}
+
+		// 检查后一天第一条是否从本天跨日过去（end 模式跨日）
+		if nextEntry != nil && nextEntry.LogDate != date && getEntryMode(nextEntry) == "end" {
+			lastTime := entries[len(entries)-1].LogTime[:5]
+			hints = append(hints, model.CrossDayHint{
+				EventType: nextEntry.EventType,
+				Category:  MatchCategory(nextEntry.EventType),
+				StartTime: lastTime,
+				EndTime:   "23:59",
+				Direction: "next",
+			})
+		}
+	}
+
 	return &model.DailyStatistics{
 		Date:          date,
 		Items:         items,
 		Summary:       summary,
 		TotalKnown:    totalKnown,
 		TimePointMode: config.GetTimePointMode(),
+		CrossDayHints: hints,
 	}, nil
 }
 
@@ -203,8 +232,9 @@ func calculateDurations(entries []model.LogEntry, currentDate string, prevEntry,
 	for i, e := range entries {
 		mode := getEntryMode(&e)
 		items[i] = model.DurationItem{
-			EventType: e.EventType,
-			Category:  MatchCategory(e.EventType),
+			EventType:     e.EventType,
+			Category:      MatchCategory(e.EventType),
+			TimePointMode: mode,
 		}
 
 		logTime := e.LogTime[:5] // "HH:mm"
@@ -275,7 +305,7 @@ func calculateDurations(entries []model.LogEntry, currentDate string, prevEntry,
 					}
 				} else {
 					items[i].Unknown = true
-					items[i].Display = "未知终点"
+					items[i].Display = "进行中"
 					items[i].EndTime = ""
 				}
 			} else {

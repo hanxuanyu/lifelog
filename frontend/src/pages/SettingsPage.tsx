@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   Plus, Trash2, Save, Lock, Eye, EyeOff,
   Server, Clock, Shield, Tag, X, Keyboard,
-  Download, Upload, Database, Plug,
+  Download, Upload, Database, Plug, Info, ExternalLink,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,6 +17,7 @@ import {
 import {
   getCategories, getSettings, setPassword,
   updateSettings, updateCategories, exportData, importData,
+  getVersion,
 } from "@/api"
 import type { Category } from "@/types"
 import { toast } from "sonner"
@@ -66,6 +67,9 @@ export function SettingsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Version state
+  const [versionInfo, setVersionInfo] = useState<{ version: string; commit: string } | null>(null)
+
   const handleShortcutKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!recordingShortcut) return
     e.preventDefault()
@@ -111,6 +115,7 @@ export function SettingsPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
+    getVersion().then(setVersionInfo).catch(() => {})
   }, [])
 
   const settingsDirty =
@@ -662,6 +667,48 @@ export function SettingsPage() {
 
               {/* AI Provider Settings */}
               <AIProviderSettings />
+
+              {/* Version Info */}
+              {versionInfo && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Info className="h-4 w-4" /> 关于
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">版本</span>
+                        <span className="font-mono">{versionInfo.version}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">构建</span>
+                        <a
+                          href={`https://github.com/hxuanyu/lifelog/commit/${versionInfo.commit}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-primary hover:underline flex items-center gap-1"
+                        >
+                          {versionInfo.commit}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                      <div className="pt-1">
+                        <a
+                          href="https://github.com/hanxuanyu/lifelog"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          GitHub
+                        </a>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
 
               {/* Import confirmation dialog */}
               <AlertDialog open={importDialogOpen} onOpenChange={(open) => {

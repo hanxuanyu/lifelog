@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { deleteLog } from "@/api"
-import type { LogEntry, Category, DurationItem } from "@/types"
+import type { LogEntry, Category, DurationItem, CrossDayHint } from "@/types"
 import { toast } from "sonner"
 import { getCategoryColorFn } from "./shared"
 import { ListView } from "./ListView"
@@ -22,6 +22,7 @@ interface TimelineProps {
   date?: string
   isToday?: boolean
   durationItems?: DurationItem[]
+  crossDayHints?: CrossDayHint[]
   timePointMode?: string
 }
 
@@ -32,6 +33,7 @@ export function Timeline({
   date,
   isToday = false,
   durationItems = [],
+  crossDayHints = [],
   timePointMode = "end",
 }: TimelineProps) {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
@@ -89,6 +91,8 @@ export function Timeline({
           onDeleteRequest={setDeleteTarget}
           getCategoryColor={getCategoryColor}
           getDurationForEntry={getDurationForEntry}
+          categories={categories}
+          crossDayHints={crossDayHints}
           date={date}
           isToday={isToday}
           currentTime={currentTime}

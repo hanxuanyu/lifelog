@@ -1,13 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Pencil, Trash2, Check, X, Plus, Maximize2, CalendarPlus, Copy, Tag } from "lucide-react"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { updateLog, createLog } from "@/api"
-import type { LogEntry, DurationItem } from "@/types"
+import { updateLog, createLog, getEventTypes } from "@/api"
+import type { LogEntry, DurationItem, Category, CrossDayHint } from "@/types"
 import { toast } from "sonner"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
-import { MarkdownEditor } from "@/components/MarkdownEditor"
+import { EventForm, type SuggestionTag } from "@/components/EventForm"
 import { CategoryAssignDialog } from "@/components/CategoryAssignDialog"
 import { showCategoryAssignToast } from "@/lib/category-toast"
 import {
@@ -21,7 +20,6 @@ import {
   type EditState,
   type QuickCreateState,
   formatTime,
-  formatTimeInput,
   timeToMinutes,
   minutesToTime,
   getContrastText,
@@ -40,6 +38,8 @@ interface ListViewProps {
   onDeleteRequest: (id: number) => void
   getCategoryColor: (category: string) => string
   getDurationForEntry: (index: number) => DurationItem | null
+  categories?: Category[]
+  crossDayHints?: CrossDayHint[]
   date?: string
   isToday: boolean
   currentTime: string
@@ -55,11 +55,19 @@ export function ListView({
   onDeleteRequest,
   getCategoryColor,
   getDurationForEntry,
+  categories,
+  crossDayHints = [],
   date,
   isToday,
   currentTime,
   timePointMode = "end",
 }: ListViewProps) {
+  // Get effective mode for an entry: use entry's own mode if stored, fallback to global
+  const getEntryMode = useCallback(
+    (entry: LogEntry) => entry.time_point_mode || timePointMode,
+    [timePointMode]
+  )
+
   const [editingEntry, setEditingEntry] = useState<EditState | null>(null)
   const [quickCreate, setQuickCreate] = useState<QuickCreateState | null>(null)
   const [hoverTime, setHoverTime] = useState<string | null>(null)
@@ -70,6 +78,7 @@ export function ListView({
     open: false,
     eventType: "",
   })
+  const [allEvents, setAllEvents] = useState<string[]>([])
   const [expandedEntryId, setExpandedEntryId] = useState<number | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     entry: LogEntry
@@ -89,13 +98,38 @@ export function ListView({
   const rafIdRef = useRef(0)
   const editEventRef = useRef<HTMLInputElement>(null)
   const quickEventRef = useRef<HTMLInputElement>(null)
-  const quickTimeRef = useRef<HTMLInputElement>(null)
   const editStartedRef = useRef(false)
   const quickCreateStartedRef = useRef(false)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFiredRef = useRef(false)
   const touchStartPos = useRef<{ x: number; y: number } | null>(null)
+
+  // Fetch event types for suggestions
+  useEffect(() => {
+    getEventTypes().then(setAllEvents).catch(() => {})
+  }, [])
+
+  const suggestions: SuggestionTag[] = useMemo(() => {
+    if (!categories || categories.length === 0) return []
+    const recentEvents = [...new Set(entries.map((e) => e.event_type))].reverse()
+    const fixedEvents: string[] = []
+    categories.forEach((cat) =>
+      cat.rules.forEach((r) => {
+        if (r.type === "fixed") fixedEvents.push(r.pattern)
+      })
+    )
+    const merged = [...new Set([...recentEvents, ...fixedEvents, ...allEvents])]
+    return merged.map((name) => {
+      const cat = categories.find((c) =>
+        c.rules.some((r) => {
+          if (r.type === "fixed") return r.pattern === name
+          try { return new RegExp(r.pattern).test(name) } catch { return false }
+        })
+      )
+      return { name, categoryName: cat?.name, categoryColor: cat?.color }
+    })
+  }, [categories, allEvents, entries])
 
   // Close context menu on outside click or scroll
   useEffect(() => {
@@ -194,7 +228,8 @@ export function ListView({
       if (durItem && !durItem.unknown && durItem.start_time && durItem.end_time) {
         let railTop: number, railBottom: number
         if (durItem.cross_day) {
-          if (timePointMode === "end") {
+          const mode = durItem.time_point_mode || getEntryMode(entry)
+          if (mode === "end") {
             railTop = timeToRailY("00:00")
             railBottom = timeToRailY(formatTime(durItem.end_time))
           } else {
@@ -221,7 +256,7 @@ export function ListView({
         if (circle) circle.setAttribute('cy', String(cardCenterY))
       }
     })
-  }, [entries, cardPositions, railHeight, getDurationForEntry, timePointMode, timeToRailY])
+  }, [entries, cardPositions, railHeight, getDurationForEntry, getEntryMode, timeToRailY])
 
   useEffect(() => {
     const el = cardsScrollRef.current
@@ -514,68 +549,21 @@ export function ListView({
     if (!quickCreate) return null
     return (
       <div className="rounded-xl border-2 border-primary/30 border-dashed bg-primary/5 p-3 shadow-sm">
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-2">
-            <Input
-              ref={quickTimeRef}
-              value={quickCreate.time}
-              onChange={(e) =>
-                setQuickCreate({
-                  ...quickCreate,
-                  time: formatTimeInput(e.target.value),
-                })
-              }
-              className="w-[80px] text-center font-mono text-sm"
-              maxLength={5}
-              placeholder="时间"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault()
-                  ;(ref || quickEventRef)?.current?.focus()
-                }
-                if (e.key === "Escape") setQuickCreate(null)
-              }}
-            />
-            <Input
-              ref={ref || quickEventRef}
-              value={quickCreate.event}
-              onChange={(e) =>
-                setQuickCreate({ ...quickCreate, event: e.target.value })
-              }
-              className="flex-1 text-sm"
-              placeholder="任务类型"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleQuickCreate()
-                if (e.key === "Escape") setQuickCreate(null)
-              }}
-            />
-          </div>
-          <MarkdownEditor
-            value={quickCreate.detail}
-            onChange={(v) =>
-              setQuickCreate({ ...quickCreate, detail: v })
-            }
-            placeholder="详情（可选，支持 Markdown）"
-            minHeight={80}
-          />
-          <div className="flex justify-end gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setQuickCreate(null)}
-            >
-              <X className="h-3.5 w-3.5 mr-1" /> 取消
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleQuickCreate}
-              disabled={saving || !quickCreate.event.trim()}
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              {saving ? "创建中..." : "创建"}
-            </Button>
-          </div>
-        </div>
+        <EventForm
+          time={quickCreate.time}
+          event={quickCreate.event}
+          detail={quickCreate.detail}
+          onTimeChange={(t) => setQuickCreate({ ...quickCreate, time: t })}
+          onEventChange={(e) => setQuickCreate({ ...quickCreate, event: e })}
+          onDetailChange={(d) => setQuickCreate({ ...quickCreate, detail: d })}
+          onSubmit={handleQuickCreate}
+          onCancel={() => setQuickCreate(null)}
+          submitting={saving}
+          submitLabel={saving ? "创建中..." : "创建"}
+          submitIcon={<Plus className="h-3.5 w-3.5" />}
+          suggestions={suggestions}
+          eventInputRef={ref || quickEventRef}
+        />
       </div>
     )
   }
@@ -674,7 +662,9 @@ export function ListView({
           }
 
           if (item.cross_day) {
-            if (timePointMode === "end") {
+            // Use the duration item's own mode to determine which portion is on this day
+            const entryMode = item.time_point_mode || (entryIdx !== undefined ? getEntryMode(entries[entryIdx]) : timePointMode)
+            if (entryMode === "end") {
               const y1 = timeToRailY("00:00")
               const y2 = timeToRailY(formatTime(item.end_time))
               if (y2 <= y1) return null
@@ -738,6 +728,30 @@ export function ListView({
               strokeOpacity={0.8}
               style={{ transition: "fill-opacity 0.15s, stroke-width 0.15s" }}
               {...segHover}
+            />
+          )
+        })}
+
+        {/* Cross-day hint ghost segments on rail */}
+        {crossDayHints.map((hint, i) => {
+          const color = getCategoryColor(hint.category)
+          const y1 = timeToRailY(formatTime(hint.start_time))
+          const y2 = timeToRailY(formatTime(hint.end_time))
+          if (y2 <= y1) return null
+          return (
+            <rect
+              key={`ghost-seg-${i}`}
+              x={cx - 4}
+              y={y1}
+              width={8}
+              height={y2 - y1}
+              rx={4}
+              fill={color}
+              fillOpacity={0.15}
+              stroke={color}
+              strokeWidth={1}
+              strokeOpacity={0.3}
+              strokeDasharray="3 2"
             />
           )
         })}
@@ -959,6 +973,41 @@ export function ListView({
         style={{ marginLeft: GAP, paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
       >
         <AnimatePresence mode="popLayout">
+          {/* Ghost cards for cross-day hints (direction: prev → top) */}
+          {crossDayHints
+            .filter((h) => h.direction === "prev")
+            .map((hint, i) => {
+              const color = getCategoryColor(hint.category)
+              return (
+                <motion.div
+                  key={`ghost-prev-${i}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="mb-1.5"
+                >
+                  <div
+                    className="rounded-r-xl border-y border-r border-l-0 border-dashed px-2.5 py-1.5 opacity-50"
+                    style={{
+                      backgroundColor: `${color}0d`,
+                      borderColor: `${color}33`,
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-sm truncate text-muted-foreground">
+                        {hint.event_type}
+                      </span>
+                      <span className="text-[11px] font-mono text-muted-foreground">
+                        {formatTime(hint.start_time)}~{formatTime(hint.end_time)}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground/60 italic">
+                        接续上一天
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
+
           {entries.map((entry, index) => {
             const isEditing = editingEntry?.id === entry.id
             const color = getCategoryColor(entry.category)
@@ -990,66 +1039,21 @@ export function ListView({
                 >
                   {isEditing ? (
                     <div className="rounded-xl border-2 border-primary/30 bg-card p-3 shadow-sm">
-                      <div className="flex flex-col gap-2">
-                        <div className="flex gap-2">
-                          <Input
-                            value={editingEntry.time}
-                            onChange={(e) =>
-                              setEditingEntry({
-                                ...editingEntry,
-                                time: formatTimeInput(e.target.value),
-                              })
-                            }
-                            className="w-[80px] text-center font-mono text-sm"
-                            maxLength={5}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault()
-                                editEventRef.current?.focus()
-                              }
-                              if (e.key === "Escape") cancelEdit()
-                            }}
-                          />
-                          <Input
-                            ref={editEventRef}
-                            value={editingEntry.event}
-                            onChange={(e) =>
-                              setEditingEntry({
-                                ...editingEntry,
-                                event: e.target.value,
-                              })
-                            }
-                            className="flex-1 text-sm"
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") saveEdit()
-                              if (e.key === "Escape") cancelEdit()
-                            }}
-                          />
-                        </div>
-                        <MarkdownEditor
-                          value={editingEntry.detail}
-                          onChange={(v) =>
-                            setEditingEntry({
-                              ...editingEntry,
-                              detail: v,
-                            })
-                          }
-                          placeholder="详情（可选，支持 Markdown）"
-                          minHeight={80}
-                        />
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={cancelEdit}
-                          >
-                            <X className="h-3.5 w-3.5 mr-1" /> 取消
-                          </Button>
-                          <Button size="sm" onClick={saveEdit}>
-                            <Check className="h-3.5 w-3.5 mr-1" /> 保存
-                          </Button>
-                        </div>
-                      </div>
+                      <EventForm
+                        time={editingEntry.time}
+                        event={editingEntry.event}
+                        detail={editingEntry.detail}
+                        onTimeChange={(t) => setEditingEntry({ ...editingEntry, time: t })}
+                        onEventChange={(e) => setEditingEntry({ ...editingEntry, event: e })}
+                        onDetailChange={(d) => setEditingEntry({ ...editingEntry, detail: d })}
+                        onSubmit={saveEdit}
+                        onCancel={cancelEdit}
+                        submitLabel="保存"
+                        submitIcon={<Check className="h-3.5 w-3.5" />}
+                        suggestions={suggestions}
+                        eventInputRef={editEventRef}
+                        initialDetailOpen={!!editingEntry.detail}
+                      />
                     </div>
                   ) : (
                     <motion.div
@@ -1115,7 +1119,7 @@ export function ListView({
                             <span className="text-[11px] font-mono text-muted-foreground">
                               {durItem && !durItem.unknown && durItem.start_time && durItem.end_time
                                 ? `${formatTime(durItem.start_time)}~${formatTime(durItem.end_time)}`
-                                : `${formatTime(entry.log_time)}(${timePointMode === "end" ? "结束" : "开始"})`}
+                                : `${formatTime(entry.log_time)}(${getEntryMode(entry) === "end" ? "结束" : "开始"})`}
                             </span>
                             {durItem &&
                               !durItem.unknown &&
@@ -1224,6 +1228,42 @@ export function ListView({
                 {renderQuickCreateForm()}
               </motion.div>
             )}
+
+          {/* Ghost cards for cross-day hints (direction: next → bottom) */}
+          {crossDayHints
+            .filter((h) => h.direction === "next")
+            .map((hint, i) => {
+              const color = getCategoryColor(hint.category)
+              return (
+                <motion.div
+                  key={`ghost-next-${i}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="mb-1.5"
+                >
+                  <div
+                    className="rounded-r-xl border-y border-r border-l-0 border-dashed px-2.5 py-1.5 opacity-50"
+                    style={{
+                      backgroundColor: `${color}0d`,
+                      borderColor: `${color}33`,
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-sm truncate text-muted-foreground">
+                        {hint.event_type}
+                      </span>
+                      <span className="text-[11px] font-mono text-muted-foreground">
+                        {formatTime(hint.start_time)}~{formatTime(hint.end_time)}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground/60 italic">
+                        延续至下一天
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
+
         </AnimatePresence>
       </div>
 

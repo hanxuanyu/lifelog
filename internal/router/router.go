@@ -20,6 +20,9 @@ func Setup(r *gin.Engine, staticFS fs.FS) {
 
 	api := r.Group("/api")
 
+	// 版本信息（无需认证）
+	api.GET("/version", handler.GetVersion)
+
 	// 认证相关（无需 token）
 	auth := api.Group("/auth")
 	{
