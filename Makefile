@@ -1,5 +1,9 @@
 .PHONY: build build-web build-server web server clean
 
+VERSION_PKG = github.com/hxuanyu/lifelog/internal/version
+GIT_COMMIT = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+GIT_TAG = $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+
 # 全量构建：先前端后后端（当前平台）
 build: build-web build-server
 
@@ -14,7 +18,7 @@ build-web:
 # 构建后端（输出到 bin/，当前平台）
 build-server:
 	@mkdir -p bin
-	CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o bin/lifelog .
+	CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X $(VERSION_PKG).Version=$(GIT_TAG) -X $(VERSION_PKG).CommitHash=$(GIT_COMMIT)" -o bin/lifelog .
 
 # 启动前端开发模式
 web:

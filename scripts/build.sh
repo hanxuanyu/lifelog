@@ -17,8 +17,11 @@ PLATFORMS=(
   "windows/arm64"
 )
 
-# Build flags: static linking, strip debug info
-LDFLAGS="-s -w"
+# Build flags: static linking, strip debug info, inject version
+VERSION_PKG="github.com/hxuanyu/lifelog/internal/version"
+GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+LDFLAGS="-s -w -X ${VERSION_PKG}.Version=${GIT_TAG} -X ${VERSION_PKG}.CommitHash=${GIT_COMMIT}"
 
 # Skip frontend build if --skip-frontend is passed (CI builds frontend separately)
 SKIP_FRONTEND=false
