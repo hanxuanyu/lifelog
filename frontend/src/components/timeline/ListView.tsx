@@ -1168,8 +1168,7 @@ export function ListView({
                   ) : (
                     <div className="relative overflow-hidden rounded-r-xl">
                       <motion.div
-                        whileTap={swipingRef.current ? undefined : { opacity: 0.85 }}
-                        className={`group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm transition-all cursor-pointer select-none ${
+                        className={`group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm transition-[box-shadow] cursor-pointer select-none active:brightness-90 ${
                           highlightIndex === index
                             ? "brightness-95 shadow-md"
                             : "hover:brightness-95"
