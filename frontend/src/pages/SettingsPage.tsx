@@ -685,7 +685,7 @@ export function SettingsPage() {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">构建</span>
                         <a
-                          href={`https://github.com/hxuanyu/lifelog/commit/${versionInfo.commit}`}
+                          href={`https://github.com/hanxuanyu/lifelog/commit/${versionInfo.commit}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="font-mono text-primary hover:underline flex items-center gap-1"
