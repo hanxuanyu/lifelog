@@ -70,6 +70,15 @@ type CategorySummary struct {
 	Percentage float64 `json:"percentage"` // 占比
 }
 
+// CrossDayHint 跨日提示（卡片不在本天，但时间轴需要显示淡色色段）
+type CrossDayHint struct {
+	EventType string `json:"event_type"`
+	Category  string `json:"category"`
+	StartTime string `json:"start_time"` // 在本天的起始时间
+	EndTime   string `json:"end_time"`   // 在本天的结束时间
+	Direction string `json:"direction"`  // "prev" = 卡片在前一天, "next" = 卡片在后一天
+}
+
 // DailyStatistics 日统计
 type DailyStatistics struct {
 	Date          string            `json:"date"`
@@ -77,6 +86,7 @@ type DailyStatistics struct {
 	Summary       []CategorySummary `json:"summary"`
 	TotalKnown    int               `json:"total_known"` // 已知时长总秒数
 	TimePointMode string            `json:"time_point_mode"`
+	CrossDayHints []CrossDayHint    `json:"cross_day_hints,omitempty"`
 }
 
 // PeriodStatistics 周/月统计

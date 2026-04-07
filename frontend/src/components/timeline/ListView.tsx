@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Pencil, Trash2, Check, X, Plus, Maximize2, CalendarPlus, Copy, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { updateLog, createLog, getEventTypes } from "@/api"
-import type { LogEntry, DurationItem, Category } from "@/types"
+import type { LogEntry, DurationItem, Category, CrossDayHint } from "@/types"
 import { toast } from "sonner"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
 import { EventForm, type SuggestionTag } from "@/components/EventForm"
@@ -39,6 +39,7 @@ interface ListViewProps {
   getCategoryColor: (category: string) => string
   getDurationForEntry: (index: number) => DurationItem | null
   categories?: Category[]
+  crossDayHints?: CrossDayHint[]
   date?: string
   isToday: boolean
   currentTime: string
@@ -55,6 +56,7 @@ export function ListView({
   getCategoryColor,
   getDurationForEntry,
   categories,
+  crossDayHints = [],
   date,
   isToday,
   currentTime,
@@ -721,6 +723,30 @@ export function ListView({
           )
         })}
 
+        {/* Cross-day hint ghost segments on rail */}
+        {crossDayHints.map((hint, i) => {
+          const color = getCategoryColor(hint.category)
+          const y1 = timeToRailY(formatTime(hint.start_time))
+          const y2 = timeToRailY(formatTime(hint.end_time))
+          if (y2 <= y1) return null
+          return (
+            <rect
+              key={`ghost-seg-${i}`}
+              x={cx - 4}
+              y={y1}
+              width={8}
+              height={y2 - y1}
+              rx={4}
+              fill={color}
+              fillOpacity={0.15}
+              stroke={color}
+              strokeWidth={1}
+              strokeOpacity={0.3}
+              strokeDasharray="3 2"
+            />
+          )
+        })}
+
         {/* Hour markers — every 2 hours, 0-24 */}
         {HOUR_MARKERS.map((h) => {
           const mins = Math.min(h * 60, 1439)
@@ -938,6 +964,41 @@ export function ListView({
         style={{ marginLeft: GAP, paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
       >
         <AnimatePresence mode="popLayout">
+          {/* Ghost cards for cross-day hints (direction: prev → top) */}
+          {crossDayHints
+            .filter((h) => h.direction === "prev")
+            .map((hint, i) => {
+              const color = getCategoryColor(hint.category)
+              return (
+                <motion.div
+                  key={`ghost-prev-${i}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="mb-1.5"
+                >
+                  <div
+                    className="rounded-r-xl border-y border-r border-l-0 border-dashed px-2.5 py-1.5 opacity-50"
+                    style={{
+                      backgroundColor: `${color}0d`,
+                      borderColor: `${color}33`,
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-sm truncate text-muted-foreground">
+                        {hint.event_type}
+                      </span>
+                      <span className="text-[11px] font-mono text-muted-foreground">
+                        {formatTime(hint.start_time)}~{formatTime(hint.end_time)}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground/60 italic">
+                        接续上一天
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
+
           {entries.map((entry, index) => {
             const isEditing = editingEntry?.id === entry.id
             const color = getCategoryColor(entry.category)
@@ -1158,6 +1219,42 @@ export function ListView({
                 {renderQuickCreateForm()}
               </motion.div>
             )}
+
+          {/* Ghost cards for cross-day hints (direction: next → bottom) */}
+          {crossDayHints
+            .filter((h) => h.direction === "next")
+            .map((hint, i) => {
+              const color = getCategoryColor(hint.category)
+              return (
+                <motion.div
+                  key={`ghost-next-${i}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="mb-1.5"
+                >
+                  <div
+                    className="rounded-r-xl border-y border-r border-l-0 border-dashed px-2.5 py-1.5 opacity-50"
+                    style={{
+                      backgroundColor: `${color}0d`,
+                      borderColor: `${color}33`,
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-sm truncate text-muted-foreground">
+                        {hint.event_type}
+                      </span>
+                      <span className="text-[11px] font-mono text-muted-foreground">
+                        {formatTime(hint.start_time)}~{formatTime(hint.end_time)}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground/60 italic">
+                        延续至下一天
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
+
         </AnimatePresence>
       </div>
 

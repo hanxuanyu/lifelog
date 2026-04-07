@@ -46,12 +46,21 @@ export interface CategorySummary {
   percentage: number
 }
 
+export interface CrossDayHint {
+  event_type: string
+  category: string
+  start_time: string
+  end_time: string
+  direction: "prev" | "next"
+}
+
 export interface DailyStatistics {
   date: string
   items: DurationItem[]
   summary: CategorySummary[]
   total_known: string
   time_point_mode: string
+  cross_day_hints?: CrossDayHint[]
 }
 
 export interface PeriodStatistics {
