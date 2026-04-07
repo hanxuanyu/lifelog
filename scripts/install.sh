@@ -30,7 +30,7 @@ error() { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
 # --- Root check ---
 [[ $EUID -eq 0 ]] || error "请使用 sudo 或 root 用户运行此脚本"
 
-# --- Detect OS/ARCH ---
+# --- Detect OS/ARCH --- (sets DETECTED_PLATFORM)
 detect_platform() {
   local os arch
   os="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -45,7 +45,7 @@ detect_platform() {
     darwin) ;;
     *) error "不支持的操作系统: $os" ;;
   esac
-  echo "${os}/${arch}"
+  DETECTED_PLATFORM="${os}/${arch}"
 }
 
 # --- Uninstall ---
@@ -64,15 +64,15 @@ do_uninstall() {
   info "已卸载。数据目录 ${DATA_DIR} 已保留，如需彻底删除请手动执行: rm -rf ${INSTALL_DIR}"
 }
 
-# --- Resolve version ---
+# --- Resolve version --- (sets RESOLVED_VERSION)
 resolve_version() {
   local ver="${1:-}"
   if [[ -z "$ver" ]]; then
     info "正在获取最新版本..."
-    ver=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+    ver=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" </dev/null | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
     [[ -n "$ver" ]] || error "无法获取最新版本号"
   fi
-  echo "$ver"
+  RESOLVED_VERSION="$ver"
 }
 
 # --- Download and extract ---
@@ -154,11 +154,13 @@ main() {
   fi
 
   local platform
-  platform=$(detect_platform)
+  detect_platform
+  platform="$DETECTED_PLATFORM"
   info "检测到平台: ${platform}"
 
   local version
-  version=$(resolve_version "$arg")
+  resolve_version "$arg"
+  version="$RESOLVED_VERSION"
   info "目标版本: ${version}"
 
   # 判断是否已部署（更新模式）
