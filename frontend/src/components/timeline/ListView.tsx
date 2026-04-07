@@ -94,6 +94,8 @@ export function ListView({
   const railRef = useRef<HTMLDivElement>(null)
   const cardsScrollRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+  const ghostCardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const [ghostCardPositions, setGhostCardPositions] = useState<Map<string, {top: number, bottom: number}>>(new Map())
   const curveSvgRef = useRef<SVGSVGElement>(null)
   const scrollTopRef = useRef(0)
   const rafIdRef = useRef(0)
@@ -283,7 +285,32 @@ export function ListView({
         if (circle) circle.setAttribute('cy', String(cardCenterY))
       }
     })
-  }, [entries, cardPositions, railHeight, getDurationForEntry, getEntryMode, timeToRailY])
+
+    // Update ghost hint ribbon paths
+    const ghostPaths = svg.querySelectorAll<SVGPathElement>('[data-ghost-curve-key]')
+    ghostPaths.forEach((pathEl) => {
+      const key = pathEl.dataset.ghostCurveKey
+      if (!key) return
+      const pos = ghostCardPositions.get(key)
+      if (!pos) return
+      // Parse direction and index from key (e.g. "prev-0", "next-1")
+      const [direction, idxStr] = key.split("-")
+      const idx = Number(idxStr)
+      const hintsForDir = crossDayHints.filter((h) => h.direction === direction)
+      const hint = hintsForDir[idx]
+      if (!hint) return
+
+      const railTop = timeToRailY(formatTime(hint.start_time))
+      const railBottom = timeToRailY(formatTime(hint.end_time))
+      if (railBottom <= railTop) return
+
+      const cardTop = pos.top - st
+      const cardBottom = pos.bottom - st
+      const railEdge = cx + 3
+      const midX = railEdge + (curveEndX - railEdge) * 0.5
+      pathEl.setAttribute('d', `M ${railEdge} ${railTop} C ${midX} ${railTop}, ${midX} ${cardTop}, ${curveEndX} ${cardTop} L ${curveEndX} ${cardBottom} C ${midX} ${cardBottom}, ${midX} ${railBottom}, ${railEdge} ${railBottom} Z`)
+    })
+  }, [entries, cardPositions, railHeight, getDurationForEntry, getEntryMode, timeToRailY, crossDayHints, ghostCardPositions])
 
   useEffect(() => {
     const el = cardsScrollRef.current
@@ -315,6 +342,13 @@ export function ListView({
       return { top: el.offsetTop, bottom: el.offsetTop + el.offsetHeight }
     })
     setCardPositions(positions)
+
+    // Measure ghost card positions
+    const ghostPositions = new Map<string, {top: number, bottom: number}>()
+    ghostCardRefs.current.forEach((el, key) => {
+      ghostPositions.set(key, { top: el.offsetTop, bottom: el.offsetTop + el.offsetHeight })
+    })
+    setGhostCardPositions(ghostPositions)
   }, [entries])
 
   useEffect(() => {
@@ -328,6 +362,8 @@ export function ListView({
     obs.observe(scrollEl)
     // Also observe all cards
     cardRefs.current.forEach((el) => obs.observe(el))
+    // Also observe ghost cards
+    ghostCardRefs.current.forEach((el) => obs.observe(el))
     return () => obs.disconnect()
   }, [measurePositions])
 
@@ -504,7 +540,7 @@ export function ListView({
     swipeActionsRef.current = null
   }
 
-  const closeContextMenu = () => { closeContextMenu() }
+  const closeContextMenu = () => { setContextMenu(null); setMenuPos(null) }
 
   const handleCardContextMenu = (e: React.MouseEvent, entry: LogEntry) => {
     e.preventDefault()
@@ -649,9 +685,14 @@ export function ListView({
   // Ghost card for cross-day hints
   const renderGhostCard = (hint: CrossDayHint, i: number, direction: "prev" | "next") => {
     const color = getCategoryColor(hint.category)
+    const refKey = `${direction}-${i}`
     return (
       <motion.div
         key={`ghost-${direction}-${i}`}
+        ref={(el: HTMLDivElement | null) => {
+          if (el) ghostCardRefs.current.set(refKey, el)
+          else ghostCardRefs.current.delete(refKey)
+        }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         className="mb-1.5"
@@ -733,7 +774,7 @@ export function ListView({
                   fill={color}
                   fillOpacity={isHl ? 0.20 : 0.10}
                   stroke="none"
-                  style={{ transition: "fill-opacity 0.3s" }}
+                  style={{ transition: "fill-opacity 0.15s" }}
                 />
               </g>
             )
@@ -749,7 +790,7 @@ export function ListView({
                 strokeWidth={isHl ? 1.5 : 1}
                 strokeOpacity={isHl ? 0.5 : 0.3}
                 strokeDasharray="3 2"
-                style={{ transition: "stroke-opacity 0.3s, stroke-width 0.3s" }}
+                style={{ transition: "stroke-opacity 0.15s, stroke-width 0.15s" }}
               />
               <circle
                 data-circle-index={i}
@@ -758,7 +799,26 @@ export function ListView({
                 r={isHl ? 3 : 2}
                 fill={color}
                 fillOpacity={isHl ? 0.6 : 0.35}
-                style={{ transition: "fill-opacity 0.3s" }}
+                style={{ transition: "fill-opacity 0.15s" }}
+              />
+            </g>
+          )
+        })}
+        {/* Ghost hint ribbons */}
+        {crossDayHints.map((hint, i) => {
+          const color = getCategoryColor(hint.category)
+          const key = `${hint.direction}-${i}`
+          return (
+            <g key={`ghost-curve-${key}`}>
+              <path
+                data-ghost-curve-key={key}
+                d=""
+                fill={color}
+                fillOpacity={0.06}
+                stroke={color}
+                strokeWidth={1}
+                strokeOpacity={0.2}
+                strokeDasharray="4 3"
               />
             </g>
           )
@@ -1141,7 +1201,7 @@ export function ListView({
                   ) : (
                     <div className="relative overflow-hidden rounded-r-xl">
                       <motion.div
-                        className={`group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm transition-[box-shadow] cursor-pointer select-none active:brightness-90 ${
+                        className={`group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer select-none active:brightness-90 ${
                           highlightIndex === index
                             ? "brightness-95 shadow-md"
                             : "hover:brightness-95"
