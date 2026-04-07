@@ -132,6 +132,21 @@ function GlobalShortcutListener() {
 function AppLayout() {
   const location = useLocation()
   const isHome = location.pathname === "/"
+  const [timelineEditing, setTimelineEditing] = useState(false)
+
+  // Listen for timeline editing state changes
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setTimelineEditing((e as CustomEvent).detail)
+    }
+    window.addEventListener("timelineEditing", handler)
+    return () => window.removeEventListener("timelineEditing", handler)
+  }, [])
+
+  // Reset when leaving home
+  useEffect(() => {
+    if (!isHome) setTimelineEditing(false)
+  }, [isHome])
 
   // Lock body scroll on HomePage (contained layout);
   // allow it on other pages so iOS Safari address-bar reacts to scroll.
@@ -163,11 +178,12 @@ function AppLayout() {
         <Outlet />
       </main>
 
-      {/* Mobile FAB — quick add (home only) */}
-      {isHome && (
+      {/* Mobile FAB — quick add (home only, hidden during editing) */}
+      {isHome && !timelineEditing && (
         <motion.button
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
           transition={{ delay: 0.2, type: "spring", stiffness: 300, damping: 20 }}
           whileTap={{ scale: 0.9 }}
           onClick={() => window.dispatchEvent(new CustomEvent("openQuickAdd"))}

@@ -194,6 +194,12 @@ export function ListView({
     }
   }, [quickCreate])
 
+  // Notify FAB to hide when editing/creating
+  useEffect(() => {
+    const isEditing = !!(editingEntry || quickCreate)
+    window.dispatchEvent(new CustomEvent("timelineEditing", { detail: isEditing }))
+  }, [editingEntry, quickCreate])
+
   // Track rail height
   useEffect(() => {
     const rail = railRef.current

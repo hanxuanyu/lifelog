@@ -51,7 +51,7 @@ function WheelColumn({
   return (
     <div className="flex flex-col items-center">
       {!compact && <span className="text-xs text-muted-foreground mb-1">{label}</span>}
-      <div className="relative overflow-hidden" style={{ height: containerHeight, width: compact ? 52 : 64 }}>
+      <div className="relative overflow-hidden" style={{ height: containerHeight, width: compact ? 44 : 64 }}>
         {/* Selection highlight */}
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-accent rounded-lg pointer-events-none z-0 border" style={{ height: itemHeight }} />
         {/* Gradient masks */}
@@ -118,10 +118,10 @@ export function MobileTimePicker({ value, onChange, compact = false }: TimePicke
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className={`flex items-center justify-center gap-2 ${compact ? "py-1" : "py-2"}`}
+      className={`flex items-center justify-center ${compact ? "gap-0.5 py-1" : "gap-2 py-2"}`}
     >
       <WheelColumn items={HOURS} selected={hour} onSelect={setHour} label="时" compact={compact} />
-      <span className={`${compact ? "text-xl" : "text-2xl"} font-bold text-muted-foreground ${compact ? "mt-0" : "mt-5"}`}>:</span>
+      <span className={`${compact ? "text-lg" : "text-2xl"} font-bold text-muted-foreground ${compact ? "mt-0" : "mt-5"}`}>:</span>
       <WheelColumn items={MINUTES} selected={minute} onSelect={setMinute} label="分" compact={compact} />
     </motion.div>
   )
