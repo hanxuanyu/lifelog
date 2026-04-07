@@ -293,3 +293,17 @@ export async function getVersion() {
   const res = await http.get<ApiResponse<{ version: string; commit: string }>>("/version")
   return res.data.data
 }
+
+// Update check
+export interface UpdateInfo {
+  has_update: boolean
+  latest_version: string
+  current_version: string
+  release_url: string
+  assets: { name: string; download_url: string }[]
+}
+
+export async function checkUpdate() {
+  const res = await http.get<ApiResponse<UpdateInfo>>("/check-update")
+  return res.data.data
+}

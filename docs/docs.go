@@ -454,6 +454,22 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/check-update": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "检查是否有新版本",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/data/export": {
             "get": {
                 "produces": [
@@ -1065,6 +1081,22 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/version": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "获取版本信息",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1185,9 +1217,38 @@ const docTemplate = `{
                 }
             }
         },
+        "model.CrossDayHint": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "direction": {
+                    "description": "\"prev\" = 卡片在前一天, \"next\" = 卡片在后一天",
+                    "type": "string"
+                },
+                "end_time": {
+                    "description": "在本天的结束时间",
+                    "type": "string"
+                },
+                "event_type": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "description": "在本天的起始时间",
+                    "type": "string"
+                }
+            }
+        },
         "model.DailyStatistics": {
             "type": "object",
             "properties": {
+                "cross_day_hints": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.CrossDayHint"
+                    }
+                },
                 "date": {
                     "type": "string"
                 },
@@ -1256,6 +1317,10 @@ const docTemplate = `{
                 },
                 "start_time": {
                     "description": "HH:mm",
+                    "type": "string"
+                },
+                "time_point_mode": {
+                    "description": "该条目创建时的模式",
                     "type": "string"
                 },
                 "unknown": {
