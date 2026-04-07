@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Send } from "lucide-react"
-import { format } from "date-fns"
+import { X, Send, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { EventForm, type SuggestionTag } from "@/components/EventForm"
-import { createLog, getCategories, getEventTypes, getTimeline } from "@/api"
+import { createLog, updateLog, getCategories, getEventTypes, getTimeline } from "@/api"
 import type { Category } from "@/types"
 import { toast } from "sonner"
 
@@ -13,34 +12,62 @@ interface QuickAddDialogProps {
   onClose: () => void
   onCreated: () => void
   onUncategorized?: (eventType: string) => void
+  date: string
+  editEntry?: { id: number; time: string; event: string; detail: string } | null
+  initialTime?: string | null
 }
 
-export function QuickAddDialog({ open, onClose, onCreated, onUncategorized }: QuickAddDialogProps) {
-  const now = new Date()
-  const h = String(now.getHours()).padStart(2, "0")
-  const m = String(now.getMinutes()).padStart(2, "0")
+export function QuickAddDialog({ open, onClose, onCreated, onUncategorized, date, editEntry, initialTime }: QuickAddDialogProps) {
+  // Use a key to force remount of inner content when dialog opens with new data
+  // This ensures all internal state (including MobileTimePicker) is fresh
+  const dialogKey = open ? `${editEntry?.id ?? "new"}-${initialTime ?? ""}-${Date.now()}` : "closed"
 
-  const [timeValue, setTimeValue] = useState(`${h}:${m}`)
-  const [eventValue, setEventValue] = useState("")
-  const [detailValue, setDetailValue] = useState("")
+  return (
+    <AnimatePresence>
+      {open && (
+        <QuickAddDialogInner
+          key={dialogKey}
+          onClose={onClose}
+          onCreated={onCreated}
+          onUncategorized={onUncategorized}
+          date={date}
+          editEntry={editEntry}
+          initialTime={initialTime}
+        />
+      )}
+    </AnimatePresence>
+  )
+}
+
+function QuickAddDialogInner({
+  onClose,
+  onCreated,
+  onUncategorized,
+  date,
+  editEntry,
+  initialTime,
+}: Omit<QuickAddDialogProps, "open">) {
+  const isEdit = !!editEntry
+
+  const [timeValue, setTimeValue] = useState(() => {
+    if (editEntry) return editEntry.time
+    if (initialTime) return initialTime
+    return ""
+  })
+  const [eventValue, setEventValue] = useState(editEntry?.event ?? "")
+  const [detailValue, setDetailValue] = useState(editEntry?.detail ?? "")
   const [submitting, setSubmitting] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [allEvents, setAllEvents] = useState<string[]>([])
 
   const eventInputRef = useRef<HTMLInputElement>(null)
-  const dateStr = format(now, "yyyy-MM-dd")
 
   useEffect(() => {
-    if (open) {
-      const n = new Date()
-      setTimeValue(`${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`)
-      setEventValue("")
-      setDetailValue("")
-
+    if (date) {
       Promise.all([
         getCategories().catch(() => [] as Category[]),
         getEventTypes().catch(() => [] as string[]),
-        getTimeline(dateStr).catch(() => []),
+        getTimeline(date).catch(() => []),
       ]).then(([cats, types, entries]) => {
         setCategories(cats || [])
         const recent = [...new Set(entries.map((e) => e.event_type))].reverse()
@@ -52,10 +79,9 @@ export function QuickAddDialog({ open, onClose, onCreated, onUncategorized }: Qu
         )
         setAllEvents([...new Set([...recent, ...fixedEvents, ...types])])
       })
-
-      setTimeout(() => eventInputRef.current?.focus(), 100)
     }
-  }, [open])
+    setTimeout(() => eventInputRef.current?.focus(), 100)
+  }, [date])
 
   const suggestions: SuggestionTag[] = useMemo(() => {
     return allEvents.map((name) => {
@@ -76,99 +102,110 @@ export function QuickAddDialog({ open, onClose, onCreated, onUncategorized }: Qu
     }
     setSubmitting(true)
     try {
-      const entry = await createLog({
-        log_date: dateStr,
-        log_time: timeValue,
-        event_type: eventValue.trim(),
-        detail: detailValue.trim() || undefined,
-      })
-      toast.success("记录成功")
-      if (entry.category === "未分类") {
-        onUncategorized?.(eventValue.trim())
+      if (editEntry) {
+        await updateLog(editEntry.id, {
+          log_time: timeValue,
+          event_type: eventValue.trim(),
+          detail: detailValue.trim() || undefined,
+        })
+        toast.success("更新成功")
+      } else {
+        const entry = await createLog({
+          log_date: date,
+          log_time: timeValue,
+          event_type: eventValue.trim(),
+          detail: detailValue.trim() || undefined,
+        })
+        toast.success("记录成功")
+        if (entry.category === "未分类") {
+          onUncategorized?.(eventValue.trim())
+        }
       }
       onCreated()
       onClose()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "提交失败"
-      toast.error("提交失败", { description: msg })
+      toast.error(isEdit ? "更新失败" : "提交失败", { description: msg })
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+    <>
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-black/40 z-[60] backdrop-blur-sm"
+      />
+      {/* Panel */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-[70] bg-background rounded-2xl shadow-2xl border max-w-md mx-auto max-h-[80vh] flex flex-col"
+      >
+        {/* Fixed header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b shrink-0">
+          <h3 className="text-base font-semibold">{isEdit ? "编辑记录" : "快速记录"}</h3>
+          <Button
+            size="icon-xs"
+            variant="ghost"
             onClick={onClose}
-            className="fixed inset-0 bg-black/40 z-[60] backdrop-blur-sm"
-          />
-          {/* Panel */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-[70] bg-background rounded-2xl shadow-2xl border max-w-md mx-auto max-h-[80vh] flex flex-col"
+            className="rounded-full text-muted-foreground"
           >
-            {/* Fixed header */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b shrink-0">
-              <h3 className="text-base font-semibold">快速记录</h3>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                onClick={onClose}
-                className="rounded-full text-muted-foreground"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
 
-            {/* Scrollable content */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
-              <EventForm
-                time={timeValue}
-                event={eventValue}
-                detail={detailValue}
-                onTimeChange={setTimeValue}
-                onEventChange={setEventValue}
-                onDetailChange={setDetailValue}
-                onSubmit={handleSubmit}
-                showActions={false}
-                suggestions={suggestions}
-                eventInputRef={eventInputRef}
+        {/* Scrollable content */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
+          <EventForm
+            time={timeValue}
+            event={eventValue}
+            detail={detailValue}
+            onTimeChange={setTimeValue}
+            onEventChange={setEventValue}
+            onDetailChange={setDetailValue}
+            onSubmit={handleSubmit}
+            showActions={false}
+            suggestions={suggestions}
+            eventInputRef={eventInputRef}
+            initialDetailOpen={isEdit && !!detailValue}
+          />
+        </div>
+
+        {/* Fixed footer */}
+        <div className="px-5 pb-5 pt-3 border-t shrink-0">
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting || !eventValue.trim() || !timeValue.trim()}
+            className="w-full h-11 rounded-xl text-base font-medium"
+          >
+            {submitting ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full"
               />
-            </div>
-
-            {/* Fixed footer */}
-            <div className="px-5 pb-5 pt-3 border-t shrink-0">
-              <Button
-                onClick={handleSubmit}
-                disabled={submitting || !eventValue.trim() || !timeValue.trim()}
-                className="w-full h-11 rounded-xl text-base font-medium"
-              >
-                {submitting ? (
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                    className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full"
-                  />
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 mr-2" />
-                    记录
-                  </>
-                )}
-              </Button>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            ) : isEdit ? (
+              <>
+                <Check className="h-4 w-4 mr-2" />
+                保存
+              </>
+            ) : (
+              <>
+                <Send className="h-4 w-4 mr-2" />
+                记录
+              </>
+            )}
+          </Button>
+        </div>
+      </motion.div>
+    </>
   )
 }

@@ -78,8 +78,28 @@ definitions:
         description: 占比
         type: number
     type: object
+  model.CrossDayHint:
+    properties:
+      category:
+        type: string
+      direction:
+        description: '"prev" = 卡片在前一天, "next" = 卡片在后一天'
+        type: string
+      end_time:
+        description: 在本天的结束时间
+        type: string
+      event_type:
+        type: string
+      start_time:
+        description: 在本天的起始时间
+        type: string
+    type: object
   model.DailyStatistics:
     properties:
+      cross_day_hints:
+        items:
+          $ref: '#/definitions/model.CrossDayHint'
+        type: array
       date:
         type: string
       items:
@@ -127,6 +147,9 @@ definitions:
         type: string
       start_time:
         description: HH:mm
+        type: string
+      time_point_mode:
+        description: 该条目创建时的模式
         type: string
       unknown:
         description: 首条/末条未知时长
@@ -525,6 +548,16 @@ paths:
       summary: 更新分类规则
       tags:
       - 大类
+  /api/check-update:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 检查是否有新版本
   /api/data/export:
     get:
       produces:
@@ -895,6 +928,16 @@ paths:
       summary: 获取某天所在周的统计数据
       tags:
       - 统计
+  /api/version:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 获取版本信息
 securityDefinitions:
   BearerAuth:
     in: header

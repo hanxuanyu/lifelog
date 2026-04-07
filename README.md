@@ -57,7 +57,133 @@
 
 ## 快速开始
 
-### 前置要求
+### 一键安装（Linux / macOS）
+
+```bash
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/hanxuanyu/lifelog/main/scripts/install.sh)"
+```
+
+安装完成后服务自动启动，访问 <http://localhost:8080> 即可使用。
+
+安装指定版本：
+
+```bash
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/hanxuanyu/lifelog/main/scripts/install.sh)" -- v0.0.3
+```
+
+卸载（保留数据）：
+
+```bash
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/hanxuanyu/lifelog/main/scripts/install.sh)" -- --uninstall
+```
+
+安装后的常用命令：
+
+```bash
+# 查看服务状态
+systemctl status lifelog
+
+# 查看日志
+journalctl -u lifelog -f
+
+# 重启服务
+systemctl restart lifelog
+```
+
+应用内置检查更新功能，可在「设置 → 关于」中一键检查并获取最新版本。
+
+> **安装脚本做了什么？**
+>
+> 脚本是开源的，你可以在运行前 [查看完整源码](https://github.com/hanxuanyu/lifelog/blob/main/scripts/install.sh)。它执行以下操作：
+>
+> 1. 检测当前系统平台和 CPU 架构（linux/darwin, amd64/arm64）
+> 2. 从 GitHub Releases 下载对应平台的预编译二进制压缩包
+> 3. 解压并将二进制文件安装到 `/opt/lifelog/`
+> 4. 创建 `lifelog` 系统用户（无登录权限，仅用于运行服务）
+> 5. 创建 systemd 服务并设置开机自启
+> 6. 创建数据目录 `/opt/lifelog/data` 和日志目录 `/opt/lifelog/logs`
+> 7. 启动服务
+>
+> 更新时仅替换二进制文件并重启服务，不影响已有数据。卸载时保留数据目录，仅移除二进制和服务配置。
+
+### 手动部署
+
+如果你不想使用一键脚本，可以手动完成部署。以下步骤与安装脚本的行为一致。
+
+#### 1. 下载二进制
+
+前往 [GitHub Releases](https://github.com/hanxuanyu/lifelog/releases) 下载对应平台的压缩包，或通过命令行下载：
+
+```bash
+# 以 linux/amd64 为例，替换为你的实际平台和版本号
+VERSION="v0.0.3"
+curl -fSL -o lifelog.tar.gz \
+  "https://github.com/hanxuanyu/lifelog/releases/download/${VERSION}/lifelog_linux_amd64.tar.gz"
+tar -xzf lifelog.tar.gz
+```
+
+#### 2. 安装二进制
+
+```bash
+sudo mkdir -p /opt/lifelog
+sudo cp lifelog /opt/lifelog/lifelog
+sudo chmod +x /opt/lifelog/lifelog
+```
+
+#### 3. 创建系统用户和目录
+
+```bash
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin lifelog
+sudo mkdir -p /opt/lifelog/data /opt/lifelog/logs
+sudo chown -R lifelog:lifelog /opt/lifelog
+```
+
+#### 4. 配置 systemd 服务
+
+```bash
+sudo tee /etc/systemd/system/lifelog.service > /dev/null <<EOF
+[Unit]
+Description=Lifelog - 无压力每日事项记录
+After=network.target
+
+[Service]
+Type=simple
+User=lifelog
+Group=lifelog
+WorkingDirectory=/opt/lifelog
+ExecStart=/opt/lifelog/lifelog
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+#### 5. 启动服务
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable lifelog
+sudo systemctl start lifelog
+```
+
+访问 <http://localhost:8080> 即可使用。
+
+#### 手动更新
+
+```bash
+sudo systemctl stop lifelog
+sudo cp lifelog /opt/lifelog/lifelog
+sudo chown lifelog:lifelog /opt/lifelog/lifelog
+sudo systemctl start lifelog
+```
+
+### 从源码构建
+
+#### 前置要求
 
 - Go 1.22+
 - Node.js 18+

@@ -24,6 +24,8 @@ interface TimelineProps {
   durationItems?: DurationItem[]
   crossDayHints?: CrossDayHint[]
   timePointMode?: string
+  onEditRequest?: (entry: LogEntry) => void
+  onRailCreate?: (time: string) => void
 }
 
 export function Timeline({
@@ -35,6 +37,8 @@ export function Timeline({
   durationItems = [],
   crossDayHints = [],
   timePointMode = "end",
+  onEditRequest,
+  onRailCreate,
 }: TimelineProps) {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [currentTime, setCurrentTime] = useState(() => {
@@ -91,12 +95,12 @@ export function Timeline({
           onDeleteRequest={setDeleteTarget}
           getCategoryColor={getCategoryColor}
           getDurationForEntry={getDurationForEntry}
-          categories={categories}
           crossDayHints={crossDayHints}
-          date={date}
           isToday={isToday}
           currentTime={currentTime}
           timePointMode={timePointMode}
+          onEditRequest={onEditRequest}
+          onRailCreate={onRailCreate}
         />
       </div>
 
