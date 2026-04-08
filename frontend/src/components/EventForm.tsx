@@ -86,7 +86,7 @@ export function EventForm({
   return (
     <div className="flex flex-col gap-3">
       {/* Top row: time picker (left) + event input (right) */}
-      <div className="flex gap-3 items-stretch">
+      <div className="flex gap-3 items-center">
         {/* Time picker */}
         <div className="shrink-0">
           <MobileTimePicker compact value={time} onChange={onTimeChange} />
