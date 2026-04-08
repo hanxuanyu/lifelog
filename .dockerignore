@@ -1,0 +1,14 @@
+# https://docs.docker.com/reference/dockerfile/#dockerignore-file
+.git
+.github
+.idea
+.vscode
+bin/
+data/
+logs/
+node_modules/
+frontend/node_modules/
+web/
+*.md
+LICENSE
+config.yaml

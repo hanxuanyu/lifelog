@@ -3,6 +3,7 @@ package config
 import (
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
@@ -146,6 +147,8 @@ var (
 )
 
 // Init 初始化配置，如果 config.yaml 不存在则创建默认配置
+// 支持环境变量覆盖，前缀为 LIFELOG_，层级用 _ 分隔
+// 例如: LIFELOG_SERVER_PORT=9090 覆盖 server.port
 func Init() {
 	ensureConfigFile()
 
@@ -157,6 +160,14 @@ func Init() {
 		slog.Error("读取配置文件失败", "error", err)
 		os.Exit(1)
 	}
+
+	// 环境变量覆盖：LIFELOG_SERVER_PORT -> server.port
+	viper.SetEnvPrefix("LIFELOG")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.AutomaticEnv()
+
+	// 显式绑定所有已知配置项，确保环境变量能正确覆盖
+	bindEnvKeys()
 
 	loadCategories()
 	loadAIProviders()
@@ -174,6 +185,24 @@ func Init() {
 		"time_point_mode", GetTimePointMode(),
 		"categories_count", len(GetCategories()),
 	)
+}
+
+// bindEnvKeys 显式绑定配置键到环境变量
+// viper.AutomaticEnv 仅对已知键生效，需显式绑定嵌套键
+func bindEnvKeys() {
+	keys := []string{
+		"server.port",
+		"server.db_path",
+		"auth.password_hash",
+		"auth.jwt_secret",
+		"auth.jwt_expire_hours",
+		"time_point_mode",
+		"mcp.enabled",
+		"mcp.port",
+	}
+	for _, key := range keys {
+		_ = viper.BindEnv(key)
+	}
 }
 
 func ensureConfigFile() {
