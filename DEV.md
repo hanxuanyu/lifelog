@@ -4,7 +4,7 @@
 
 ### 后端
 
-- **Go 1.22+** — 主语言
+- **Go 1.26+** — 主语言
 - **Gin** — HTTP 框架
 - **GORM + SQLite** — ORM 与数据库（纯 Go 实现，无 CGO 依赖）
 - **Viper** — 配置管理，支持 YAML 热重载（fsnotify）
@@ -39,6 +39,7 @@ lifelog/
 ├── go.mod / go.sum            # Go 依赖
 ├── config.yaml                # 配置文件（首次运行自动生成）
 ├── Makefile                   # 构建脚本
+├── LICENSE                    # AGPL-3.0 许可证
 ├── README.md                  # 项目说明
 ├── DEV.md                     # 开发指南（本文件）
 ├── .github/workflows/
@@ -46,7 +47,8 @@ lifelog/
 │   └── release.yaml           # CI：tag 推送时跨平台发布
 ├── scripts/
 │   ├── build.sh               # 跨平台构建脚本（6 平台）
-│   └── release.sh             # 版本标签创建与推送
+│   ├── release.sh             # 版本标签创建与推送
+│   └── install.sh             # 一键安装/更新/卸载脚本
 ├── docs/                      # Swagger 文档（自动生成）
 ├── data/                      # SQLite 数据库目录
 ├── web/                       # 前端构建产物（嵌入到二进制）
@@ -59,30 +61,35 @@ lifelog/
 │   │   ├── category.go        # 分类管理
 │   │   ├── statistics.go      # 统计接口（日/周/月/趋势）
 │   │   ├── data.go            # 数据导入导出
-│   │   └── settings.go        # 系统设置
+│   │   ├── settings.go        # 系统设置
+│   │   ├── ai.go              # AI 提供商管理与对话
+│   │   ├── version.go         # 版本信息与更新检查
+│   │   └── router.go          # 路由注册、静态文件服务、SPA fallback
 │   ├── middleware/
 │   │   └── auth.go            # JWT 认证中间件
 │   ├── model/
 │   │   ├── log_entry.go       # 日志条目模型（GORM）
 │   │   ├── category.go        # 分类与匹配规则模型
+│   │   ├── ai.go              # AI 提供商与对话模型
 │   │   └── response.go        # 响应 DTO（统计、分页等）
 │   ├── repository/
 │   │   ├── db.go              # 数据库初始化（AutoMigrate）
 │   │   └── log_entry.go       # 数据访问层（查询、分页、范围查询）
-│   ├── router/
-│   │   └── router.go          # 路由注册、静态文件服务、SPA fallback
 │   ├── service/
 │   │   ├── auth.go            # 认证逻辑（bcrypt、JWT 生成/验证）
 │   │   ├── log_entry.go       # 日志业务逻辑
 │   │   ├── category.go        # 分类匹配（fixed/regex，正则缓存）
-│   │   └── statistics.go      # 统计计算（时长、跨天、趋势）
+│   │   ├── statistics.go      # 统计计算（时长、跨天、趋势）
+│   │   └── ai.go              # AI 提供商管理与模型调用
 │   ├── logger/
 │   │   └── logger.go          # 结构化日志（slog + lumberjack 轮转）
 │   ├── mcp/
 │   │   └── server.go          # MCP 服务端（SSE 传输，5 个工具）
-│   └── util/
-│       ├── time_parser.go     # 时间格式解析工具
-│       └── time_parser_test.go
+│   ├── util/
+│   │   ├── time_parser.go     # 时间格式解析工具
+│   │   └── time_parser_test.go
+│   └── version/
+│       └── version.go         # 版本变量（构建时注入）
 └── frontend/
     ├── package.json
     ├── vite.config.ts         # Vite 配置（代理、路径别名、输出到 ../web）
@@ -90,40 +97,62 @@ lifelog/
     ├── index.html
     └── src/
         ├── main.tsx           # React 入口
-        ├── App.tsx            # 根组件、路由、顶部导航
+        ├── App.tsx            # 根组件、路由、全局弹窗、顶部导航
         ├── index.css          # 全局样式、主题变量（OKLch）
         ├── api/index.ts       # API 请求封装（Axios）
         ├── types/index.ts     # TypeScript 类型定义
-        ├── lib/utils.ts       # 工具函数（cn 等）
+        ├── lib/
+        │   ├── utils.ts       # 工具函数（cn 等）
+        │   └── category-toast.ts # 分类分配 Toast 提示
         ├── hooks/
         │   ├── use-theme.ts   # 深浅模式管理
         │   ├── use-toast.ts   # Toast 通知
-        │   └── use-shortcut.ts # 键盘快捷键
+        │   └── use-shortcut.ts # 键盘快捷键（平台自适应显示）
         ├── pages/
-        │   ├── HomePage.tsx        # 首页（时间轴 + 输入）
+        │   ├── HomePage.tsx        # 首页（时间轴 + 日期导航）
         │   ├── StatisticsPage.tsx  # 统计页（日/周/月/趋势）
         │   ├── SettingsPage.tsx    # 设置页
         │   └── LoginPage.tsx       # 登录页
         └── components/
+            ├── QuickAddDialog.tsx      # 快速添加/编辑弹窗
+            ├── EventForm.tsx           # 事件表单（时间、事项、标签、详情）
+            ├── CategoryAssignDialog.tsx # 分类分配弹窗
             ├── LogInput.tsx            # 日志输入组件
-            ├── QuickAddDialog.tsx      # 快速添加弹窗
             ├── MobileTimePicker.tsx    # 移动端滚轮时间选择器
             ├── MarkdownEditor.tsx      # Markdown 编辑器
             ├── MarkdownRenderer.tsx    # Markdown 渲染器
             ├── timeline/
             │   ├── index.tsx          # 时间轴容器
             │   ├── ListView.tsx       # 时间轴列表（轨道 + 卡片）
-            │   └── shared.ts          # 时间格式化、颜色对比度
+            │   ├── EntryCard.tsx      # 事项卡片
+            │   ├── RailSvg.tsx        # 时间轴轨道 SVG
+            │   ├── CurveSvg.tsx       # 轨道-卡片连接曲线
+            │   ├── CardContextMenu.tsx # 卡片右键菜单
+            │   ├── shared.ts          # 时间格式化、常量
+            │   ├── useCardGestures.ts # 卡片手势交互
+            │   └── useRailInteraction.ts # 轨道交互
             ├── statistics/
             │   ├── DateNav.tsx             # 日期导航
-            │   ├── PieChartCard.tsx        # 分类占比饼图
-            │   ├── SummaryList.tsx         # 分类汇总列表
+            │   ├── CompactCategorySummary.tsx # 分类汇总
             │   ├── EventBarChart.tsx       # 事项时长柱状图
             │   ├── StackedBarChart.tsx     # 每日堆叠柱状图
             │   ├── TrendChart.tsx          # 趋势面积图
             │   ├── TopEventsCard.tsx       # 事项排行
-            │   ├── DailyAverageCard.tsx    # 日均统计
-            │   └── CategoryDetailDialog.tsx # 子分类详情弹窗
+            │   ├── DailyAveragePills.tsx   # 日均统计
+            │   ├── CategoryDetailDialog.tsx # 子分类详情弹窗
+            │   └── AISummaryChat.tsx       # AI 统计摘要对话
+            ├── settings/
+            │   ├── AuthConfigCard.tsx      # 认证配置
+            │   ├── PasswordCard.tsx        # 密码设置
+            │   ├── ServerConfigCard.tsx    # 服务器配置
+            │   ├── TimePointModeCard.tsx   # 时间点模式
+            │   ├── CategoriesCard.tsx      # 分类管理
+            │   ├── ShortcutCard.tsx        # 快捷键设置
+            │   ├── DataManagementCard.tsx  # 数据导入导出
+            │   ├── MCPServiceCard.tsx      # MCP 服务配置
+            │   ├── AIProviderSettings.tsx  # AI 提供商设置
+            │   ├── AIProviderDialog.tsx    # AI 提供商编辑弹窗
+            │   └── VersionInfoCard.tsx     # 版本信息与更新
             └── ui/                    # shadcn/ui 组件
 ```
 
@@ -282,6 +311,15 @@ Service / Repository / Config（复用后端业务层）
 | `PUT` | `/api/settings` | 更新设置 | 是 |
 | `GET` | `/api/data/export` | 导出数据（ZIP） | 是 |
 | `POST` | `/api/data/import` | 导入数据（ZIP） | 是 |
+| `GET` | `/api/version` | 获取版本信息 | 否 |
+| `GET` | `/api/check-update` | 检查更新 | 是 |
+| `GET` | `/api/ai/providers` | 获取 AI 提供商列表 | 是 |
+| `POST` | `/api/ai/providers` | 添加 AI 提供商 | 是 |
+| `PUT` | `/api/ai/providers/:name` | 更新 AI 提供商 | 是 |
+| `DELETE` | `/api/ai/providers/:name` | 删除 AI 提供商 | 是 |
+| `POST` | `/api/ai/providers/test` | 测试 AI 提供商连接 | 是 |
+| `POST` | `/api/ai/models` | 获取 AI 模型列表 | 是 |
+| `POST` | `/api/ai/chat` | AI 对话 | 是 |
 
 ### MCP 接口（独立端口）
 

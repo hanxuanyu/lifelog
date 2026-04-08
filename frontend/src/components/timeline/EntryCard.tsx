@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Pencil, Trash2, Maximize2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -35,6 +36,18 @@ export function EntryCard({
   onCardTouchEnd, onHighlightEnter, onHighlightLeave, onEditRequest, onDeleteRequest,
   onDetailView, onAssignCategory, setCardRef, setSwipedEntryId,
 }: EntryCardProps) {
+  // Extract plain text preview from markdown for collapsed state
+  const detailPreview = useMemo(() => {
+    if (!entry.detail) return ""
+    return entry.detail
+      .replace(/^#{1,6}\s+/gm, "")           // headings
+      .replace(/\[([xX ])\]\s*/g, (_, c) => c.trim().toLowerCase() === "x" ? "\u2611 " : "\u2610 ") // checkboxes
+      .replace(/[*_~`>|]/g, "")               // inline formatting
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1") // links/images
+      .replace(/\n+/g, " ")                   // newlines to spaces
+      .trim()
+  }, [entry.detail])
+
   return (
     <motion.div
       ref={setCardRef(entry.id)}
@@ -102,9 +115,7 @@ export function EntryCard({
                   ) : (
                     <motion.div key="collapsed" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }} className="mt-0.5">
-                      <div className="text-xs text-muted-foreground prose-compact min-w-0 [&>*]:line-clamp-2">
-                        <MarkdownRenderer content={entry.detail} />
-                      </div>
+                      <p className="text-xs text-muted-foreground truncate">{detailPreview}</p>
                     </motion.div>
                   )}
                 </AnimatePresence>

@@ -14,9 +14,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { QuickAddDialog } from "@/components/QuickAddDialog"
-import { CategoryAssignDialog } from "@/components/CategoryAssignDialog"
-import { showCategoryAssignToast } from "@/lib/category-toast"
 
 export function HomePage() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -69,46 +66,23 @@ export function HomePage() {
   const goNext = () => setCurrentDate((d) => addDays(d, 1))
 
   const [calendarOpen, setCalendarOpen] = useState(false)
-  const [quickAddOpen, setQuickAddOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<{
-    id: number
-    time: string
-    event: string
-    detail: string
-  } | null>(null)
-  const [quickAddInitialTime, setQuickAddInitialTime] = useState<string | null>(null)
-  const [assignDialog, setAssignDialog] = useState<{ open: boolean; eventType: string }>({
-    open: false,
-    eventType: "",
-  })
-
-  // Listen for global shortcut event
-  useEffect(() => {
-    const handler = () => {
-      const now = new Date()
-      const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
-      setQuickAddInitialTime(time)
-      setQuickAddOpen(true)
-    }
-    window.addEventListener("openQuickAdd", handler)
-    return () => window.removeEventListener("openQuickAdd", handler)
-  }, [])
-
-  // Notify FAB to hide when dialog is open
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent("timelineEditing", { detail: quickAddOpen }))
-  }, [quickAddOpen])
 
   const displayDate = format(currentDate, "M月d日 EEE", { locale: zhCN })
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts — listen for global dialog state to block shortcuts
+  const [dialogOpen, setDialogOpen] = useState(false)
+  useEffect(() => {
+    const handler = (e: Event) => setDialogOpen((e as CustomEvent).detail)
+    window.addEventListener("timelineEditing", handler)
+    return () => window.removeEventListener("timelineEditing", handler)
+  }, [])
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if user is typing in an input/textarea
-      const tag = (e.target as HTMLElement)?.tagName
-      const isInputFocused = tag === "INPUT" || tag === "TEXTAREA"
+      if (dialogOpen) return
 
-      if (isInputFocused) return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === "INPUT" || tag === "TEXTAREA") return
 
       switch (e.key) {
         case "ArrowLeft":
@@ -127,7 +101,7 @@ export function HomePage() {
     }
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [currentDate])
+  }, [currentDate, dialogOpen])
 
   return (
     <div className="flex flex-col flex-1 min-h-0 max-w-2xl mx-auto w-full px-4 overflow-hidden">
@@ -211,50 +185,26 @@ export function HomePage() {
             crossDayHints={crossDayHints}
             timePointMode={timePointMode}
             onEditRequest={(entry) => {
-              setEditTarget({
-                id: entry.id,
-                time: formatTime(entry.log_time),
-                event: entry.event_type,
-                detail: entry.detail,
-              })
-              setQuickAddOpen(true)
+              window.dispatchEvent(new CustomEvent("openQuickAddEdit", {
+                detail: {
+                  entry: {
+                    id: entry.id,
+                    time: formatTime(entry.log_time),
+                    event: entry.event_type,
+                    detail: entry.detail,
+                  },
+                  date: dateStr,
+                },
+              }))
             }}
             onRailCreate={(time) => {
-              setQuickAddInitialTime(time)
-              setQuickAddOpen(true)
+              window.dispatchEvent(new CustomEvent("openQuickAddRail", {
+                detail: { time, date: dateStr },
+              }))
             }}
           />
         )}
       </div>
-
-      <QuickAddDialog
-        open={quickAddOpen}
-        onClose={() => {
-          setQuickAddOpen(false)
-          setEditTarget(null)
-          setQuickAddInitialTime(null)
-        }}
-        onCreated={() => {
-          window.dispatchEvent(new CustomEvent("logCreated"))
-        }}
-        onUncategorized={(eventType) => {
-          showCategoryAssignToast(eventType, () => {
-            setAssignDialog({ open: true, eventType })
-          })
-        }}
-        date={dateStr}
-        editEntry={editTarget}
-        initialTime={quickAddInitialTime}
-      />
-
-      <CategoryAssignDialog
-        open={assignDialog.open}
-        onOpenChange={(open) => setAssignDialog((prev) => ({ ...prev, open }))}
-        eventType={assignDialog.eventType}
-        onAssigned={() => {
-          window.dispatchEvent(new CustomEvent("logCreated"))
-        }}
-      />
     </div>
   )
 }

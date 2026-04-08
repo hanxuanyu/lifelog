@@ -129,6 +129,12 @@ export function EventForm({
       {/* Suggestion tags — two-level or flat search */}
       {isSearching ? (
         filteredSuggestions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="overflow-hidden"
+          >
           <div className="flex flex-wrap gap-1.5">
             {filteredSuggestions.map((s) => {
               const isSelected = event === s.name
@@ -136,12 +142,13 @@ export function EventForm({
                 <Badge
                   key={s.name}
                   asChild
-                  variant={isSelected ? "default" : "outline"}
+                  variant="outline"
                   className={`cursor-pointer h-auto py-1 px-2.5 gap-1.5 ${
                     isSelected
-                      ? ""
+                      ? "text-white border-transparent"
                       : "bg-accent/60 text-secondary-foreground border-transparent hover:bg-accent hover:border-border"
                   }`}
+                  style={isSelected && s.categoryColor ? { backgroundColor: s.categoryColor } : undefined}
                 >
                   <button
                     type="button"
@@ -159,9 +166,16 @@ export function EventForm({
               )
             })}
           </div>
+          </motion.div>
         )
       ) : (
         categoryGroups.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="overflow-hidden"
+          >
           <div className="flex flex-col gap-1.5">
             {/* Category badges */}
             <div className="flex flex-wrap gap-1.5">
@@ -216,12 +230,13 @@ export function EventForm({
                           <Badge
                             key={s.name}
                             asChild
-                            variant={isSelected ? "default" : "outline"}
+                            variant="outline"
                             className={`cursor-pointer h-auto py-1 px-2.5 gap-1.5 ${
                               isSelected
-                                ? ""
+                                ? "text-white border-transparent"
                                 : "bg-accent/60 text-secondary-foreground border-transparent hover:bg-accent hover:border-border"
                             }`}
+                            style={isSelected && s.categoryColor ? { backgroundColor: s.categoryColor } : undefined}
                           >
                             <button
                               type="button"
@@ -238,6 +253,7 @@ export function EventForm({
               })()}
             </AnimatePresence>
           </div>
+          </motion.div>
         )
       )}
 

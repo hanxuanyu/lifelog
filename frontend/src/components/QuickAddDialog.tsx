@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react"
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Send, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -18,9 +18,8 @@ interface QuickAddDialogProps {
 }
 
 export function QuickAddDialog({ open, onClose, onCreated, onUncategorized, date, editEntry, initialTime }: QuickAddDialogProps) {
-  // Use a key to force remount of inner content when dialog opens with new data
-  // This ensures all internal state (including MobileTimePicker) is fresh
-  const dialogKey = open ? `${editEntry?.id ?? "new"}-${initialTime ?? ""}-${Date.now()}` : "closed"
+  // Key forces remount when switching between edit targets or initial times
+  const dialogKey = open ? `${editEntry?.id ?? "new"}-${initialTime ?? ""}` : "closed"
 
   return (
     <AnimatePresence>
@@ -59,11 +58,37 @@ function QuickAddDialogInner({
   const [submitting, setSubmitting] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [allEvents, setAllEvents] = useState<string[]>([])
+  const [confirmClose, setConfirmClose] = useState(false)
+  const [dataReady, setDataReady] = useState(false)
 
   const eventInputRef = useRef<HTMLInputElement>(null)
 
+  // Check if form has meaningful content that would be lost
+  const hasContent = useMemo(() => {
+    if (isEdit) {
+      // In edit mode, check if anything changed from original
+      return (
+        timeValue !== editEntry!.time ||
+        eventValue !== editEntry!.event ||
+        detailValue !== (editEntry!.detail ?? "")
+      )
+    }
+    // In new mode, check if user has typed anything
+    return !!(eventValue.trim() || detailValue.trim())
+  }, [isEdit, timeValue, eventValue, detailValue, editEntry])
+
+  const tryClose = useCallback(() => {
+    if (hasContent) {
+      setConfirmClose(true)
+    } else {
+      onClose()
+    }
+  }, [hasContent, onClose])
+
   useEffect(() => {
-    if (date) {
+    if (!date) return
+    // Defer data loading to avoid layout shift during enter animation
+    const timer = setTimeout(() => {
       Promise.all([
         getCategories().catch(() => [] as Category[]),
         getEventTypes().catch(() => [] as string[]),
@@ -78,9 +103,11 @@ function QuickAddDialogInner({
           })
         )
         setAllEvents([...new Set([...recent, ...fixedEvents, ...types])])
+        setDataReady(true)
       })
-    }
+    }, 250)
     setTimeout(() => eventInputRef.current?.focus(), 100)
+    return () => clearTimeout(timer)
   }, [date])
 
   const suggestions: SuggestionTag[] = useMemo(() => {
@@ -138,7 +165,7 @@ function QuickAddDialogInner({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onClose}
+        onClick={tryClose}
         className="fixed inset-0 bg-black/40 z-[60] backdrop-blur-sm"
       />
       {/* Panel */}
@@ -155,7 +182,7 @@ function QuickAddDialogInner({
           <Button
             size="icon-xs"
             variant="ghost"
-            onClick={onClose}
+            onClick={tryClose}
             className="rounded-full text-muted-foreground"
           >
             <X className="h-4 w-4" />
@@ -206,6 +233,49 @@ function QuickAddDialogInner({
           </Button>
         </div>
       </motion.div>
+
+      {/* Close confirmation overlay */}
+      <AnimatePresence>
+        {confirmClose && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[80] bg-black/20"
+              onClick={() => setConfirmClose(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[90] bg-background rounded-xl shadow-2xl border p-5 w-[280px]"
+            >
+              <p className="text-sm font-medium mb-1">确认放弃{isEdit ? "编辑" : "输入"}？</p>
+              <p className="text-xs text-muted-foreground mb-4">当前内容尚未保存，关闭后将丢失。</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setConfirmClose(false)}
+                >
+                  继续{isEdit ? "编辑" : "输入"}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="flex-1"
+                  onClick={onClose}
+                >
+                  放弃
+                </Button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   )
 }
