@@ -18,9 +18,8 @@ interface QuickAddDialogProps {
 }
 
 export function QuickAddDialog({ open, onClose, onCreated, onUncategorized, date, editEntry, initialTime }: QuickAddDialogProps) {
-  // Use a key to force remount of inner content when dialog opens with new data
-  // This ensures all internal state (including MobileTimePicker) is fresh
-  const dialogKey = open ? `${editEntry?.id ?? "new"}-${initialTime ?? ""}-${Date.now()}` : "closed"
+  // Key forces remount when switching between edit targets or initial times
+  const dialogKey = open ? `${editEntry?.id ?? "new"}-${initialTime ?? ""}` : "closed"
 
   return (
     <AnimatePresence>
@@ -60,6 +59,7 @@ function QuickAddDialogInner({
   const [categories, setCategories] = useState<Category[]>([])
   const [allEvents, setAllEvents] = useState<string[]>([])
   const [confirmClose, setConfirmClose] = useState(false)
+  const [dataReady, setDataReady] = useState(false)
 
   const eventInputRef = useRef<HTMLInputElement>(null)
 
@@ -86,7 +86,9 @@ function QuickAddDialogInner({
   }, [hasContent, onClose])
 
   useEffect(() => {
-    if (date) {
+    if (!date) return
+    // Defer data loading to avoid layout shift during enter animation
+    const timer = setTimeout(() => {
       Promise.all([
         getCategories().catch(() => [] as Category[]),
         getEventTypes().catch(() => [] as string[]),
@@ -101,9 +103,11 @@ function QuickAddDialogInner({
           })
         )
         setAllEvents([...new Set([...recent, ...fixedEvents, ...types])])
+        setDataReady(true)
       })
-    }
+    }, 250)
     setTimeout(() => eventInputRef.current?.focus(), 100)
+    return () => clearTimeout(timer)
   }, [date])
 
   const suggestions: SuggestionTag[] = useMemo(() => {
