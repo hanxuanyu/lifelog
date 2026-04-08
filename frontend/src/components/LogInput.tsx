@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect, useCallback } from "react"
+import React, { useState, useRef, useEffect, useCallback, lazy, Suspense } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Send, Clock, FileText, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { MarkdownEditor } from "@/components/MarkdownEditor"
+const MarkdownEditor = lazy(() => import("@/components/MarkdownEditor").then(m => ({ default: m.MarkdownEditor })))
 import { createLog, getCategories, getEventTypes, getTimeline } from "@/api"
 import type { Category, LogEntry } from "@/types"
 import { toast } from "sonner"
@@ -338,12 +338,14 @@ export const LogInput = React.forwardRef<HTMLInputElement, LogInputProps>(
             className="overflow-hidden pl-[94px] pr-[38px]"
           >
             <div className="relative">
-              <MarkdownEditor
-                value={detailValue}
-                onChange={setDetailValue}
-                placeholder="输入详情（支持 Markdown）..."
-                minHeight={60}
-              />
+              <Suspense fallback={<div className="h-[60px] animate-pulse bg-muted rounded-lg" />}>
+                <MarkdownEditor
+                  value={detailValue}
+                  onChange={setDetailValue}
+                  placeholder="输入详情（支持 Markdown）..."
+                  minHeight={60}
+                />
+              </Suspense>
             </div>
           </motion.div>
         )}

@@ -4,6 +4,7 @@ go 1.26.1
 
 require (
 	github.com/fsnotify/fsnotify v1.9.0
+	github.com/gin-contrib/gzip v0.0.6
 	github.com/gin-gonic/gin v1.12.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/golang-jwt/jwt/v5 v5.3.1

@@ -43,7 +43,7 @@ export function VersionInfoCard() {
             <a href={`https://github.com/hanxuanyu/lifelog/commit/${versionInfo.commit}`}
               target="_blank" rel="noopener noreferrer"
               className="font-mono text-primary hover:underline flex items-center gap-1">
-              {versionInfo.commit}<ExternalLink className="h-3 w-3" />
+              {versionInfo.commit.length > 7 ? versionInfo.commit.slice(0, 7) : versionInfo.commit}<ExternalLink className="h-3 w-3" />
             </a>
           </div>
           <div className="flex items-center justify-between text-sm">

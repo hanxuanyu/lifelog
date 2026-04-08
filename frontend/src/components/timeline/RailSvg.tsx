@@ -136,13 +136,13 @@ export function RailSvg({
           <circle cx={cx} cy={hoverRailY} r={isTouching ? 5 : 3} className={isTouching ? "fill-primary" : "fill-muted-foreground/50"} />
           {isTouching ? (
             <>
-              <rect x={0} y={Math.max(0, hoverRailY - 55)} width={cx - 2} height={20} rx={4} className="fill-primary" />
-              <text x={(cx - 2) / 2} y={Math.max(0, hoverRailY - 55) + 14} textAnchor="middle" fill="white" fontSize={13} fontFamily="monospace" fontWeight="bold">
+              <rect x={0} y={Math.max(0, hoverRailY - 55)} width={cx - 2} height={20} rx={4} className="fill-primary-foreground dark:fill-primary" />
+              <text x={(cx - 2) / 2} y={Math.max(0, hoverRailY - 55) + 14} textAnchor="middle" className="fill-primary dark:fill-primary-foreground" fontSize={13} fontFamily="monospace" fontWeight="bold">
                 {hoverTime}
               </text>
             </>
           ) : (
-            <text x={cx - 7} y={hoverRailY - 5} textAnchor="end" className="fill-muted-foreground" fontSize={10} fontFamily="monospace">
+            <text x={cx - 7} y={hoverRailY - 5} textAnchor="end" className="fill-foreground/70" fontSize={10} fontFamily="monospace">
               {hoverTime}
             </text>
           )}
