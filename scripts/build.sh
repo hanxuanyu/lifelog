@@ -37,7 +37,7 @@ if [ "$SKIP_FRONTEND" = false ]; then
 fi
 
 echo "==> Cross-compiling Go binaries..."
-for platform in "${PLATFORMS[@]}";
+for platform in "${PLATFORMS[@]}"; do
   GOOS="${platform%/*}"
   GOARCH="${platform#*/}"
 
