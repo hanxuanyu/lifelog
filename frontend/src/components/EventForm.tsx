@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, lazy, Suspense } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Tag, FileText, X, ChevronDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MobileTimePicker } from "@/components/MobileTimePicker"
-import { MarkdownEditor } from "@/components/MarkdownEditor"
+const MarkdownEditor = lazy(() => import("@/components/MarkdownEditor").then(m => ({ default: m.MarkdownEditor })))
 
 export interface SuggestionTag {
   name: string
@@ -267,12 +267,14 @@ export function EventForm({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <MarkdownEditor
-              value={detail}
-              onChange={onDetailChange}
-              placeholder="输入详情（支持 Markdown）..."
-              minHeight={100}
-            />
+            <Suspense fallback={<div className="h-[100px] animate-pulse bg-muted rounded-lg" />}>
+              <MarkdownEditor
+                value={detail}
+                onChange={onDetailChange}
+                placeholder="输入详情（支持 Markdown）..."
+                minHeight={100}
+              />
+            </Suspense>
           </motion.div>
         )}
       </AnimatePresence>

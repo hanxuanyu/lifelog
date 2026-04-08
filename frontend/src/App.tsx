@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, lazy, Suspense } from "react"
 import { createBrowserRouter, RouterProvider, useNavigate, useLocation, useBlocker, Outlet } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { BarChart3, Settings, Home, Plus, Sun, Moon } from "lucide-react"
@@ -6,8 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
 import { getSettings } from "@/api"
 import { HomePage } from "@/pages/HomePage"
-import { StatisticsPage } from "@/pages/StatisticsPage"
-import { SettingsPage } from "@/pages/SettingsPage"
 import { LoginPage } from "@/pages/LoginPage"
 import { useTheme } from "@/hooks/use-theme"
 import { useQuickAddShortcut } from "@/hooks/use-shortcut"
@@ -15,6 +13,9 @@ import { QuickAddDialog } from "@/components/QuickAddDialog"
 import { CategoryAssignDialog } from "@/components/CategoryAssignDialog"
 import { showCategoryAssignToast } from "@/lib/category-toast"
 import { format } from "date-fns"
+
+const StatisticsPage = lazy(() => import("@/pages/StatisticsPage").then(m => ({ default: m.StatisticsPage })))
+const SettingsPage = lazy(() => import("@/pages/SettingsPage").then(m => ({ default: m.SettingsPage })))
 
 // Top-right nav: all action buttons grouped together
 function TopNav() {
@@ -292,8 +293,8 @@ const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { path: "/", element: <HomePage /> },
-      { path: "/statistics", element: <StatisticsPage /> },
-      { path: "/settings", element: <SettingsPage /> },
+      { path: "/statistics", element: <Suspense fallback={null}><StatisticsPage /></Suspense> },
+      { path: "/settings", element: <Suspense fallback={null}><SettingsPage /></Suspense> },
     ],
   },
 ])
