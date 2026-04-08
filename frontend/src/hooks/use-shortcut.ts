@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from "react"
 
 const STORAGE_KEY = "quickAddShortcut"
-const DEFAULT_SHORTCUT = "ctrl+shift+n"
+const DEFAULT_SHORTCUT = "alt+shift+n"
 
 export interface ShortcutConfig {
   ctrl: boolean
@@ -22,15 +22,17 @@ export function parseShortcut(shortcut: string): ShortcutConfig {
   }
 }
 
+const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+
 export function formatShortcut(shortcut: string): string {
   const config = parseShortcut(shortcut)
   const parts: string[] = []
-  if (config.ctrl) parts.push("Ctrl")
-  if (config.shift) parts.push("Shift")
-  if (config.alt) parts.push("Alt")
-  if (config.meta) parts.push("⌘")
+  if (config.ctrl) parts.push(isMac ? "⌃" : "Ctrl")
+  if (config.alt) parts.push(isMac ? "⌥" : "Alt")
+  if (config.shift) parts.push(isMac ? "⇧" : "Shift")
+  if (config.meta) parts.push(isMac ? "⌘" : "Win")
   if (config.key) parts.push(config.key.toUpperCase())
-  return parts.join(" + ")
+  return parts.join(isMac ? "" : " + ")
 }
 
 function matchesShortcut(e: KeyboardEvent, config: ShortcutConfig): boolean {

@@ -11,6 +11,10 @@ import { SettingsPage } from "@/pages/SettingsPage"
 import { LoginPage } from "@/pages/LoginPage"
 import { useTheme } from "@/hooks/use-theme"
 import { useQuickAddShortcut } from "@/hooks/use-shortcut"
+import { QuickAddDialog } from "@/components/QuickAddDialog"
+import { CategoryAssignDialog } from "@/components/CategoryAssignDialog"
+import { showCategoryAssignToast } from "@/lib/category-toast"
+import { format } from "date-fns"
 
 // Top-right nav: all action buttons grouped together
 function TopNav() {
@@ -134,6 +138,62 @@ function AppLayout() {
   const isHome = location.pathname === "/"
   const [timelineEditing, setTimelineEditing] = useState(false)
 
+  // Quick add dialog state (global, works on all pages)
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<{
+    id: number; time: string; event: string; detail: string
+  } | null>(null)
+  const [quickAddInitialTime, setQuickAddInitialTime] = useState<string | null>(null)
+  const [quickAddDate, setQuickAddDate] = useState(() => format(new Date(), "yyyy-MM-dd"))
+  const [assignDialog, setAssignDialog] = useState<{ open: boolean; eventType: string }>({
+    open: false, eventType: "",
+  })
+
+  // Listen for openQuickAdd (from shortcut or FAB/button)
+  useEffect(() => {
+    const handler = () => {
+      const now = new Date()
+      const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
+      setQuickAddDate(format(now, "yyyy-MM-dd"))
+      setQuickAddInitialTime(time)
+      setEditTarget(null)
+      setQuickAddOpen(true)
+    }
+    window.addEventListener("openQuickAdd", handler)
+    return () => window.removeEventListener("openQuickAdd", handler)
+  }, [])
+
+  // Listen for edit request from HomePage timeline
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { entry, date } = (e as CustomEvent).detail
+      setEditTarget(entry)
+      setQuickAddDate(date)
+      setQuickAddInitialTime(null)
+      setQuickAddOpen(true)
+    }
+    window.addEventListener("openQuickAddEdit", handler)
+    return () => window.removeEventListener("openQuickAddEdit", handler)
+  }, [])
+
+  // Listen for rail create from HomePage timeline
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { time, date } = (e as CustomEvent).detail
+      setQuickAddInitialTime(time)
+      setQuickAddDate(date)
+      setEditTarget(null)
+      setQuickAddOpen(true)
+    }
+    window.addEventListener("openQuickAddRail", handler)
+    return () => window.removeEventListener("openQuickAddRail", handler)
+  }, [])
+
+  // Notify FAB to hide when dialog is open
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("timelineEditing", { detail: quickAddOpen }))
+  }, [quickAddOpen])
+
   // Listen for timeline editing state changes
   useEffect(() => {
     const handler = (e: Event) => {
@@ -194,6 +254,35 @@ function AppLayout() {
           <Plus className="h-5 w-5" />
         </motion.button>
       )}
+
+      <QuickAddDialog
+        open={quickAddOpen}
+        onClose={() => {
+          setQuickAddOpen(false)
+          setEditTarget(null)
+          setQuickAddInitialTime(null)
+        }}
+        onCreated={() => {
+          window.dispatchEvent(new CustomEvent("logCreated"))
+        }}
+        onUncategorized={(eventType) => {
+          showCategoryAssignToast(eventType, () => {
+            setAssignDialog({ open: true, eventType })
+          })
+        }}
+        date={quickAddDate}
+        editEntry={editTarget}
+        initialTime={quickAddInitialTime}
+      />
+
+      <CategoryAssignDialog
+        open={assignDialog.open}
+        onOpenChange={(open) => setAssignDialog((prev) => ({ ...prev, open }))}
+        eventType={assignDialog.eventType}
+        onAssigned={() => {
+          window.dispatchEvent(new CustomEvent("logCreated"))
+        }}
+      />
     </div>
   )
 }

@@ -46,7 +46,7 @@ export function ShortcutCard() {
                 : <kbd className="font-mono text-xs">{formatShortcut(shortcutValue)}</kbd>}
             </div>
             <Button size="sm" variant="outline" onClick={() => {
-              const defaultKey = "ctrl+shift+n"
+              const defaultKey = "alt+shift+n"
               setShortcutValue(defaultKey); setShortcut(defaultKey); setRecordingShortcut(false)
               toast.success("已恢复默认快捷键")
             }}>重置</Button>
