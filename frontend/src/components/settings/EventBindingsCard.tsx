@@ -74,16 +74,21 @@ export function EventBindingsCard() {
             const isExpanded = expanded.has(b.event)
             return (
               <div key={b.event} className="border rounded-md p-2.5 space-y-2">
+                {/* 第一行：展开按钮 + 事件名 + 开关 */}
                 <div className="flex items-center gap-2">
                   <button type="button" className="shrink-0 p-0.5 hover:bg-muted rounded" onClick={() => toggleExpand(b.event)}>
                     {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                   </button>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium">{b.event}</div>
-                    {def && <div className="text-xs text-muted-foreground">{def.description}</div>}
+                    <div className="text-sm font-medium truncate">{b.event}</div>
+                    {def && <div className="text-xs text-muted-foreground truncate">{def.description}</div>}
                   </div>
+                  <Switch checked={b.enabled} onCheckedChange={v => updateBinding(b.event, { enabled: v })} className="shrink-0" />
+                </div>
+                {/* 第二行：Webhook 选择器 */}
+                <div className="pl-6">
                   <Select value={b.webhook_name || NONE_VALUE} onValueChange={v => updateBinding(b.event, { webhook_name: v === NONE_VALUE ? "" : v })}>
-                    <SelectTrigger className="h-7 text-xs w-[140px] shrink-0"><SelectValue placeholder="选择 Webhook" /></SelectTrigger>
+                    <SelectTrigger className="h-7 text-xs w-full"><SelectValue placeholder="选择 Webhook" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={NONE_VALUE}>未绑定</SelectItem>
                       {webhooks.map(wh => (
@@ -91,7 +96,6 @@ export function EventBindingsCard() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Switch checked={b.enabled} onCheckedChange={v => updateBinding(b.event, { enabled: v })} className="shrink-0" />
                 </div>
                 {isExpanded && def && def.variables.length > 0 && (
                   <div className="pl-6 flex flex-wrap gap-1.5">
