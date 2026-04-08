@@ -6,7 +6,7 @@ lifelog
 data/
 
 # Config (contains password hash)
-config.yaml
+config/
 
 # IDE
 .idea/

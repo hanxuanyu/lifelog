@@ -3,6 +3,7 @@ package config
 import (
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -144,9 +145,16 @@ var (
 	mu          sync.RWMutex
 	categories  []model.Category
 	aiProviders []model.AIProvider
+	configDir   = "./config" // 默认配置目录
 )
 
+// SetConfigDir 设置配置文件目录（需在 Init 之前调用）
+func SetConfigDir(dir string) {
+	configDir = dir
+}
+
 // Init 初始化配置，如果 config.yaml 不存在则创建默认配置
+// 配置文件固定在 configDir 目录下（默认 ./config/）
 // 支持环境变量覆盖，前缀为 LIFELOG_，层级用 _ 分隔
 // 例如: LIFELOG_SERVER_PORT=9090 覆盖 server.port
 func Init() {
@@ -154,7 +162,7 @@ func Init() {
 
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
+	viper.AddConfigPath(configDir)
 
 	if err := viper.ReadInConfig(); err != nil {
 		slog.Error("读取配置文件失败", "error", err)
@@ -206,11 +214,16 @@ func bindEnvKeys() {
 }
 
 func ensureConfigFile() {
-	if _, err := os.Stat("config.yaml"); err == nil {
+	configPath := filepath.Join(configDir, "config.yaml")
+	if info, err := os.Stat(configPath); err == nil && !info.IsDir() {
 		return
 	}
-	slog.Info("config.yaml 不存在，创建默认配置文件")
-	if err := os.WriteFile("config.yaml", []byte(defaultConfigYAML), 0644); err != nil {
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		slog.Error("创建配置目录失败", "error", err, "dir", configDir)
+		os.Exit(1)
+	}
+	slog.Info("配置文件不存在，创建默认配置", "path", configPath)
+	if err := os.WriteFile(configPath, []byte(defaultConfigYAML), 0644); err != nil {
 		slog.Error("创建默认配置文件失败", "error", err)
 		os.Exit(1)
 	}
