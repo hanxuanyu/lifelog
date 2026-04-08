@@ -15,6 +15,12 @@ export function useRailInteraction({
   const [hoverTime, setHoverTime] = useState<string | null>(null)
   const [isTouching, setIsTouching] = useState(false)
   const isTouchingRef = useRef(false)
+  const hoverTimeRef = useRef<string | null>(null)
+
+  // Keep ref in sync with state for use in event handlers
+  useEffect(() => {
+    hoverTimeRef.current = hoverTime
+  }, [hoverTime])
 
   const handleRailHover = (e: React.MouseEvent) => {
     const rail = railRef.current
@@ -65,10 +71,9 @@ export function useRailInteraction({
       if (!isTouchingRef.current) return
       isTouchingRef.current = false
       setIsTouching(false)
-      setHoverTime((prev) => {
-        if (prev) onRailCreate?.(prev)
-        return null
-      })
+      const lastTime = hoverTimeRef.current
+      setHoverTime(null)
+      if (lastTime) onRailCreate?.(lastTime)
     }
 
     rail.addEventListener("touchstart", onTouchStart, { passive: false })
