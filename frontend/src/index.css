@@ -418,7 +418,30 @@ body::before {
   text-decoration: line-through;
 }
 .prose-compact input[type="checkbox"] {
-  margin-right: 0.3em;
+  margin-right: 0.4em;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+  width: 0.9em;
+  height: 0.9em;
+  accent-color: oklch(var(--primary));
+}
+.prose-compact .contains-task-list {
+  list-style: none;
+  padding-left: 0.2em;
+}
+.prose-compact .task-list-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.1em;
+}
+.prose-compact .task-list-item label {
+  flex: 1;
+  min-width: 0;
+}
+.prose-compact .task-list-item input:checked + label {
+  text-decoration: line-through;
+  opacity: 0.6;
 }
 
 @theme inline {

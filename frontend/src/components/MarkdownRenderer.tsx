@@ -1,7 +1,9 @@
 import { useMemo, useEffect, useRef } from "react"
 import MarkdownIt from "markdown-it"
+import taskLists from "markdown-it-task-lists"
 
 const md = MarkdownIt({ html: true, linkify: true, typographer: true })
+  .use(taskLists, { enabled: false, label: true, labelAfter: true })
 
 // Sanitize: strip dangerous tags but keep safe inline formatting tags
 const ALLOWED_TAGS = new Set(["em", "strong", "u", "s", "del", "code", "br", "sub", "sup", "mark"])
@@ -17,7 +19,7 @@ function sanitizeHtml(html: string): string {
       const t = tag.toLowerCase()
       if (ALLOWED_TAGS.has(t)) return `<${match.startsWith("</") ? "/" : ""}${t}>`
       // Allow block-level tags that markdown-it generates
-      if (["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "pre", "table", "thead", "tbody", "tr", "th", "td", "hr", "a", "img", "div", "span", "input"].includes(t)) {
+      if (["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "pre", "table", "thead", "tbody", "tr", "th", "td", "hr", "a", "img", "div", "span", "input", "label"].includes(t)) {
         return match
       }
       return ""
