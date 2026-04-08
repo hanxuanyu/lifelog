@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"flag"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -26,7 +27,11 @@ var webFS embed.FS
 // @in header
 // @name Authorization
 func main() {
+	configDir := flag.String("c", "./config", "配置文件目录路径")
+	flag.Parse()
+
 	logger.Init("./logs")
+	config.SetConfigDir(*configDir)
 	config.Init()
 	repository.InitDB(config.GetDBPath())
 

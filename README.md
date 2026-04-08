@@ -68,18 +68,18 @@ curl -fSL -o docker-compose.yaml \
 docker compose up -d
 ```
 
-首次启动会自动生成 `config.yaml` 和 `data/` 目录。访问 <http://localhost:8080> 即可使用。
+首次启动会自动在 `config/` 目录下生成默认 `config.yaml`，`data/`、`logs/`、`config/` 目录会挂载到宿主机。访问 <http://localhost:8080> 即可使用。
 
 自定义配置：
 
 ```bash
-# 通过环境变量覆盖（编辑 docker-compose.yaml 的 environment 部分）
+# 方式一：通过环境变量覆盖（推荐，编辑 docker-compose.yaml 的 environment 部分）
 environment:
   - LIFELOG_SERVER_PORT=8080
   - LIFELOG_AUTH_JWT_SECRET=your-secret-here
 
-# 或直接编辑挂载的 config.yaml
-vim config.yaml
+# 方式二：直接编辑挂载的配置文件
+vim config/config.yaml
 docker compose restart
 ```
 

@@ -9,7 +9,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
-      - ./config.yaml:/app/config.yaml
+      - ./config:/app/config
     environment:
       - TZ=Asia/Shanghai
       # 环境变量覆盖配置示例（前缀 LIFELOG_，层级用 _ 分隔）：
