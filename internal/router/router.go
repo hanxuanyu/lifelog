@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"net/http"
 
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/hxuanyu/lifelog/internal/handler"
 	"github.com/hxuanyu/lifelog/internal/middleware"
@@ -15,6 +16,8 @@ import (
 
 // Setup 注册所有路由
 func Setup(r *gin.Engine, staticFS fs.FS) {
+	// Gzip 压缩中间件
+	r.Use(gzip.Gzip(gzip.DefaultCompression))
 	// Swagger 文档
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
