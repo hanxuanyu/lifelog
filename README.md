@@ -54,6 +54,44 @@ systemctl restart lifelog      # 重启服务
 
 > **安装脚本做了什么？** 脚本是开源的，可在运行前[查看完整源码](https://github.com/hanxuanyu/lifelog/blob/main/scripts/install.sh)。它会检测平台架构、从 GitHub Releases 下载二进制、安装到 `/opt/lifelog/`、创建 systemd 服务并启动。更新时仅替换二进制并重启，卸载时保留数据。
 
+### Docker 部署
+
+```bash
+# 创建工作目录
+mkdir lifelog && cd lifelog
+
+# 下载 docker-compose 配置
+curl -fSL -o docker-compose.yaml \
+  https://raw.githubusercontent.com/hanxuanyu/lifelog/main/docker-compose.yaml
+
+# 启动服务
+docker compose up -d
+```
+
+首次启动会自动生成 `config.yaml` 和 `data/` 目录。访问 <http://localhost:8080> 即可使用。
+
+自定义配置：
+
+```bash
+# 通过环境变量覆盖（编辑 docker-compose.yaml 的 environment 部分）
+environment:
+  - LIFELOG_SERVER_PORT=8080
+  - LIFELOG_AUTH_JWT_SECRET=your-secret-here
+
+# 或直接编辑挂载的 config.yaml
+vim config.yaml
+docker compose restart
+```
+
+常用命令：
+
+```bash
+docker compose logs -f     # 查看日志
+docker compose restart     # 重启服务
+docker compose pull        # 更新镜像
+docker compose down        # 停止服务
+```
+
 ### 手动部署
 
 前往 [GitHub Releases](https://github.com/hanxuanyu/lifelog/releases) 下载对应平台的压缩包：
@@ -118,6 +156,23 @@ make build-all      # 跨平台构建（6 个平台）
 | `categories` | 分类规则配置 | 预设 7 个分类 | 是 |
 | `mcp.enabled` | 启用 MCP 服务 | `false` | 否 |
 | `mcp.port` | MCP 服务端口 | `8081` | 否 |
+
+### 环境变量覆盖
+
+所有配置项均可通过环境变量覆盖，规则：前缀 `LIFELOG_`，层级用 `_` 分隔，全大写。
+
+| 环境变量 | 对应配置项 |
+| -------- | ---------- |
+| `LIFELOG_SERVER_PORT` | `server.port` |
+| `LIFELOG_SERVER_DB_PATH` | `server.db_path` |
+| `LIFELOG_AUTH_JWT_SECRET` | `auth.jwt_secret` |
+| `LIFELOG_AUTH_JWT_EXPIRE_HOURS` | `auth.jwt_expire_hours` |
+| `LIFELOG_AUTH_PASSWORD_HASH` | `auth.password_hash` |
+| `LIFELOG_TIME_POINT_MODE` | `time_point_mode` |
+| `LIFELOG_MCP_ENABLED` | `mcp.enabled` |
+| `LIFELOG_MCP_PORT` | `mcp.port` |
+
+环境变量优先级高于配置文件，适合 Docker 部署时动态配置。
 
 ### 默认分类
 
