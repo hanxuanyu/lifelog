@@ -339,8 +339,13 @@ export async function deleteWebhook(name: string) {
   return res.data
 }
 
-export async function testWebhook(name: string) {
-  const res = await http.post<ApiResponse>(`/webhooks/${encodeURIComponent(name)}/test`)
+export async function testWebhook(name: string, event?: string) {
+  const res = await http.post<ApiResponse>(`/webhooks/${encodeURIComponent(name)}/test`, event ? { event } : {})
+  return res.data
+}
+
+export async function testWebhookDry(webhook: Webhook, event?: string) {
+  const res = await http.post<ApiResponse>("/webhooks/test-dry", { ...webhook, event })
   return res.data
 }
 

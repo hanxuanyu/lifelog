@@ -75,6 +75,7 @@ func Setup(r *gin.Engine, staticFS fs.FS) {
 		{
 			webhooks.GET("", handler.GetWebhooks)
 			webhooks.POST("", handler.CreateWebhook)
+			webhooks.POST("/test-dry", handler.TestWebhookDry)
 			webhooks.PUT("/:name", handler.UpdateWebhook)
 			webhooks.DELETE("/:name", handler.DeleteWebhook)
 			webhooks.POST("/:name/test", handler.TestWebhook)

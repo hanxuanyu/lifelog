@@ -26,8 +26,10 @@ type exportData struct {
 
 // exportConfig 导出配置的结构
 type exportConfig struct {
-	TimePointMode string           `json:"time_point_mode"`
-	Categories    []model.Category `json:"categories"`
+	TimePointMode string               `json:"time_point_mode"`
+	Categories    []model.Category     `json:"categories"`
+	Webhooks      []model.Webhook      `json:"webhooks,omitempty"`
+	EventBindings []model.EventBinding `json:"event_bindings,omitempty"`
 }
 
 // importRequest 导入请求参数
@@ -60,6 +62,8 @@ func ExportData(c *gin.Context) {
 	cfg := exportConfig{
 		TimePointMode: config.GetTimePointMode(),
 		Categories:    config.GetCategories(),
+		Webhooks:      config.GetWebhooks(),
+		EventBindings: config.GetEventBindings(),
 	}
 
 	// 创建 zip
@@ -254,6 +258,16 @@ func ImportData(c *gin.Context) {
 		}
 		if err := config.SetCategoriesConfig(cfgData.Categories); err != nil {
 			result["config_error"] = "设置分类规则失败: " + err.Error()
+		}
+		if len(cfgData.Webhooks) > 0 {
+			if err := config.SetWebhooks(cfgData.Webhooks); err != nil {
+				result["config_error"] = "导入 Webhook 失败: " + err.Error()
+			}
+		}
+		if len(cfgData.EventBindings) > 0 {
+			if err := config.SetEventBindings(cfgData.EventBindings); err != nil {
+				result["config_error"] = "导入事件绑定失败: " + err.Error()
+			}
 		}
 		result["config_imported"] = true
 	}

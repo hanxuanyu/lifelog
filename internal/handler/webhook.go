@@ -131,8 +131,10 @@ func DeleteWebhook(c *gin.Context) {
 // TestWebhook 测试 webhook（使用示例数据同步执行）
 // @Summary 测试 webhook
 // @Tags Webhook
+// @Accept json
 // @Produce json
 // @Param name path string true "Webhook 名称"
+// @Param body body object false "可选指定事件 {\"event\": \"log.created\"}"
 // @Success 200 {object} model.Response
 // @Router /api/webhooks/{name}/test [post]
 func TestWebhook(c *gin.Context) {
@@ -142,19 +144,66 @@ func TestWebhook(c *gin.Context) {
 		c.JSON(http.StatusNotFound, model.Response{Code: 404, Message: "webhook 不存在: " + name})
 		return
 	}
-	// 使用第一个绑定此 webhook 的事件的示例数据，否则用空数据
+
+	// 支持通过 body 指定事件名
+	var req struct {
+		Event string `json:"event"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
 	sampleData := map[string]string{"test": "true"}
-	for _, b := range config.GetEventBindings() {
-		if b.WebhookName == name {
-			sampleData = events.GetSampleData(b.Event)
-			break
+	if req.Event != "" {
+		sampleData = events.GetSampleData(req.Event)
+	} else {
+		for _, b := range config.GetEventBindings() {
+			if b.WebhookName == name {
+				sampleData = events.GetSampleData(b.Event)
+				break
+			}
 		}
 	}
-	if err := events.ExecuteWebhook(*wh, sampleData); err != nil {
-		c.JSON(http.StatusOK, model.Response{Code: 500, Message: "测试失败: " + err.Error()})
+
+	resp, err := events.ExecuteWebhookWithResponse(*wh, sampleData)
+	if err != nil {
+		c.JSON(http.StatusOK, model.Response{Code: 500, Message: "测试失败: " + err.Error(), Data: resp})
 		return
 	}
-	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "测试成功"})
+	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "测试成功", Data: resp})
+}
+
+// TestWebhookDry 测试未保存的 webhook（不需要先创建）
+// @Summary 测试未保存的 webhook
+// @Tags Webhook
+// @Accept json
+// @Produce json
+// @Param body body object true "Webhook 配置 + 可选事件名"
+// @Success 200 {object} model.Response
+// @Router /api/webhooks/test-dry [post]
+func TestWebhookDry(c *gin.Context) {
+	var req struct {
+		model.Webhook `json:",inline"`
+		Event         string `json:"event"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "参数错误: " + err.Error()})
+		return
+	}
+	if req.URL == "" {
+		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "url 为必填项"})
+		return
+	}
+
+	sampleData := map[string]string{"test": "true"}
+	if req.Event != "" {
+		sampleData = events.GetSampleData(req.Event)
+	}
+
+	resp, err := events.ExecuteWebhookWithResponse(req.Webhook, sampleData)
+	if err != nil {
+		c.JSON(http.StatusOK, model.Response{Code: 500, Message: "测试失败: " + err.Error(), Data: resp})
+		return
+	}
+	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "测试成功", Data: resp})
 }
 
 // GetEvents 获取所有事件定义（含变量信息）

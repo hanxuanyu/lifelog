@@ -4,19 +4,23 @@ import { Webhook as WebhookIcon, Plus, Pencil, Trash2, Play } from "lucide-react
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { getWebhooks, deleteWebhook, testWebhook } from "@/api"
+import { getWebhooks, deleteWebhook, testWebhook, getEvents } from "@/api"
 import { toast } from "sonner"
 import { WebhookDialog } from "./WebhookDialog"
-import type { Webhook } from "@/types"
+import type { Webhook, EventDefinition } from "@/types"
 
 export function WebhookSettingsCard() {
   const [webhooks, setWebhooks] = useState<Webhook[]>([])
+  const [events, setEvents] = useState<EventDefinition[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Webhook | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
 
   const load = () => { getWebhooks().then(setWebhooks).catch(() => {}) }
-  useEffect(load, [])
+  useEffect(() => {
+    load()
+    getEvents().then(setEvents).catch(() => {})
+  }, [])
 
   const handleDelete = async (name: string) => {
     try {
@@ -78,7 +82,7 @@ export function WebhookSettingsCard() {
           )}
         </CardContent>
       </Card>
-      <WebhookDialog open={dialogOpen} onOpenChange={setDialogOpen} webhook={editing} onSaved={load} />
+      <WebhookDialog open={dialogOpen} onOpenChange={setDialogOpen} webhook={editing} onSaved={load} events={events} />
     </motion.div>
   )
 }

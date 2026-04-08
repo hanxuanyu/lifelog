@@ -51,6 +51,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <input type="text" name="username" autoComplete="username" value="admin" readOnly hidden />
               <div className="relative">
                 <Input
                   type={showPw ? "text" : "password"}
@@ -58,6 +59,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="请输入密码"
                   className="pr-9"
+                  autoComplete="current-password"
                   autoFocus
                 />
                 <button

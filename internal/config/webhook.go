@@ -148,13 +148,18 @@ func SetEventBindings(items []model.EventBinding) error {
 	seen := make(map[string]struct{}, len(items))
 	for _, item := range items {
 		eventName := strings.TrimSpace(item.Event)
+		webhookName := strings.TrimSpace(item.WebhookName)
 		if eventName == "" {
 			return fmt.Errorf("event name is required")
 		}
-		if _, exists := seen[eventName]; exists {
-			return fmt.Errorf("duplicate event binding: %s", eventName)
+		if webhookName == "" {
+			return fmt.Errorf("webhook name is required")
 		}
-		seen[eventName] = struct{}{}
+		key := eventName + "|" + webhookName
+		if _, exists := seen[key]; exists {
+			return fmt.Errorf("duplicate event binding: %s -> %s", eventName, webhookName)
+		}
+		seen[key] = struct{}{}
 	}
 
 	viper.Set("event_bindings", items)
