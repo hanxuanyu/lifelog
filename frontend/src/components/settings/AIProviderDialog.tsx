@@ -183,7 +183,7 @@ export function AIProviderDialog({ open, onOpenChange, provider, onSaved }: AIPr
           <div className="space-y-1.5">
             <Label className="text-xs">API Key</Label>
             <div className="relative">
-              <Input type={showKey ? "text" : "password"} value={form.api_key} onChange={(e) => setForm({ ...form, api_key: e.target.value })} placeholder="sk-..." className="text-sm font-mono pr-9" />
+              <Input type={showKey ? "text" : "password"} value={form.api_key} onChange={(e) => setForm({ ...form, api_key: e.target.value })} placeholder="sk-..." className="text-sm font-mono pr-9" autoComplete="off" />
               <button type="button" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowKey(!showKey)}>
                 {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
               </button>

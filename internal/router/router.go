@@ -67,6 +67,25 @@ func Setup(r *gin.Engine, staticFS fs.FS) {
 		protected.GET("/settings", handler.GetSettings)
 		protected.PUT("/settings", handler.UpdateSettings)
 
+		// 系统监控
+		protected.GET("/system/monitor", handler.GetSystemMonitor)
+
+		// Webhooks
+		webhooks := protected.Group("/webhooks")
+		{
+			webhooks.GET("", handler.GetWebhooks)
+			webhooks.POST("", handler.CreateWebhook)
+			webhooks.POST("/test-dry", handler.TestWebhookDry)
+			webhooks.PUT("/:name", handler.UpdateWebhook)
+			webhooks.DELETE("/:name", handler.DeleteWebhook)
+			webhooks.POST("/:name/test", handler.TestWebhook)
+		}
+
+		// 事件
+		protected.GET("/events", handler.GetEvents)
+		protected.GET("/event-bindings", handler.GetEventBindings)
+		protected.PUT("/event-bindings", handler.UpdateEventBindings)
+
 		// 数据导入导出
 		data := protected.Group("/data")
 		{

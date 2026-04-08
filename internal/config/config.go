@@ -179,11 +179,15 @@ func Init() {
 
 	loadCategories()
 	loadAIProviders()
+	loadWebhooks()
+	loadEventBindings()
 
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		slog.Info("配置文件已变更，重新加载", "file", e.Name)
 		loadCategories()
 		loadAIProviders()
+		loadWebhooks()
+		loadEventBindings()
 	})
 	viper.WatchConfig()
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hxuanyu/lifelog/internal/config"
+	"github.com/hxuanyu/lifelog/internal/events"
 	"github.com/hxuanyu/lifelog/internal/model"
 	"github.com/hxuanyu/lifelog/internal/repository"
 )
@@ -25,8 +26,10 @@ type exportData struct {
 
 // exportConfig 导出配置的结构
 type exportConfig struct {
-	TimePointMode string           `json:"time_point_mode"`
-	Categories    []model.Category `json:"categories"`
+	TimePointMode string               `json:"time_point_mode"`
+	Categories    []model.Category     `json:"categories"`
+	Webhooks      []model.Webhook      `json:"webhooks,omitempty"`
+	EventBindings []model.EventBinding `json:"event_bindings,omitempty"`
 }
 
 // importRequest 导入请求参数
@@ -59,6 +62,8 @@ func ExportData(c *gin.Context) {
 	cfg := exportConfig{
 		TimePointMode: config.GetTimePointMode(),
 		Categories:    config.GetCategories(),
+		Webhooks:      config.GetWebhooks(),
+		EventBindings: config.GetEventBindings(),
 	}
 
 	// 创建 zip
@@ -106,6 +111,7 @@ func ExportData(c *gin.Context) {
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	slog.Info("数据导出完成", "logs_count", len(logs), "filename", filename)
 	c.Data(http.StatusOK, "application/zip", buf.Bytes())
+	go events.Fire("data.exported", map[string]string{"timestamp": time.Now().Format(time.RFC3339)})
 }
 
 // ImportData 从 zip 导入数据
@@ -253,9 +259,24 @@ func ImportData(c *gin.Context) {
 		if err := config.SetCategoriesConfig(cfgData.Categories); err != nil {
 			result["config_error"] = "设置分类规则失败: " + err.Error()
 		}
+		if len(cfgData.Webhooks) > 0 {
+			if err := config.SetWebhooks(cfgData.Webhooks); err != nil {
+				result["config_error"] = "导入 Webhook 失败: " + err.Error()
+			}
+		}
+		if len(cfgData.EventBindings) > 0 {
+			if err := config.SetEventBindings(cfgData.EventBindings); err != nil {
+				result["config_error"] = "导入事件绑定失败: " + err.Error()
+			}
+		}
 		result["config_imported"] = true
 	}
 
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "导入完成", Data: result})
 	slog.Info("数据导入完成", "merge", mergeLogs, "import_config", importConfig, "result", result)
+	go events.Fire("data.imported", map[string]string{
+		"logs_imported": fmt.Sprintf("%v", result["logs_imported"]),
+		"logs_skipped":  fmt.Sprintf("%v", result["logs_skipped"]),
+		"timestamp":     time.Now().Format(time.RFC3339),
+	})
 }

@@ -37,11 +37,12 @@ export function PasswordCard() {
         </CardHeader>
         <CardContent>
           <form onSubmit={(e) => { e.preventDefault(); handlePasswordChange() }} className="space-y-3">
+            <input type="text" name="username" autoComplete="username" value="admin" readOnly hidden />
             <div className="space-y-1.5">
               <Label className="text-xs">旧密码</Label>
               <div className="relative">
                 <Input type={showOldPw ? "text" : "password"} value={oldPassword}
-                  onChange={(e) => setOldPassword(e.target.value)} placeholder="首次设置可留空" className="pr-9" />
+                  onChange={(e) => setOldPassword(e.target.value)} placeholder="首次设置可留空" className="pr-9" autoComplete="current-password" />
                 <button type="button" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowOldPw(!showOldPw)}>
                   {showOldPw ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -52,7 +53,7 @@ export function PasswordCard() {
               <Label className="text-xs">新密码</Label>
               <div className="relative">
                 <Input type={showNewPw ? "text" : "password"} value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)} placeholder="至少4位" className="pr-9" />
+                  onChange={(e) => setNewPassword(e.target.value)} placeholder="至少4位" className="pr-9" autoComplete="new-password" />
                 <button type="button" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowNewPw(!showNewPw)}>
                   {showNewPw ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
