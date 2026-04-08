@@ -6,8 +6,7 @@ lifelog
 data/
 
 # Config (contains password hash)
-config/
-
+config/config.yaml
 # IDE
 .idea/
 .vscode/

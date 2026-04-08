@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hxuanyu/lifelog/internal/config"
+	"github.com/hxuanyu/lifelog/internal/events"
 	"github.com/hxuanyu/lifelog/internal/model"
 )
 
@@ -42,6 +45,7 @@ func UpdateCategories(c *gin.Context) {
 	}
 	slog.Info("分类规则已更新", "count", len(cats))
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "分类规则已更新（已热重载）"})
+	go events.Fire("categories.updated", map[string]string{"count": fmt.Sprintf("%d", len(cats)), "timestamp": time.Now().Format(time.RFC3339)})
 }
 
 // GetSettings 获取公开配置
@@ -135,4 +139,5 @@ func UpdateSettings(c *gin.Context) {
 		msg = "配置已保存，部分设置需要重启服务后生效"
 	}
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: msg, Data: map[string]bool{"need_restart": needRestart}})
+	go events.Fire("settings.updated", map[string]string{"timestamp": time.Now().Format(time.RFC3339)})
 }

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Save } from "lucide-react"
+import { Save, Info, Settings2, Webhook, Zap, Tags } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { getSettings, updateSettings } from "@/api"
 import { toast } from "sonner"
 import { VersionInfoCard } from "@/components/settings/VersionInfoCard"
+import { ServerMonitorCard } from "@/components/settings/ServerMonitorCard"
 import { TimePointModeCard } from "@/components/settings/TimePointModeCard"
 import { ServerConfigCard } from "@/components/settings/ServerConfigCard"
 import { AuthConfigCard } from "@/components/settings/AuthConfigCard"
@@ -14,6 +16,8 @@ import { ShortcutCard } from "@/components/settings/ShortcutCard"
 import { DataManagementCard } from "@/components/settings/DataManagementCard"
 import { AIProviderSettings } from "@/components/settings/AIProviderSettings"
 import { CategoriesCard } from "@/components/settings/CategoriesCard"
+import { WebhookSettingsCard } from "@/components/settings/WebhookSettingsCard"
+import { EventBindingsCard } from "@/components/settings/EventBindingsCard"
 
 export function SettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -123,31 +127,66 @@ export function SettingsPage() {
       <div className="pt-14" />
       <div className="max-w-5xl mx-auto px-4 w-full">
         <div style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4">
-            <div className="space-y-4">
-              <VersionInfoCard />
-              <TimePointModeCard value={timePointMode} onChange={setTimePointMode} />
-              <ServerConfigCard serverPort={serverPort} onServerPortChange={setServerPort} dbPath={dbPath} onDbPathChange={setDbPath} />
-              <AuthConfigCard jwtExpireHours={jwtExpireHours} onJwtExpireHoursChange={setJwtExpireHours} />
-              <MCPServiceCard mcpEnabled={mcpEnabled} onMcpEnabledChange={setMcpEnabled} mcpPort={mcpPort} onMcpPortChange={setMcpPort} />
-              <AnimatePresence>
-                {settingsDirty && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-                    <Button onClick={handleSaveSettings} disabled={savingSettings} className="w-full">
-                      <Save className="h-4 w-4 mr-1.5" />{savingSettings ? "保存中..." : "保存配置"}
-                    </Button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              <PasswordCard />
-              <ShortcutCard />
-              <DataManagementCard onImportComplete={handleImportComplete} />
-              <AIProviderSettings />
-            </div>
-            <div className="space-y-4">
+          <Tabs defaultValue="app-info">
+            <TabsList className="w-full grid grid-cols-5 mb-4">
+              <TabsTrigger value="app-info" className="gap-1.5">
+                <Info className="h-4 w-4" /><span className="hidden sm:inline">应用信息</span>
+              </TabsTrigger>
+              <TabsTrigger value="basic" className="gap-1.5">
+                <Settings2 className="h-4 w-4" /><span className="hidden sm:inline">基础配置</span>
+              </TabsTrigger>
+              <TabsTrigger value="webhooks" className="gap-1.5">
+                <Webhook className="h-4 w-4" /><span className="hidden sm:inline">Webhook</span>
+              </TabsTrigger>
+              <TabsTrigger value="events" className="gap-1.5">
+                <Zap className="h-4 w-4" /><span className="hidden sm:inline">事件绑定</span>
+              </TabsTrigger>
+              <TabsTrigger value="categories" className="gap-1.5">
+                <Tags className="h-4 w-4" /><span className="hidden sm:inline">分类管理</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="app-info">
+              <div className="space-y-4">
+                <VersionInfoCard />
+                <ServerMonitorCard />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="basic">
+              <div className="space-y-4">
+                <TimePointModeCard value={timePointMode} onChange={setTimePointMode} />
+                <ServerConfigCard serverPort={serverPort} onServerPortChange={setServerPort} dbPath={dbPath} onDbPathChange={setDbPath} />
+                <AuthConfigCard jwtExpireHours={jwtExpireHours} onJwtExpireHoursChange={setJwtExpireHours} />
+                <MCPServiceCard mcpEnabled={mcpEnabled} onMcpEnabledChange={setMcpEnabled} mcpPort={mcpPort} onMcpPortChange={setMcpPort} />
+                <AnimatePresence>
+                  {settingsDirty && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
+                      <Button onClick={handleSaveSettings} disabled={savingSettings} className="w-full">
+                        <Save className="h-4 w-4 mr-1.5" />{savingSettings ? "保存中..." : "保存配置"}
+                      </Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                <PasswordCard />
+                <ShortcutCard />
+                <DataManagementCard onImportComplete={handleImportComplete} />
+                <AIProviderSettings />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="webhooks">
+              <WebhookSettingsCard />
+            </TabsContent>
+
+            <TabsContent value="events">
+              <EventBindingsCard />
+            </TabsContent>
+
+            <TabsContent value="categories">
               <CategoriesCard refreshKey={refreshKey} />
-            </div>
-          </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

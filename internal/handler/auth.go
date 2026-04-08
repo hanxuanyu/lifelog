@@ -3,8 +3,10 @@ package handler
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hxuanyu/lifelog/internal/events"
 	"github.com/hxuanyu/lifelog/internal/model"
 	"github.com/hxuanyu/lifelog/internal/service"
 )
@@ -39,6 +41,7 @@ func Login(c *gin.Context) {
 		Message: "登录成功",
 		Data:    model.LoginResponse{Token: token},
 	})
+	go events.Fire("auth.login.succeeded", map[string]string{"ip": c.ClientIP(), "timestamp": time.Now().Format(time.RFC3339)})
 }
 
 // SetPassword 设置/修改密码
@@ -70,4 +73,5 @@ func SetPassword(c *gin.Context) {
 		Message: "密码设置成功",
 		Data:    model.LoginResponse{Token: token},
 	})
+	go events.Fire("auth.password.changed", map[string]string{"ip": c.ClientIP(), "timestamp": time.Now().Format(time.RFC3339)})
 }

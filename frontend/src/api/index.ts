@@ -13,6 +13,10 @@ import type {
   UpdateSettingsResponse,
   AIProvider,
   AIChatRequest,
+  Webhook,
+  EventBinding,
+  EventDefinition,
+  SystemMonitor,
 } from "@/types"
 
 const http = axios.create({
@@ -306,4 +310,52 @@ export interface UpdateInfo {
 export async function checkUpdate() {
   const res = await http.get<ApiResponse<UpdateInfo>>("/check-update")
   return res.data.data
+}
+
+// System Monitor
+export async function getSystemMonitor() {
+  const res = await http.get<ApiResponse<SystemMonitor>>("/system/monitor")
+  return res.data.data
+}
+
+// Webhooks
+export async function getWebhooks() {
+  const res = await http.get<ApiResponse<Webhook[]>>("/webhooks")
+  return res.data.data
+}
+
+export async function createWebhook(webhook: Webhook) {
+  const res = await http.post<ApiResponse>("/webhooks", webhook)
+  return res.data
+}
+
+export async function updateWebhook(name: string, webhook: Webhook) {
+  const res = await http.put<ApiResponse>(`/webhooks/${encodeURIComponent(name)}`, webhook)
+  return res.data
+}
+
+export async function deleteWebhook(name: string) {
+  const res = await http.delete<ApiResponse>(`/webhooks/${encodeURIComponent(name)}`)
+  return res.data
+}
+
+export async function testWebhook(name: string) {
+  const res = await http.post<ApiResponse>(`/webhooks/${encodeURIComponent(name)}/test`)
+  return res.data
+}
+
+// Events
+export async function getEvents() {
+  const res = await http.get<ApiResponse<EventDefinition[]>>("/events")
+  return res.data.data
+}
+
+export async function getEventBindings() {
+  const res = await http.get<ApiResponse<EventBinding[]>>("/event-bindings")
+  return res.data.data
+}
+
+export async function updateEventBindings(bindings: EventBinding[]) {
+  const res = await http.put<ApiResponse>("/event-bindings", bindings)
+  return res.data
 }

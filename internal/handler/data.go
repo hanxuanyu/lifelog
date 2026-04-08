@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hxuanyu/lifelog/internal/config"
+	"github.com/hxuanyu/lifelog/internal/events"
 	"github.com/hxuanyu/lifelog/internal/model"
 	"github.com/hxuanyu/lifelog/internal/repository"
 )
@@ -106,6 +107,7 @@ func ExportData(c *gin.Context) {
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	slog.Info("数据导出完成", "logs_count", len(logs), "filename", filename)
 	c.Data(http.StatusOK, "application/zip", buf.Bytes())
+	go events.Fire("data.exported", map[string]string{"timestamp": time.Now().Format(time.RFC3339)})
 }
 
 // ImportData 从 zip 导入数据
@@ -258,4 +260,9 @@ func ImportData(c *gin.Context) {
 
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "导入完成", Data: result})
 	slog.Info("数据导入完成", "merge", mergeLogs, "import_config", importConfig, "result", result)
+	go events.Fire("data.imported", map[string]string{
+		"logs_imported": fmt.Sprintf("%v", result["logs_imported"]),
+		"logs_skipped":  fmt.Sprintf("%v", result["logs_skipped"]),
+		"timestamp":     time.Now().Format(time.RFC3339),
+	})
 }

@@ -148,3 +148,58 @@ export interface AIChatRequest {
   system_prompt?: string
   categories?: string[]
 }
+
+export interface Webhook {
+  name: string
+  url: string
+  method: string
+  headers: Record<string, string>
+  query_params: Record<string, string>
+  body: string
+  timeout_seconds: number
+}
+
+export interface EventBinding {
+  event: string
+  webhook_name: string
+  enabled: boolean
+}
+
+export interface EventVariable {
+  key: string
+  description: string
+}
+
+export interface EventDefinition {
+  name: string
+  description: string
+  variables: EventVariable[]
+}
+
+export interface SystemMonitor {
+  cpu_usage: number
+  cpu_cores: number
+  os_mem_used: number
+  os_mem_total: number
+  os_mem_percent: number
+  go_mem_alloc: number
+  go_mem_sys: number
+  go_mem_gc_sys: number
+  go_gc_count: number
+  go_gc_pause_ms: number
+  goroutines: number
+  go_version: string
+  disk_used: number
+  disk_total: number
+  disk_percent: number
+  uptime_seconds: number
+  directories: DirInfo[]
+}
+
+export interface DirInfo {
+  label: string
+  path: string
+  size_bytes: number
+  file_count: number
+  exists: boolean
+}
