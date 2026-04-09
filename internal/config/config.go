@@ -334,7 +334,9 @@ func defaultWebhookConfig() webhookFileConfig {
 		ScheduledTasks: []model.ScheduledTaskConfig{
 			{Name: "daily_report", Cron: "0 22 * * *", Enabled: false},
 			{Name: "weekly_report", Cron: "0 10 * * 1", Enabled: false},
+			{Name: "monthly_report", Cron: "0 10 1 * *", Enabled: false},
 			{Name: "no_log_reminder", Cron: "0 */2 * * *", Enabled: false},
+			{Name: "uncategorized_reminder", Cron: "30 21 * * *", Enabled: false},
 		},
 	}
 }

@@ -14,11 +14,11 @@ import (
 
 // Task 定时任务接口
 type Task interface {
-	Name() string                           // 任务唯一标识
-	Description() string                    // 任务描述
-	DefaultCron() string                    // 默认 cron 表达式
-	EventName() string                      // 执行完成后发布的事件名
-	Execute() (map[string]string, error)    // 执行任务并返回事件数据
+	Name() string                        // 任务唯一标识
+	Description() string                 // 任务描述
+	DefaultCron() string                 // 默认 cron 表达式
+	EventName() string                   // 执行完成后发布的事件名
+	Execute() (map[string]string, error) // 执行任务并返回事件数据
 }
 
 // TaskEntry 已注册任务的状态
@@ -114,7 +114,7 @@ func ensureBuiltinTaskConfigs() error {
 			existing = append(existing, model.ScheduledTaskConfig{
 				Name:    t.Name(),
 				Cron:    t.DefaultCron(),
-				Enabled: true,
+				Enabled: false,
 			})
 			changed = true
 		}

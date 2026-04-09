@@ -27,16 +27,7 @@ func (t *DailyReportTask) Execute() (map[string]string, error) {
 		return nil, fmt.Errorf("获取日报数据失败: %w", err)
 	}
 
-	summaryText := formatCategorySummary(stats.Summary)
-	detail := formatDailyDetail(stats)
-
-	return map[string]string{
-		"report_date": date,
-		"summary":     summaryText,
-		"total_known": formatSeconds(stats.TotalKnown),
-		"detail":      detail,
-		"timestamp":   time.Now().Format("2006-01-02 15:04:05"),
-	}, nil
+	return buildDailyReportEventData(date, stats), nil
 }
 
 // ========== 周报任务 ==========
@@ -56,18 +47,26 @@ func (t *WeeklyReportTask) Execute() (map[string]string, error) {
 		return nil, fmt.Errorf("获取周报数据失败: %w", err)
 	}
 
-	summaryText := formatCategorySummary(stats.Summary)
-	detail := formatPeriodDetail(stats)
+	return buildPeriodReportEventData("weekly_report", "周报", stats), nil
+}
 
-	return map[string]string{
-		"start_date":  stats.StartDate,
-		"end_date":    stats.EndDate,
-		"summary":     summaryText,
-		"total_known": formatSeconds(stats.TotalKnown),
-		"day_count":   fmt.Sprintf("%d", stats.DayCount),
-		"detail":      detail,
-		"timestamp":   time.Now().Format("2006-01-02 15:04:05"),
-	}, nil
+// ========== 月报任务 ==========
+
+type MonthlyReportTask struct{}
+
+func (t *MonthlyReportTask) Name() string        { return "monthly_report" }
+func (t *MonthlyReportTask) Description() string { return "每月月报生成" }
+func (t *MonthlyReportTask) DefaultCron() string { return "0 10 1 * *" }
+func (t *MonthlyReportTask) EventName() string   { return "task.monthly_report" }
+
+func (t *MonthlyReportTask) Execute() (map[string]string, error) {
+	ref := time.Now().AddDate(0, 0, -1)
+	stats, err := service.GetMonthlyStatistics(ref.Year(), int(ref.Month()))
+	if err != nil {
+		return nil, fmt.Errorf("获取月报数据失败: %w", err)
+	}
+
+	return buildPeriodReportEventData("monthly_report", "月报", stats), nil
 }
 
 // ========== 长时间未记录提醒任务 ==========
@@ -125,6 +124,45 @@ func (t *NoLogReminderTask) Execute() (map[string]string, error) {
 	}, nil
 }
 
+// ========== 未分类事项提醒任务 ==========
+
+type UncategorizedReminderTask struct{}
+
+func (t *UncategorizedReminderTask) Name() string        { return "uncategorized_reminder" }
+func (t *UncategorizedReminderTask) Description() string { return "未分类事项提醒" }
+func (t *UncategorizedReminderTask) DefaultCron() string { return "30 21 * * *" }
+func (t *UncategorizedReminderTask) EventName() string   { return "task.uncategorized_reminder" }
+
+func (t *UncategorizedReminderTask) Execute() (map[string]string, error) {
+	date := time.Now().Format("2006-01-02")
+	entries, err := repository.GetTimelineEntries(date)
+	if err != nil {
+		return nil, fmt.Errorf("获取当日日志失败: %w", err)
+	}
+	if len(entries) == 0 {
+		return nil, nil
+	}
+
+	uncategorized := make([]model.LogEntry, 0)
+	for _, entry := range entries {
+		if service.MatchCategory(entry.EventType) == "未分类" {
+			uncategorized = append(uncategorized, entry)
+		}
+	}
+	if len(uncategorized) == 0 {
+		return nil, nil
+	}
+
+	message := fmt.Sprintf("今天还有 %d 条未分类事项，建议补充分类规则或规范事项名称。", len(uncategorized))
+	return map[string]string{
+		"report_date":         date,
+		"uncategorized_count": fmt.Sprintf("%d", len(uncategorized)),
+		"message":             message,
+		"detail":              formatUncategorizedDetail(date, uncategorized),
+		"timestamp":           time.Now().Format("2006-01-02 15:04:05"),
+	}, nil
+}
+
 // ========== 辅助函数 ==========
 
 // parseEntryTime 将日志条目的 log_date+log_time 解析为本地时间
@@ -177,9 +215,9 @@ func formatDailyDetail(stats *model.DailyStatistics) string {
 }
 
 // formatPeriodDetail 格式化周/月报详细内容
-func formatPeriodDetail(stats *model.PeriodStatistics) string {
+func formatPeriodDetail(reportLabel string, stats *model.PeriodStatistics) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("📊 周报 - %s 至 %s\n", stats.StartDate, stats.EndDate))
+	sb.WriteString(fmt.Sprintf("📊 %s - %s 至 %s\n", reportLabel, stats.StartDate, stats.EndDate))
 	sb.WriteString(fmt.Sprintf("覆盖天数：%d 天\n", stats.DayCount))
 	sb.WriteString(fmt.Sprintf("总时长：%s\n\n", formatSeconds(stats.TotalKnown)))
 
@@ -189,6 +227,21 @@ func formatPeriodDetail(stats *model.PeriodStatistics) string {
 			sb.WriteString(fmt.Sprintf("  • %s: %s (%.1f%%)\n", s.Category, s.Display, s.Percentage))
 		}
 	}
+	return sb.String()
+}
+
+func formatUncategorizedDetail(date string, entries []model.LogEntry) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("🏷️ 未分类事项提醒 - %s\n", date))
+	sb.WriteString(fmt.Sprintf("共有 %d 条记录尚未匹配分类：\n", len(entries)))
+	for _, entry := range entries {
+		line := fmt.Sprintf("  · %s %s", entry.LogTime[:5], entry.EventType)
+		if entry.Detail != "" {
+			line += fmt.Sprintf(" — %s", entry.Detail)
+		}
+		sb.WriteString(line + "\n")
+	}
+	sb.WriteString("\n建议：为高频事项补充分类规则，或统一事项名称，后续统计会更准确。")
 	return sb.String()
 }
 
@@ -208,5 +261,7 @@ func formatSeconds(seconds int) string {
 func RegisterBuiltinTasks() {
 	RegisterBuiltinTask(&DailyReportTask{})
 	RegisterBuiltinTask(&WeeklyReportTask{})
+	RegisterBuiltinTask(&MonthlyReportTask{})
 	RegisterBuiltinTask(&NoLogReminderTask{})
+	RegisterBuiltinTask(&UncategorizedReminderTask{})
 }
