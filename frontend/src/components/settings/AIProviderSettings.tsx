@@ -3,6 +3,10 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Plus, Trash2, Pencil, Bot, Zap, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { getAIProviders, updateAIProvider, deleteAIProvider, testAIProvider } from "@/api"
 import type { AIProvider } from "@/types"
 import { toast } from "sonner"
@@ -14,6 +18,7 @@ export function AIProviderSettings() {
   const [testingIdx, setTestingIdx] = useState<number | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editProvider, setEditProvider] = useState<AIProvider | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -42,13 +47,16 @@ export function AIProviderSettings() {
     }
   }
 
-  const handleDelete = async (name: string) => {
+  const handleDelete = async () => {
+    if (!deleting) return
     try {
-      await deleteAIProvider(name)
+      await deleteAIProvider(deleting)
       toast.success("已删除")
       load()
     } catch {
       toast.error("删除失败")
+    } finally {
+      setDeleting(null)
     }
   }
 
@@ -112,7 +120,7 @@ export function AIProviderSettings() {
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditProvider(p); setDialogOpen(true) }} title="编辑">
                         <Pencil className="h-3 w-3" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(p.name)} title="删除">
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleting(p.name)} title="删除">
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
@@ -136,6 +144,21 @@ export function AIProviderSettings() {
         provider={editProvider}
         onSaved={load}
       />
+
+      <AlertDialog open={!!deleting} onOpenChange={(open) => { if (!open) setDeleting(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除 AI 服务商「{deleting}」吗？此操作不可恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-white hover:bg-destructive/90">删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   )
 }

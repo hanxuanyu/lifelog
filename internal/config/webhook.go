@@ -6,12 +6,12 @@ import (
 	"strings"
 
 	"github.com/hxuanyu/lifelog/internal/model"
-	"github.com/spf13/viper"
 )
 
 var (
-	webhooks      []model.Webhook
-	eventBindings []model.EventBinding
+	webhooks       []model.Webhook
+	eventBindings  []model.EventBinding
+	scheduledTasks []model.ScheduledTaskConfig
 )
 
 func loadWebhooks() {
@@ -19,29 +19,12 @@ func loadWebhooks() {
 	defer mu.Unlock()
 
 	var items []model.Webhook
-	if err := viper.UnmarshalKey("webhooks", &items); err != nil {
+	if err := webhookViper.UnmarshalKey("webhooks", &items); err != nil {
 		slog.Error("failed to parse webhook config", "error", err)
 		return
 	}
 
-	for i := range items {
-		items[i].Name = strings.TrimSpace(items[i].Name)
-		items[i].Method = strings.ToUpper(strings.TrimSpace(items[i].Method))
-		if items[i].Method == "" {
-			items[i].Method = "POST"
-		}
-		if items[i].Headers == nil {
-			items[i].Headers = map[string]string{}
-		}
-		if items[i].QueryParams == nil {
-			items[i].QueryParams = map[string]string{}
-		}
-		if items[i].TimeoutSeconds <= 0 {
-			items[i].TimeoutSeconds = 10
-		}
-	}
-
-	webhooks = items
+	webhooks = normalizeWebhooks(items)
 	slog.Info("webhook config loaded", "count", len(webhooks))
 }
 
@@ -50,33 +33,30 @@ func loadEventBindings() {
 	defer mu.Unlock()
 
 	var items []model.EventBinding
-	if err := viper.UnmarshalKey("event_bindings", &items); err != nil {
+	if err := webhookViper.UnmarshalKey("event_bindings", &items); err != nil {
 		slog.Error("failed to parse event bindings", "error", err)
 		return
 	}
 
-	for i := range items {
-		items[i].Event = strings.TrimSpace(items[i].Event)
-		items[i].WebhookName = strings.TrimSpace(items[i].WebhookName)
-	}
-
-	eventBindings = items
+	eventBindings = normalizeEventBindings(items)
 	slog.Info("event bindings loaded", "count", len(eventBindings))
 }
 
-// GetWebhooks 获取所有 webhook 配置
+// GetWebhooks returns all configured webhooks.
 func GetWebhooks() []model.Webhook {
 	mu.RLock()
 	defer mu.RUnlock()
+
 	result := make([]model.Webhook, len(webhooks))
 	copy(result, webhooks)
 	return result
 }
 
-// GetWebhookByName 根据名称获取 webhook
+// GetWebhookByName returns a webhook by name.
 func GetWebhookByName(name string) *model.Webhook {
 	mu.RLock()
 	defer mu.RUnlock()
+
 	for _, item := range webhooks {
 		if item.Name == name {
 			cp := item
@@ -86,54 +66,36 @@ func GetWebhookByName(name string) *model.Webhook {
 	return nil
 }
 
-// SetWebhooks 保存 webhook 配置
+// SetWebhooks persists webhook config into webhooks.yaml.
 func SetWebhooks(items []model.Webhook) error {
-	seen := make(map[string]struct{}, len(items))
-	for i := range items {
-		items[i].Name = strings.TrimSpace(items[i].Name)
-		if items[i].Name == "" {
-			return fmt.Errorf("webhook name is required")
-		}
-		if _, exists := seen[items[i].Name]; exists {
-			return fmt.Errorf("duplicate webhook name: %s", items[i].Name)
-		}
-		seen[items[i].Name] = struct{}{}
-		items[i].Method = strings.ToUpper(strings.TrimSpace(items[i].Method))
-		if items[i].Method == "" {
-			items[i].Method = "POST"
-		}
-		if items[i].Headers == nil {
-			items[i].Headers = map[string]string{}
-		}
-		if items[i].QueryParams == nil {
-			items[i].QueryParams = map[string]string{}
-		}
-		if items[i].TimeoutSeconds <= 0 {
-			items[i].TimeoutSeconds = 10
-		}
+	normalized, err := validateWebhooks(items)
+	if err != nil {
+		return err
 	}
 
-	viper.Set("webhooks", items)
-	if err := viper.WriteConfig(); err != nil {
+	webhookViper.Set("webhooks", normalized)
+	if err := webhookViper.WriteConfig(); err != nil {
 		return err
 	}
 	loadWebhooks()
 	return nil
 }
 
-// GetEventBindings 获取所有事件绑定
+// GetEventBindings returns all event bindings.
 func GetEventBindings() []model.EventBinding {
 	mu.RLock()
 	defer mu.RUnlock()
+
 	result := make([]model.EventBinding, len(eventBindings))
 	copy(result, eventBindings)
 	return result
 }
 
-// GetEventBinding 根据事件名获取绑定
+// GetEventBinding returns an event binding by event name.
 func GetEventBinding(eventName string) *model.EventBinding {
 	mu.RLock()
 	defer mu.RUnlock()
+
 	for _, item := range eventBindings {
 		if item.Event == eventName {
 			cp := item
@@ -143,29 +105,170 @@ func GetEventBinding(eventName string) *model.EventBinding {
 	return nil
 }
 
-// SetEventBindings 保存事件绑定配置
+// SetEventBindings persists event bindings into webhooks.yaml.
 func SetEventBindings(items []model.EventBinding) error {
-	seen := make(map[string]struct{}, len(items))
-	for _, item := range items {
-		eventName := strings.TrimSpace(item.Event)
-		webhookName := strings.TrimSpace(item.WebhookName)
-		if eventName == "" {
-			return fmt.Errorf("event name is required")
-		}
-		if webhookName == "" {
-			return fmt.Errorf("webhook name is required")
-		}
-		key := eventName + "|" + webhookName
-		if _, exists := seen[key]; exists {
-			return fmt.Errorf("duplicate event binding: %s -> %s", eventName, webhookName)
-		}
-		seen[key] = struct{}{}
+	normalized, err := validateEventBindings(items)
+	if err != nil {
+		return err
 	}
 
-	viper.Set("event_bindings", items)
-	if err := viper.WriteConfig(); err != nil {
+	webhookViper.Set("event_bindings", normalized)
+	if err := webhookViper.WriteConfig(); err != nil {
 		return err
 	}
 	loadEventBindings()
 	return nil
+}
+
+func loadScheduledTasks() {
+	mu.Lock()
+	defer mu.Unlock()
+
+	var items []model.ScheduledTaskConfig
+	if err := webhookViper.UnmarshalKey("scheduled_tasks", &items); err != nil {
+		slog.Error("failed to parse scheduled tasks", "error", err)
+		return
+	}
+
+	scheduledTasks = normalizeScheduledTasks(items)
+	slog.Info("scheduled tasks loaded", "count", len(scheduledTasks))
+}
+
+// GetScheduledTasks 返回所有定时任务配置
+func GetScheduledTasks() []model.ScheduledTaskConfig {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	result := make([]model.ScheduledTaskConfig, len(scheduledTasks))
+	copy(result, scheduledTasks)
+	return result
+}
+
+// GetScheduledTaskByName 根据任务名查找配置
+func GetScheduledTaskByName(name string) *model.ScheduledTaskConfig {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	for _, item := range scheduledTasks {
+		if item.Name == name {
+			cp := item
+			return &cp
+		}
+	}
+	return nil
+}
+
+// SetScheduledTasks 持久化定时任务配置到 webhooks.yaml
+func SetScheduledTasks(items []model.ScheduledTaskConfig) error {
+	normalized, err := validateScheduledTasks(items)
+	if err != nil {
+		return err
+	}
+
+	webhookViper.Set("scheduled_tasks", normalized)
+	if err := webhookViper.WriteConfig(); err != nil {
+		return err
+	}
+	loadScheduledTasks()
+	return nil
+}
+
+func normalizeScheduledTasks(items []model.ScheduledTaskConfig) []model.ScheduledTaskConfig {
+	normalized := make([]model.ScheduledTaskConfig, len(items))
+	for i := range items {
+		normalized[i] = items[i]
+		normalized[i].Name = strings.TrimSpace(normalized[i].Name)
+		normalized[i].Cron = strings.TrimSpace(normalized[i].Cron)
+	}
+	return normalized
+}
+
+func validateScheduledTasks(items []model.ScheduledTaskConfig) ([]model.ScheduledTaskConfig, error) {
+	normalized := normalizeScheduledTasks(items)
+	seen := make(map[string]struct{}, len(normalized))
+
+	for _, item := range normalized {
+		if item.Name == "" {
+			return nil, fmt.Errorf("scheduled task name is required")
+		}
+		if item.Cron == "" {
+			return nil, fmt.Errorf("scheduled task cron is required")
+		}
+		if _, exists := seen[item.Name]; exists {
+			return nil, fmt.Errorf("duplicate scheduled task name: %s", item.Name)
+		}
+		seen[item.Name] = struct{}{}
+	}
+
+	return normalized, nil
+}
+
+func normalizeWebhooks(items []model.Webhook) []model.Webhook {
+	normalized := make([]model.Webhook, len(items))
+	for i := range items {
+		normalized[i] = items[i]
+		normalized[i].Name = strings.TrimSpace(normalized[i].Name)
+		normalized[i].Method = strings.ToUpper(strings.TrimSpace(normalized[i].Method))
+		if normalized[i].Method == "" {
+			normalized[i].Method = "POST"
+		}
+		if normalized[i].Headers == nil {
+			normalized[i].Headers = map[string]string{}
+		}
+		if normalized[i].QueryParams == nil {
+			normalized[i].QueryParams = map[string]string{}
+		}
+		if normalized[i].TimeoutSeconds <= 0 {
+			normalized[i].TimeoutSeconds = 10
+		}
+	}
+	return normalized
+}
+
+func validateWebhooks(items []model.Webhook) ([]model.Webhook, error) {
+	normalized := normalizeWebhooks(items)
+	seen := make(map[string]struct{}, len(normalized))
+
+	for _, item := range normalized {
+		if item.Name == "" {
+			return nil, fmt.Errorf("webhook name is required")
+		}
+		if _, exists := seen[item.Name]; exists {
+			return nil, fmt.Errorf("duplicate webhook name: %s", item.Name)
+		}
+		seen[item.Name] = struct{}{}
+	}
+
+	return normalized, nil
+}
+
+func normalizeEventBindings(items []model.EventBinding) []model.EventBinding {
+	normalized := make([]model.EventBinding, len(items))
+	for i := range items {
+		normalized[i] = items[i]
+		normalized[i].Event = strings.TrimSpace(normalized[i].Event)
+		normalized[i].WebhookName = strings.TrimSpace(normalized[i].WebhookName)
+	}
+	return normalized
+}
+
+func validateEventBindings(items []model.EventBinding) ([]model.EventBinding, error) {
+	normalized := normalizeEventBindings(items)
+	seen := make(map[string]struct{}, len(normalized))
+
+	for _, item := range normalized {
+		if item.Event == "" {
+			return nil, fmt.Errorf("event name is required")
+		}
+		if item.WebhookName == "" {
+			return nil, fmt.Errorf("webhook name is required")
+		}
+		key := item.Event + "|" + item.WebhookName
+		if _, exists := seen[key]; exists {
+			return nil, fmt.Errorf("duplicate event binding: %s -> %s", item.Event, item.WebhookName)
+		}
+		seen[key] = struct{}{}
+	}
+
+	return normalized, nil
 }

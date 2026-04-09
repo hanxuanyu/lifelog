@@ -15,6 +15,16 @@ import (
 	"github.com/hxuanyu/lifelog/internal/repository"
 )
 
+func buildAPIMessages(systemPrompt string, messages []model.AIChatMessage) []map[string]string {
+	apiMessages := []map[string]string{
+		{"role": "system", "content": systemPrompt},
+	}
+	for _, m := range messages {
+		apiMessages = append(apiMessages, map[string]string{"role": m.Role, "content": m.Content})
+	}
+	return apiMessages
+}
+
 // BuildLogContext 根据日期范围构建日志上下文文本，可选按分类筛选
 func BuildLogContext(startDate, endDate string, categories []string) (string, error) {
 	entries, err := repository.GetEntriesByDateRange(startDate, endDate)
@@ -67,16 +77,9 @@ func BuildLogContext(startDate, endDate string, categories []string) (string, er
 
 // StreamChat 调用 AI 提供商的 OpenAI 兼容接口进行流式对话
 func StreamChat(provider model.AIProvider, systemPrompt string, messages []model.AIChatMessage, writer io.Writer, flusher http.Flusher) error {
-	apiMessages := []map[string]string{
-		{"role": "system", "content": systemPrompt},
-	}
-	for _, m := range messages {
-		apiMessages = append(apiMessages, map[string]string{"role": m.Role, "content": m.Content})
-	}
-
 	body, _ := json.Marshal(map[string]any{
 		"model":    provider.Model,
-		"messages": apiMessages,
+		"messages": buildAPIMessages(systemPrompt, messages),
 		"stream":   true,
 	})
 
@@ -136,6 +139,84 @@ func StreamChat(provider model.AIProvider, systemPrompt string, messages []model
 		}
 	}
 	return scanner.Err()
+}
+
+// ChatCompletion 调用 AI 提供商的 OpenAI 兼容接口进行非流式对话
+func ChatCompletion(provider model.AIProvider, systemPrompt string, messages []model.AIChatMessage) (string, error) {
+	body, _ := json.Marshal(map[string]any{
+		"model":    provider.Model,
+		"messages": buildAPIMessages(systemPrompt, messages),
+		"stream":   false,
+	})
+
+	endpoint := strings.TrimRight(provider.Endpoint, "/") + "/chat/completions"
+	req, err := http.NewRequest("POST", endpoint, bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("创建请求失败: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if provider.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+provider.APIKey)
+	}
+
+	client := &http.Client{Timeout: 90 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		slog.Error("AI非流式请求失败", "endpoint", endpoint, "error", err)
+		return "", fmt.Errorf("请求AI服务失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("AI服务返回错误 (%d): %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Content any `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("解析AI响应失败: %w", err)
+	}
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("AI响应为空")
+	}
+
+	content := extractMessageContent(result.Choices[0].Message.Content)
+	if content == "" {
+		return "", fmt.Errorf("AI响应内容为空")
+	}
+	return content, nil
+}
+
+func extractMessageContent(content any) string {
+	switch v := content.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case []any:
+		var parts []string
+		for _, item := range v {
+			segment, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			switch text := segment["text"].(type) {
+			case string:
+				parts = append(parts, text)
+			case map[string]any:
+				if value, ok := text["value"].(string); ok {
+					parts = append(parts, value)
+				}
+			}
+		}
+		return strings.TrimSpace(strings.Join(parts, "\n"))
+	default:
+		return ""
+	}
 }
 
 // TestProvider 测试 AI 提供商连接

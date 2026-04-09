@@ -86,6 +86,14 @@ func Setup(r *gin.Engine, staticFS fs.FS) {
 		protected.GET("/event-bindings", handler.GetEventBindings)
 		protected.PUT("/event-bindings", handler.UpdateEventBindings)
 
+		// 定时任务
+		scheduledTasks := protected.Group("/scheduled-tasks")
+		{
+			scheduledTasks.GET("", handler.GetScheduledTasks)
+			scheduledTasks.PUT("", handler.UpdateScheduledTasks)
+			scheduledTasks.POST("/:name/run", handler.RunScheduledTask)
+		}
+
 		// 数据导入导出
 		data := protected.Group("/data")
 		{

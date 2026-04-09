@@ -108,6 +108,16 @@ func GetFirstEntryAfter(date string) (*model.LogEntry, error) {
 	return &entry, nil
 }
 
+// GetLatestEntry 获取最新一条日志（按日期+时间倒序）
+func GetLatestEntry() (*model.LogEntry, error) {
+	var entry model.LogEntry
+	err := DB.Order("log_date DESC, log_time DESC").First(&entry).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entry, nil
+}
+
 // GetDistinctEventTypes 获取所有不重复的事项类型
 func GetDistinctEventTypes() ([]string, error) {
 	var types []string

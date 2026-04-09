@@ -39,7 +39,7 @@ func CreateLogEntry(c *gin.Context) {
 	resp := service.ToResponse(entry)
 	slog.Debug("日志已创建", "id", entry.ID, "date", entry.LogDate, "event_type", entry.EventType)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "创建成功", Data: resp})
-	go events.Fire("log.created", map[string]string{
+	go events.Publish("log.created", map[string]string{
 		"log_id": fmt.Sprintf("%d", entry.ID), "log_date": entry.LogDate,
 		"log_time": entry.LogTime, "event_type": entry.EventType,
 		"detail": entry.Detail, "category": resp.Category,
@@ -101,7 +101,7 @@ func UpdateLogEntry(c *gin.Context) {
 	resp := service.ToResponse(entry)
 	slog.Debug("日志已更新", "id", id, "event_type", entry.EventType)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "更新成功", Data: resp})
-	go events.Fire("log.updated", map[string]string{
+	go events.Publish("log.updated", map[string]string{
 		"log_id": fmt.Sprintf("%d", entry.ID), "log_date": entry.LogDate,
 		"log_time": entry.LogTime, "event_type": entry.EventType,
 		"detail": entry.Detail, "category": resp.Category,
@@ -130,7 +130,7 @@ func DeleteLogEntry(c *gin.Context) {
 
 	slog.Info("日志已删除", "id", id)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "删除成功"})
-	go events.Fire("log.deleted", map[string]string{"log_id": fmt.Sprintf("%d", id)})
+	go events.Publish("log.deleted", map[string]string{"log_id": fmt.Sprintf("%d", id)})
 }
 
 // QueryLogEntries 查询日志列表

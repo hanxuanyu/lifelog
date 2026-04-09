@@ -5,8 +5,8 @@ lifelog
 # Database
 data/
 
-# Config (contains password hash)
-config/config.yaml
+# Config (contains runtime secrets and user data)
+config/*.yaml
 # IDE
 .idea/
 .vscode/
