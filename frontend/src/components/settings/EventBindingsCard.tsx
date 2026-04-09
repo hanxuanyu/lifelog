@@ -123,8 +123,8 @@ export function EventBindingsCard() {
   const newEventDef = getEventDef(newEvent)
 
   const renderUnmatchedWarning = (unmatched: string[]) => (
-    <div className="rounded-md border border-amber-500/40 bg-amber-50/70 p-2.5 text-xs text-amber-700 dark:bg-amber-950/20 dark:text-amber-400">
-      <div className="flex items-start gap-2">
+    <div className="rounded-md border border-amber-500/40 bg-amber-50/70 p-2 text-xs text-amber-700 dark:bg-amber-950/20 dark:text-amber-400">
+      <div className="flex items-start gap-1.5">
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         <div className="space-y-1">
           <p className="font-medium">以下变量在当前事件中找不到：</p>
@@ -144,12 +144,12 @@ export function EventBindingsCard() {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-start justify-between gap-2.5">
-            <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <div>
               <CardTitle className="text-sm flex items-center gap-2">
                 <Zap className="h-4 w-4" /> 事件绑定
               </CardTitle>
-              <CardDescription className="text-xs">
+              <CardDescription className="text-xs mt-1">
                 将事件发送到目标 Webhook，并在绑定前检查变量是否匹配
               </CardDescription>
             </div>
@@ -158,78 +158,73 @@ export function EventBindingsCard() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-2.5">
+        <CardContent className="space-y-2">
           {/* 添加绑定表单 */}
           <AnimatePresence>
             {adding && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                <div className="rounded-lg border bg-muted/20 p-3">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-foreground">新建事件绑定</p>
-                        <p className="text-[11px] text-muted-foreground">先选择事件和目标 Webhook，再确认写入绑定列表。</p>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Button size="xs" variant="ghost" className="h-7 px-2 text-[11px]" onClick={resetAddingForm}>取消</Button>
-                        <Button size="xs" className="h-7 px-2 text-[11px]" onClick={addBinding}>确认添加</Button>
-                      </div>
+                <div className="rounded-md border bg-muted/20 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-foreground">新建事件绑定</p>
+                    <div className="flex items-center gap-1.5">
+                      <Button size="xs" variant="ghost" className="h-7 px-2 text-[11px]" onClick={resetAddingForm}>取消</Button>
+                      <Button size="xs" className="h-7 px-2 text-[11px]" onClick={addBinding}>确认添加</Button>
                     </div>
-
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <div className="space-y-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">事件</span>
-                        <Select value={newEvent || NONE_VALUE} onValueChange={v => setNewEvent(v === NONE_VALUE ? "" : v)}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="选择事件" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={NONE_VALUE}>选择事件</SelectItem>
-                            {events.map(e => (
-                              <SelectItem key={e.name} value={e.name}>{e.name} - {e.description}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">Webhook</span>
-                        <Select value={newWebhook || NONE_VALUE} onValueChange={v => setNewWebhook(v === NONE_VALUE ? "" : v)}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="选择 Webhook" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={NONE_VALUE}>选择 Webhook</SelectItem>
-                            {webhooks.map(wh => (
-                              <SelectItem key={wh.name} value={wh.name}>{wh.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {/* 事件变量预览 */}
-                    {newEventDef && newEventDef.variables.length > 0 && (
-                      <div className="rounded-md border bg-background/80 p-2.5 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-foreground">事件变量</span>
-                          <span className="text-[11px] text-muted-foreground">{newEventDef.variables.length} 个可用变量</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {newEventDef.variables.map(v => (
-                            <Badge key={v.key} variant="outline" className="h-auto items-start px-2 py-1 text-xs font-mono whitespace-normal">
-                              {`{{${v.key}}}`} <span className="ml-1 font-normal text-muted-foreground">{v.description}</span>
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 变量匹配警告 */}
-                    {newEvent && newWebhook && (() => {
-                      const unmatched = getUnmatchedVars(newEvent, newWebhook)
-                      return unmatched.length > 0 ? renderUnmatchedWarning(unmatched) : null
-                    })()}
                   </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">事件</span>
+                      <Select value={newEvent || NONE_VALUE} onValueChange={v => setNewEvent(v === NONE_VALUE ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="选择事件" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NONE_VALUE}>选择事件</SelectItem>
+                          {events.map(e => (
+                            <SelectItem key={e.name} value={e.name}>{e.name} - {e.description}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Webhook</span>
+                      <Select value={newWebhook || NONE_VALUE} onValueChange={v => setNewWebhook(v === NONE_VALUE ? "" : v)}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="选择 Webhook" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NONE_VALUE}>选择 Webhook</SelectItem>
+                          {webhooks.map(wh => (
+                            <SelectItem key={wh.name} value={wh.name}>{wh.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* 事件变量预览 */}
+                  {newEventDef && newEventDef.variables.length > 0 && (
+                    <div className="rounded-md border bg-background/80 p-2 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-foreground">事件变量</span>
+                        <span className="text-[11px] text-muted-foreground">{newEventDef.variables.length} 个可用变量</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {newEventDef.variables.map(v => (
+                          <Badge key={v.key} variant="outline" className="h-auto items-start px-1.5 py-0.5 text-xs font-mono whitespace-normal">
+                            {`{{${v.key}}}`} <span className="ml-1 font-normal text-muted-foreground">{v.description}</span>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 变量匹配警告 */}
+                  {newEvent && newWebhook && (() => {
+                    const unmatched = getUnmatchedVars(newEvent, newWebhook)
+                    return unmatched.length > 0 ? renderUnmatchedWarning(unmatched) : null
+                  })()}
                 </div>
               </motion.div>
             )}
@@ -244,45 +239,40 @@ export function EventBindingsCard() {
               const unmatched = getUnmatchedVars(b.event, b.webhook_name)
               const testKey = `${b.event}|${b.webhook_name}`
               return (
-                <div key={`${b.event}-${b.webhook_name}`} className={`rounded-lg border p-3 space-y-2.5 ${unmatched.length > 0 ? "border-amber-500/50 bg-amber-50/30 dark:bg-amber-950/10" : ""}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <div className="text-sm font-medium leading-none">{b.event}</div>
-                        <span className="text-[11px] text-muted-foreground">→</span>
-                        <Badge variant="outline" className="text-[11px]">{b.webhook_name}</Badge>
-                        {!b.enabled && <Badge variant="outline" className="text-[11px] text-muted-foreground">已停用</Badge>}
-                      </div>
-                      {def && <div className="text-xs leading-relaxed text-muted-foreground">{def.description}</div>}
+                <div key={`${b.event}-${b.webhook_name}`} className={`rounded-md border p-2.5 space-y-1.5 ${unmatched.length > 0 ? "border-amber-500/50 bg-amber-50/30 dark:bg-amber-950/10" : ""}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-sm font-medium shrink-0">{b.event}</span>
+                      <span className="text-[11px] text-muted-foreground shrink-0">→</span>
+                      <Badge variant="outline" className="text-[11px] shrink-0">{b.webhook_name}</Badge>
+                      {!b.enabled && <Badge variant="outline" className="text-[11px] text-muted-foreground shrink-0">已停用</Badge>}
                     </div>
-                    <div className="inline-flex items-center gap-1 rounded-full border bg-background/80 px-2 py-1 shrink-0">
-                      <span className="text-[11px] text-muted-foreground">启用</span>
-                      <Switch checked={b.enabled} onCheckedChange={v => toggleEnabled(idx, v)} className="shrink-0" />
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Switch checked={b.enabled} onCheckedChange={v => toggleEnabled(idx, v)} />
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground"
+                        onClick={() => handleTest(b.webhook_name, b.event)}
+                        disabled={testing === testKey}
+                        title="测试"
+                        aria-label={`测试 ${b.event} 到 ${b.webhook_name}`}
+                      >
+                        <Play className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeleteTarget({ idx, event: b.event, webhook: b.webhook_name })}
+                        title="删除"
+                        aria-label={`删除 ${b.event} 到 ${b.webhook_name} 的绑定`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-end gap-1.5">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-muted-foreground"
-                      onClick={() => handleTest(b.webhook_name, b.event)}
-                      disabled={testing === testKey}
-                      title="测试"
-                      aria-label={`测试 ${b.event} 到 ${b.webhook_name}`}
-                    >
-                      <Play className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => setDeleteTarget({ idx, event: b.event, webhook: b.webhook_name })}
-                      title="删除"
-                      aria-label={`删除 ${b.event} 到 ${b.webhook_name} 的绑定`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                  {def && <div className="text-xs text-muted-foreground">{def.description}</div>}
                   {unmatched.length > 0 && renderUnmatchedWarning(unmatched)}
                 </div>
               )
