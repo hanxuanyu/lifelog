@@ -20,6 +20,7 @@
 - **单文件部署** — 前端嵌入 Go 二进制，只需一个可执行文件 + `config/` 配置目录
 - **键盘快捷键** — `←` `→` 切换日期，`T` 回到今天，`Alt+Shift+N` 快速记录
 - **深浅模式** — 亮色/暗色主题，自动跟随系统偏好
+- **事件与自动化** — 事件总线 + Webhook 推送，内置日报/周报/未记录提醒等定时任务
 - **数据导入导出** — ZIP 格式全量备份与恢复
 
 ## 快速开始
@@ -152,7 +153,7 @@ make build-all      # 跨平台构建（6 个平台）
 | ---- | ---- | ------ |
 | `config.yaml` | 基础配置：服务端口、数据库路径、认证、时间点模式、AI、MCP | 部分支持 |
 | `categories.yaml` | 分类规则配置 | 是 |
-| `webhooks.yaml` | Webhook 与事件绑定配置 | 是 |
+| `webhooks.yaml` | Webhook、事件绑定与定时任务配置 | 是 |
 
 `config.yaml` 主要配置项：
 
@@ -195,6 +196,83 @@ make build-all      # 跨平台构建（6 个平台）
 | 吃喝 | `#f97316` | 早饭、午饭、晚饭、聚餐、下午茶、夜宵 |
 | 玩乐 | `#ec4899` | 游戏、视频、追剧、逛街、兴趣活动 |
 | 家务 | `#78716c` | 打扫、洗衣、收纳、修理、做饭 |
+
+## 事件系统
+
+Lifelog 内置事件总线（Event Bus），系统操作（创建日志、修改设置等）和定时任务执行完成后会发布事件。用户可以将事件绑定到 Webhook，实现自动通知推送。
+
+### 内置事件
+
+| 事件 | 说明 | 可用变量 |
+| ---- | ---- | -------- |
+| `log.created` | 日志创建 | `log_id`, `log_date`, `log_time`, `event_type`, `detail`, `category` |
+| `log.updated` | 日志更新 | `log_id`, `log_date`, `log_time`, `event_type`, `detail`, `category` |
+| `log.deleted` | 日志删除 | `log_id` |
+| `auth.login.succeeded` | 登录成功 | `ip`, `timestamp` |
+| `auth.password.changed` | 密码修改 | `ip`, `timestamp` |
+| `categories.updated` | 分类规则更新 | `count`, `timestamp` |
+| `settings.updated` | 系统设置更新 | `timestamp` |
+| `data.exported` | 数据导出 | `timestamp` |
+| `data.imported` | 数据导入 | `logs_imported`, `logs_skipped`, `timestamp` |
+| `ai.provider.created` | AI 服务商创建 | `provider_name`, `timestamp` |
+| `ai.provider.updated` | AI 服务商更新 | `provider_name`, `timestamp` |
+| `ai.provider.deleted` | AI 服务商删除 | `provider_name`, `timestamp` |
+| `task.daily_report` | 日报生成完成 | `report_date`, `summary`, `total_known`, `detail`, `timestamp` |
+| `task.weekly_report` | 周报生成完成 | `start_date`, `end_date`, `summary`, `total_known`, `day_count`, `detail`, `timestamp` |
+| `task.no_log_reminder` | 长时间未记录提醒 | `last_log_time`, `idle_hours`, `message`, `timestamp` |
+
+### Webhook 配置
+
+在 `webhooks.yaml` 中配置 Webhook 和事件绑定：
+
+```yaml
+webhooks:
+  - name: my-push
+    url: https://example.com/webhook
+    method: POST
+    headers:
+      Authorization: "Bearer token"
+    query_params:
+      text: "{{event_type}}: {{detail}}"
+    body: ""
+    timeout_seconds: 10
+
+event_bindings:
+  - event: log.created
+    webhook_name: my-push
+    enabled: true
+```
+
+Webhook 的 URL、Headers、Query Params、Body 中可使用 `{{变量名}}` 占位符，事件触发时自动替换为实际值。
+
+### 定时任务
+
+系统内置以下定时任务，执行结果通过事件发布，可绑定到 Webhook 实现自动推送。**默认全部关闭**，需在设置页面手动启用并绑定 Webhook 后生效。
+
+| 任务 | 事件 | 默认 Cron | 说明 |
+| ---- | ---- | --------- | ---- |
+| 每日日报 | `task.daily_report` | `0 22 * * *` | 每天 22:00 生成当日活动汇总 |
+| 每周周报 | `task.weekly_report` | `0 10 * * 1` | 每周一 10:00 生成上周汇总 |
+| 未记录提醒 | `task.no_log_reminder` | `0 */2 * * *` | 每 2 小时检查，超过 4 小时未记录则提醒 |
+
+Cron 表达式格式：`分 时 日 月 周`，可在设置页面的「事件绑定」标签页中修改。
+
+`webhooks.yaml` 中的定时任务配置：
+
+```yaml
+scheduled_tasks:
+  - name: daily_report
+    cron: "0 22 * * *"
+    enabled: false
+  - name: weekly_report
+    cron: "0 10 * * 1"
+    enabled: false
+  - name: no_log_reminder
+    cron: "0 */2 * * *"
+    enabled: false
+```
+
+> **注意**：任务启用后，还需要在事件绑定中将对应事件（如 `task.daily_report`）绑定到 Webhook，否则任务执行时会自动跳过。
 
 ## MCP 集成
 

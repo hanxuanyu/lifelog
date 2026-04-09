@@ -13,6 +13,7 @@
 - **Swagger** — API 文档自动生成（swaggo）
 - **embed** — 前端静态文件嵌入二进制
 - **MCP** — Model Context Protocol 服务端（mark3labs/mcp-go，SSE 传输）
+- **cron** — 定时任务调度（robfig/cron/v3）
 - **slog + lumberjack** — 结构化日志，双输出（控制台 + 文件轮转）
 
 ### 前端
@@ -54,7 +55,16 @@ lifelog/
 ├── web/                       # 前端构建产物（嵌入到二进制）
 ├── internal/
 │   ├── config/
-│   │   └── config.go          # 配置加载、热重载、读写接口
+│   │   ├── config.go          # 配置加载、热重载、读写接口
+│   │   └── webhook.go         # Webhook、事件绑定、定时任务配置管理
+│   ├── events/
+│   │   ├── bus.go             # 事件总线（发布/订阅）
+│   │   ├── events.go          # 事件定义注册表
+│   │   ├── dispatcher.go      # Webhook HTTP 执行器
+│   │   └── webhook_subscriber.go # Webhook 订阅者（事件 → Webhook 分发）
+│   ├── scheduler/
+│   │   ├── scheduler.go       # 定时任务调度器（robfig/cron）
+│   │   └── tasks.go           # 内置任务（日报、周报、未记录提醒）
 │   ├── handler/
 │   │   ├── auth.go            # 登录、密码设置
 │   │   ├── log_entry.go       # 日志 CRUD、时间轴
@@ -62,6 +72,8 @@ lifelog/
 │   │   ├── statistics.go      # 统计接口（日/周/月/趋势）
 │   │   ├── data.go            # 数据导入导出
 │   │   ├── settings.go        # 系统设置
+│   │   ├── webhook.go         # Webhook 管理、事件定义、事件绑定
+│   │   ├── scheduled_task.go  # 定时任务管理
 │   │   ├── ai.go              # AI 提供商管理与对话
 │   │   ├── version.go         # 版本信息与更新检查
 │   │   └── router.go          # 路由注册、静态文件服务、SPA fallback
@@ -70,6 +82,7 @@ lifelog/
 │   ├── model/
 │   │   ├── log_entry.go       # 日志条目模型（GORM）
 │   │   ├── category.go        # 分类与匹配规则模型
+│   │   ├── webhook.go         # Webhook、事件绑定、定时任务配置模型
 │   │   ├── ai.go              # AI 提供商与对话模型
 │   │   └── response.go        # 响应 DTO（统计、分页等）
 │   ├── repository/
@@ -152,6 +165,10 @@ lifelog/
             │   ├── MCPServiceCard.tsx      # MCP 服务配置
             │   ├── AIProviderSettings.tsx  # AI 提供商设置
             │   ├── AIProviderDialog.tsx    # AI 提供商编辑弹窗
+            │   ├── WebhookSettingsCard.tsx # Webhook 管理
+            │   ├── WebhookDialog.tsx       # Webhook 编辑/复制弹窗
+            │   ├── EventBindingsCard.tsx   # 事件绑定管理
+            │   ├── ScheduledTasksCard.tsx  # 定时任务管理
             │   └── VersionInfoCard.tsx     # 版本信息与更新
             └── ui/                    # shadcn/ui 组件
 ```
@@ -198,12 +215,14 @@ HTTP Request
 Router（路由分组、认证中间件）
     ↓
 Handler（参数校验、响应格式化）
-    ↓
-Service（核心业务逻辑）
-    ↓
-Repository（数据库 CRUD）    Config（YAML 配置读写）
+    ↓                           ↓ events.Publish()
+Service（核心业务逻辑）        EventBus（异步分发）
     ↓                           ↓
-SQLite                      config.yaml（fsnotify 热重载）
+Repository（数据库 CRUD）    WebhookSubscriber → HTTP 请求
+    ↓                           ↑
+SQLite                      Scheduler（cron 定时任务）
+                                ↓
+                            Config（YAML 热重载）
 ```
 
 ### MCP 服务
@@ -232,6 +251,61 @@ Service / Repository / Config（复用后端业务层）
 1. 在 `internal/mcp/server.go` 的 `tools` 切片中添加 `toolDef`
 2. 实现对应的 handler 函数，使用 `withLog` 包装
 3. handler 内部复用 `service` 或 `repository` 层的现有逻辑
+
+### 事件总线
+
+系统使用发布/订阅模式的事件总线统一管理事件分发：
+
+```text
+Handler / Scheduler
+    ↓ events.Publish(eventName, data)
+EventBus（异步分发）
+    ↓
+Subscriber（WebhookSubscriber → 查询 event_bindings → 执行 HTTP 请求）
+```
+
+- 全局单例 `defaultBus`，启动时注册 `WebhookSubscriber` 为全局订阅者
+- `Publish()` 异步调用所有订阅者，每个订阅者在独立 goroutine 中执行
+- `WebhookSubscriber` 读取配置中的事件绑定，匹配事件名和 webhook 名，执行 HTTP 请求
+- 支持 `Subscribe(eventName, sub)` 订阅特定事件和 `SubscribeAll(sub)` 订阅所有事件
+
+添加新事件：
+
+1. 在 `internal/events/events.go` 的 `Registry` 中添加 `EventDefinition`
+2. 在业务代码中调用 `events.Publish("event.name", data)`
+
+添加新订阅者：
+
+1. 实现 `Subscriber` 接口（`Name()` + `Handle()`）
+2. 在 `main.go` 中调用 `events.Subscribe()` 或 `events.SubscribeAll()` 注册
+
+### 定时任务调度
+
+基于 `robfig/cron/v3` 实现，支持动态修改 cron 表达式和启用/停用：
+
+```text
+main.go
+    ↓ scheduler.RegisterBuiltinTasks() + scheduler.Start()
+Scheduler（cron 调度）
+    ↓ 到达触发时间
+runTask(task)
+    ↓ 检查事件是否有已启用的 webhook 绑定
+    ↓ 无绑定则跳过，有绑定则执行
+task.Execute() → 生成报告数据
+    ↓
+events.Publish(task.EventName(), data)
+```
+
+- Cron 表达式和启用状态存储在 `webhooks.yaml` 的 `scheduled_tasks` 节
+- 首次启动时自动补全缺失的内置任务配置（默认关闭）
+- 执行前检查事件是否有已启用的下游 webhook 绑定，无绑定则跳过执行
+- 未记录提醒任务内置防抖：同一空闲期（最新日志 ID 相同）且距上次提醒不足 2 小时则跳过
+
+添加新定时任务：
+
+1. 在 `internal/scheduler/tasks.go` 中实现 `Task` 接口
+2. 在 `RegisterBuiltinTasks()` 中注册
+3. 在 `internal/events/events.go` 中添加对应的事件定义
 
 ### 前端构建嵌入
 
@@ -320,6 +394,19 @@ Service / Repository / Config（复用后端业务层）
 | `POST` | `/api/ai/providers/test` | 测试 AI 提供商连接 | 是 |
 | `POST` | `/api/ai/models` | 获取 AI 模型列表 | 是 |
 | `POST` | `/api/ai/chat` | AI 对话 | 是 |
+| `GET` | `/api/webhooks` | 获取 Webhook 列表 | 是 |
+| `POST` | `/api/webhooks` | 创建 Webhook | 是 |
+| `PUT` | `/api/webhooks/:name` | 更新 Webhook | 是 |
+| `DELETE` | `/api/webhooks/:name` | 删除 Webhook | 是 |
+| `POST` | `/api/webhooks/:name/test` | 测试 Webhook | 是 |
+| `POST` | `/api/webhooks/test-dry` | 测试未保存的 Webhook | 是 |
+| `GET` | `/api/events` | 获取事件定义列表 | 是 |
+| `GET` | `/api/event-bindings` | 获取事件绑定列表 | 是 |
+| `PUT` | `/api/event-bindings` | 更新事件绑定 | 是 |
+| `GET` | `/api/scheduled-tasks` | 获取定时任务列表 | 是 |
+| `PUT` | `/api/scheduled-tasks` | 更新定时任务配置 | 是 |
+| `POST` | `/api/scheduled-tasks/:name/run` | 手动触发定时任务 | 是 |
+| `GET` | `/api/system/monitor` | 获取系统监控信息 | 是 |
 
 ### MCP 接口（独立端口）
 
