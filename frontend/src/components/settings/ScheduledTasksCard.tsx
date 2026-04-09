@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Clock, Play, RotateCcw, ChevronDown, ChevronRight } from "lucide-react"
+import { Clock, Play, RotateCcw, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -103,11 +103,12 @@ export function ScheduledTasksCard() {
           ) : (
             tasks.map(task => {
               const isExpanded = expanded.has(task.name)
+              const unbound = task.enabled && task.bound_webhook_count === 0
               return (
-                <div key={task.name} className="border rounded-md overflow-hidden">
+                <div key={task.name} className={`border rounded-md overflow-hidden ${unbound ? "border-amber-500/50" : ""}`}>
                   {/* 折叠头部 */}
                   <div
-                    className="flex items-center gap-2 p-2.5 cursor-pointer hover:bg-muted/50 transition-colors"
+                    className={`flex items-center gap-2 p-2.5 cursor-pointer hover:bg-muted/50 transition-colors ${unbound ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`}
                     onClick={() => toggleExpand(task.name)}
                   >
                     {isExpanded
@@ -115,7 +116,10 @@ export function ScheduledTasksCard() {
                       : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     }
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium">{task.description}</div>
+                      <div className="text-sm font-medium flex items-center gap-1.5">
+                        {task.description}
+                        {unbound && <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
+                      </div>
                     </div>
                     <Badge variant={task.enabled ? "secondary" : "outline"} className="text-[10px] shrink-0">
                       {task.enabled ? "启用" : "停用"}
@@ -133,6 +137,12 @@ export function ScheduledTasksCard() {
                         className="overflow-hidden"
                       >
                         <div className="px-3 pb-3 pt-1 space-y-2 border-t">
+                          {unbound && (
+                            <div className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                              <span>任务已启用但未绑定 Webhook，执行时将跳过。请在上方「事件绑定」中将 <span className="font-mono">{task.event_name}</span> 绑定到 Webhook。</span>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between gap-2">
                             <div className="text-xs text-muted-foreground min-w-0">
                               <span>事件：</span><span className="font-mono">{task.event_name}</span>

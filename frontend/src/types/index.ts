@@ -197,6 +197,7 @@ export interface ScheduledTaskInfo {
   event_name: string
   default_cron: string
   next_run?: string
+  bound_webhook_count: number
 }
 
 export interface ScheduledTaskUpdate {

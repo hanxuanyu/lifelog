@@ -151,9 +151,41 @@ func unscheduleEntry(entry *TaskEntry) {
 	entry.EntryID = 0
 }
 
+// hasEnabledBindings 检查事件是否有已启用的下游 webhook 绑定
+func hasEnabledBindings(eventName string) bool {
+	for _, b := range config.GetEventBindings() {
+		if b.Event == eventName && b.Enabled && b.WebhookName != "" {
+			if config.GetWebhookByName(b.WebhookName) != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// countEnabledBindings 统计事件已启用的下游 webhook 绑定数
+func countEnabledBindings(eventName string) int {
+	count := 0
+	for _, b := range config.GetEventBindings() {
+		if b.Event == eventName && b.Enabled && b.WebhookName != "" {
+			if config.GetWebhookByName(b.WebhookName) != nil {
+				count++
+			}
+		}
+	}
+	return count
+}
+
 // runTask 执行一次任务并发布事件
 func runTask(t Task) {
 	start := time.Now()
+
+	// 检查是否有下游 webhook 绑定，无绑定则跳过执行
+	if !hasEnabledBindings(t.EventName()) {
+		slog.Info("定时任务跳过：事件无已启用的 webhook 绑定", "task", t.Name(), "event", t.EventName())
+		return
+	}
+
 	slog.Info("开始执行定时任务", "task", t.Name())
 
 	defer func() {
@@ -185,13 +217,14 @@ func runTask(t Task) {
 
 // TaskInfo 对外暴露的任务信息
 type TaskInfo struct {
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Cron        string    `json:"cron"`
-	Enabled     bool      `json:"enabled"`
-	EventName   string    `json:"event_name"`
-	DefaultCron string    `json:"default_cron"`
-	NextRun     time.Time `json:"next_run,omitempty"`
+	Name              string    `json:"name"`
+	Description       string    `json:"description"`
+	Cron              string    `json:"cron"`
+	Enabled           bool      `json:"enabled"`
+	EventName         string    `json:"event_name"`
+	DefaultCron       string    `json:"default_cron"`
+	NextRun           time.Time `json:"next_run,omitempty"`
+	BoundWebhookCount int       `json:"bound_webhook_count"`
 }
 
 // GetTasks 返回所有注册的任务信息
@@ -206,12 +239,13 @@ func GetTasks() []TaskInfo {
 			continue
 		}
 		info := TaskInfo{
-			Name:        t.Name(),
-			Description: t.Description(),
-			Cron:        entry.CronExpr,
-			Enabled:     entry.Enabled,
-			EventName:   t.EventName(),
-			DefaultCron: t.DefaultCron(),
+			Name:              t.Name(),
+			Description:       t.Description(),
+			Cron:              entry.CronExpr,
+			Enabled:           entry.Enabled,
+			EventName:         t.EventName(),
+			DefaultCron:       t.DefaultCron(),
+			BoundWebhookCount: countEnabledBindings(t.EventName()),
 		}
 		if cronRunner != nil && entry.EntryID != 0 {
 			e := cronRunner.Entry(entry.EntryID)
