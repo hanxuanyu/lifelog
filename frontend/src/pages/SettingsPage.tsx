@@ -130,7 +130,7 @@ export function SettingsPage() {
           <Tabs defaultValue="app-info">
             <TabsList className="w-full grid grid-cols-5 mb-4">
               <TabsTrigger value="app-info" className="gap-1.5">
-                <Info className="h-4 w-4" /><span className="hidden sm:inline">应用信息</span>
+                <Info className="h-4 w-4" /><span className="hidden sm:inline">设置首页</span>
               </TabsTrigger>
               <TabsTrigger value="basic" className="gap-1.5">
                 <Settings2 className="h-4 w-4" /><span className="hidden sm:inline">基础配置</span>
@@ -150,6 +150,9 @@ export function SettingsPage() {
               <div className="space-y-4">
                 <VersionInfoCard />
                 <ServerMonitorCard />
+                <PasswordCard />
+                <DataManagementCard onImportComplete={handleImportComplete} />
+                <ShortcutCard />
               </div>
             </TabsContent>
 
@@ -168,9 +171,6 @@ export function SettingsPage() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-                <PasswordCard />
-                <ShortcutCard />
-                <DataManagementCard onImportComplete={handleImportComplete} />
                 <AIProviderSettings />
               </div>
             </TabsContent>
