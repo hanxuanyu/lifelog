@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	webhooks      []model.Webhook
-	eventBindings []model.EventBinding
+	webhooks       []model.Webhook
+	eventBindings  []model.EventBinding
+	scheduledTasks []model.ScheduledTaskConfig
 )
 
 func loadWebhooks() {
@@ -117,6 +118,89 @@ func SetEventBindings(items []model.EventBinding) error {
 	}
 	loadEventBindings()
 	return nil
+}
+
+func loadScheduledTasks() {
+	mu.Lock()
+	defer mu.Unlock()
+
+	var items []model.ScheduledTaskConfig
+	if err := webhookViper.UnmarshalKey("scheduled_tasks", &items); err != nil {
+		slog.Error("failed to parse scheduled tasks", "error", err)
+		return
+	}
+
+	scheduledTasks = normalizeScheduledTasks(items)
+	slog.Info("scheduled tasks loaded", "count", len(scheduledTasks))
+}
+
+// GetScheduledTasks 返回所有定时任务配置
+func GetScheduledTasks() []model.ScheduledTaskConfig {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	result := make([]model.ScheduledTaskConfig, len(scheduledTasks))
+	copy(result, scheduledTasks)
+	return result
+}
+
+// GetScheduledTaskByName 根据任务名查找配置
+func GetScheduledTaskByName(name string) *model.ScheduledTaskConfig {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	for _, item := range scheduledTasks {
+		if item.Name == name {
+			cp := item
+			return &cp
+		}
+	}
+	return nil
+}
+
+// SetScheduledTasks 持久化定时任务配置到 webhooks.yaml
+func SetScheduledTasks(items []model.ScheduledTaskConfig) error {
+	normalized, err := validateScheduledTasks(items)
+	if err != nil {
+		return err
+	}
+
+	webhookViper.Set("scheduled_tasks", normalized)
+	if err := webhookViper.WriteConfig(); err != nil {
+		return err
+	}
+	loadScheduledTasks()
+	return nil
+}
+
+func normalizeScheduledTasks(items []model.ScheduledTaskConfig) []model.ScheduledTaskConfig {
+	normalized := make([]model.ScheduledTaskConfig, len(items))
+	for i := range items {
+		normalized[i] = items[i]
+		normalized[i].Name = strings.TrimSpace(normalized[i].Name)
+		normalized[i].Cron = strings.TrimSpace(normalized[i].Cron)
+	}
+	return normalized
+}
+
+func validateScheduledTasks(items []model.ScheduledTaskConfig) ([]model.ScheduledTaskConfig, error) {
+	normalized := normalizeScheduledTasks(items)
+	seen := make(map[string]struct{}, len(normalized))
+
+	for _, item := range normalized {
+		if item.Name == "" {
+			return nil, fmt.Errorf("scheduled task name is required")
+		}
+		if item.Cron == "" {
+			return nil, fmt.Errorf("scheduled task cron is required")
+		}
+		if _, exists := seen[item.Name]; exists {
+			return nil, fmt.Errorf("duplicate scheduled task name: %s", item.Name)
+		}
+		seen[item.Name] = struct{}{}
+	}
+
+	return normalized, nil
 }
 
 func normalizeWebhooks(items []model.Webhook) []model.Webhook {

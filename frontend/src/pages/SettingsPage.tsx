@@ -18,6 +18,7 @@ import { AIProviderSettings } from "@/components/settings/AIProviderSettings"
 import { CategoriesCard } from "@/components/settings/CategoriesCard"
 import { WebhookSettingsCard } from "@/components/settings/WebhookSettingsCard"
 import { EventBindingsCard } from "@/components/settings/EventBindingsCard"
+import { ScheduledTasksCard } from "@/components/settings/ScheduledTasksCard"
 
 export function SettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -180,7 +181,10 @@ export function SettingsPage() {
             </TabsContent>
 
             <TabsContent value="events">
-              <EventBindingsCard />
+              <div className="space-y-4">
+                <EventBindingsCard />
+                <ScheduledTasksCard />
+              </div>
             </TabsContent>
 
             <TabsContent value="categories">

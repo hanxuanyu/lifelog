@@ -189,6 +189,22 @@ export interface EventDefinition {
   variables: EventVariable[]
 }
 
+export interface ScheduledTaskInfo {
+  name: string
+  description: string
+  cron: string
+  enabled: boolean
+  event_name: string
+  default_cron: string
+  next_run?: string
+}
+
+export interface ScheduledTaskUpdate {
+  name: string
+  cron: string
+  enabled: boolean
+}
+
 export interface SystemMonitor {
   cpu_usage: number
   cpu_cores: number

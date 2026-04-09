@@ -17,3 +17,10 @@ type EventBinding struct {
 	WebhookName string `json:"webhook_name" yaml:"webhook_name" mapstructure:"webhook_name"`
 	Enabled     bool   `json:"enabled" yaml:"enabled" mapstructure:"enabled"`
 }
+
+// ScheduledTaskConfig 定时任务配置
+type ScheduledTaskConfig struct {
+	Name    string `json:"name" yaml:"name" mapstructure:"name"`
+	Cron    string `json:"cron" yaml:"cron" mapstructure:"cron"`
+	Enabled bool   `json:"enabled" yaml:"enabled" mapstructure:"enabled"`
+}

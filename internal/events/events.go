@@ -117,4 +117,38 @@ var Registry = []EventDefinition{
 			{Key: "timestamp", Description: "时间戳"},
 		},
 	},
+	{
+		Name:        "task.daily_report",
+		Description: "日报生成完成",
+		Variables: []EventVariable{
+			{Key: "report_date", Description: "报告日期"},
+			{Key: "summary", Description: "分类汇总"},
+			{Key: "total_known", Description: "已知总时长"},
+			{Key: "detail", Description: "详细内容"},
+			{Key: "timestamp", Description: "时间戳"},
+		},
+	},
+	{
+		Name:        "task.weekly_report",
+		Description: "周报生成完成",
+		Variables: []EventVariable{
+			{Key: "start_date", Description: "开始日期"},
+			{Key: "end_date", Description: "结束日期"},
+			{Key: "summary", Description: "分类汇总"},
+			{Key: "total_known", Description: "已知总时长"},
+			{Key: "day_count", Description: "天数"},
+			{Key: "detail", Description: "详细内容"},
+			{Key: "timestamp", Description: "时间戳"},
+		},
+	},
+	{
+		Name:        "task.no_log_reminder",
+		Description: "长时间未记录提醒",
+		Variables: []EventVariable{
+			{Key: "last_log_time", Description: "最后记录时间"},
+			{Key: "idle_hours", Description: "空闲小时数"},
+			{Key: "message", Description: "提醒消息"},
+			{Key: "timestamp", Description: "时间戳"},
+		},
+	},
 }

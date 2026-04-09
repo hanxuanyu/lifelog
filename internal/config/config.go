@@ -54,8 +54,9 @@ type categoriesFileConfig struct {
 }
 
 type webhookFileConfig struct {
-	Webhooks      []model.Webhook      `mapstructure:"webhooks" yaml:"webhooks"`
-	EventBindings []model.EventBinding `mapstructure:"event_bindings" yaml:"event_bindings"`
+	Webhooks       []model.Webhook             `mapstructure:"webhooks" yaml:"webhooks"`
+	EventBindings  []model.EventBinding        `mapstructure:"event_bindings" yaml:"event_bindings"`
+	ScheduledTasks []model.ScheduledTaskConfig `mapstructure:"scheduled_tasks" yaml:"scheduled_tasks"`
 }
 
 var (
@@ -109,12 +110,14 @@ func Init() {
 	loadAIProviders()
 	loadWebhooks()
 	loadEventBindings()
+	loadScheduledTasks()
 
 	watchConfigFile(baseViper, loadAIProviders)
 	watchConfigFile(categoriesViper, loadCategories)
 	watchConfigFile(webhookViper, func() {
 		loadWebhooks()
 		loadEventBindings()
+		loadScheduledTasks()
 	})
 
 	slog.Info("configuration loaded",
@@ -328,6 +331,11 @@ func defaultWebhookConfig() webhookFileConfig {
 	return webhookFileConfig{
 		Webhooks:      []model.Webhook{},
 		EventBindings: []model.EventBinding{},
+		ScheduledTasks: []model.ScheduledTaskConfig{
+			{Name: "daily_report", Cron: "0 22 * * *", Enabled: true},
+			{Name: "weekly_report", Cron: "0 10 * * 1", Enabled: true},
+			{Name: "no_log_reminder", Cron: "0 */2 * * *", Enabled: true},
+		},
 	}
 }
 

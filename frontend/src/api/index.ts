@@ -18,6 +18,8 @@ import type {
   Webhook,
   EventBinding,
   EventDefinition,
+  ScheduledTaskInfo,
+  ScheduledTaskUpdate,
   SystemMonitor,
 } from "@/types"
 
@@ -359,5 +361,21 @@ export async function getEventBindings() {
 
 export async function updateEventBindings(bindings: EventBinding[]) {
   const res = await http.put<ApiResponse>("/event-bindings", bindings)
+  return res.data
+}
+
+// Scheduled Tasks
+export async function getScheduledTasks() {
+  const res = await http.get<ApiResponse<ScheduledTaskInfo[]>>("/scheduled-tasks")
+  return res.data.data
+}
+
+export async function updateScheduledTasks(tasks: ScheduledTaskUpdate[]) {
+  const res = await http.put<ApiResponse<ScheduledTaskInfo[]>>("/scheduled-tasks", tasks)
+  return res.data
+}
+
+export async function runScheduledTask(name: string) {
+  const res = await http.post<ApiResponse>(`/scheduled-tasks/${encodeURIComponent(name)}/run`)
   return res.data
 }

@@ -41,7 +41,7 @@ func Login(c *gin.Context) {
 		Message: "登录成功",
 		Data:    model.LoginResponse{Token: token},
 	})
-	go events.Fire("auth.login.succeeded", map[string]string{"ip": c.ClientIP(), "timestamp": time.Now().Format(time.RFC3339)})
+	go events.Publish("auth.login.succeeded", map[string]string{"ip": c.ClientIP(), "timestamp": time.Now().Format(time.RFC3339)})
 }
 
 // SetPassword 设置/修改密码
@@ -73,5 +73,5 @@ func SetPassword(c *gin.Context) {
 		Message: "密码设置成功",
 		Data:    model.LoginResponse{Token: token},
 	})
-	go events.Fire("auth.password.changed", map[string]string{"ip": c.ClientIP(), "timestamp": time.Now().Format(time.RFC3339)})
+	go events.Publish("auth.password.changed", map[string]string{"ip": c.ClientIP(), "timestamp": time.Now().Format(time.RFC3339)})
 }

@@ -1,11 +1,15 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Zap, Plus, Trash2, Play, AlertTriangle, Save } from "lucide-react"
+import { Zap, Plus, Trash2, Play, AlertTriangle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { getEvents, getEventBindings, getWebhooks, updateEventBindings, testWebhook } from "@/api"
 import { toast } from "sonner"
 import type { EventDefinition, EventBinding, Webhook } from "@/types"
@@ -24,42 +28,32 @@ function extractPlaceholders(wh: Webhook): Set<string> {
   return keys
 }
 
-interface BindingRow {
-  event: string
-  webhook_name: string
-  enabled: boolean
-  isNew?: boolean
-}
-
 export function EventBindingsCard() {
   const [events, setEvents] = useState<EventDefinition[]>([])
-  const [bindings, setBindings] = useState<BindingRow[]>([])
-  const [origBindings, setOrigBindings] = useState<BindingRow[]>([])
+  const [bindings, setBindings] = useState<EventBinding[]>([])
   const [webhooks, setWebhooks] = useState<Webhook[]>([])
-  const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [newEvent, setNewEvent] = useState("")
   const [newWebhook, setNewWebhook] = useState("")
+  const [deleteTarget, setDeleteTarget] = useState<{ idx: number; event: string; webhook: string } | null>(null)
 
-  useEffect(() => {
+  const load = () => {
     Promise.all([getEvents(), getEventBindings(), getWebhooks()])
       .then(([evts, binds, whs]) => {
         setEvents(evts || [])
         setWebhooks(whs || [])
-        const rows = (binds || []).map(b => ({ ...b }))
-        setBindings(rows)
-        setOrigBindings(JSON.parse(JSON.stringify(rows)))
+        setBindings(binds || [])
       })
       .catch(() => {})
-  }, [])
+  }
 
-  const dirty = JSON.stringify(bindings.map(({ isNew: _, ...b }) => b)) !== JSON.stringify(origBindings)
+  useEffect(() => { load() }, [])
 
   const getEventDef = (name: string) => events.find(e => e.name === name)
   const getWebhookDef = (name: string) => webhooks.find(w => w.name === name)
 
-  // 变量匹配校验：返回 webhook 中使用了但事件未提供的变量
+  // 变量匹配校验
   const getUnmatchedVars = (eventName: string, webhookName: string) => {
     const def = getEventDef(eventName)
     const wh = getWebhookDef(webhookName)
@@ -69,7 +63,18 @@ export function EventBindingsCard() {
     return [...used].filter(k => !eventKeys.has(k))
   }
 
-  const addBinding = () => {
+  // 持久化当前绑定列表到后端
+  const persist = async (next: EventBinding[]) => {
+    try {
+      await updateEventBindings(next)
+      setBindings(next)
+    } catch {
+      toast.error("保存失败")
+      load() // 回滚到服务端状态
+    }
+  }
+
+  const addBinding = async () => {
     if (!newEvent || !newWebhook) {
       toast.error("请选择事件和 Webhook")
       return
@@ -78,18 +83,25 @@ export function EventBindingsCard() {
       toast.error("该绑定已存在")
       return
     }
-    setBindings(prev => [...prev, { event: newEvent, webhook_name: newWebhook, enabled: true, isNew: true }])
+    const next = [...bindings, { event: newEvent, webhook_name: newWebhook, enabled: true }]
+    await persist(next)
+    toast.success("绑定已添加")
     setNewEvent("")
     setNewWebhook("")
     setAdding(false)
   }
 
-  const removeBinding = (idx: number) => {
-    setBindings(prev => prev.filter((_, i) => i !== idx))
+  const confirmRemove = async () => {
+    if (!deleteTarget) return
+    const next = bindings.filter((_, i) => i !== deleteTarget.idx)
+    await persist(next)
+    toast.success("绑定已删除")
+    setDeleteTarget(null)
   }
 
-  const toggleEnabled = (idx: number, val: boolean) => {
-    setBindings(prev => prev.map((b, i) => i === idx ? { ...b, enabled: val } : b))
+  const toggleEnabled = async (idx: number, val: boolean) => {
+    const next = bindings.map((b, i) => i === idx ? { ...b, enabled: val } : b)
+    await persist(next)
   }
 
   const handleTest = async (webhookName: string, eventName: string) => {
@@ -101,19 +113,6 @@ export function EventBindingsCard() {
       else toast.error(res.message)
     } catch { toast.error("测试失败") }
     finally { setTesting(null) }
-  }
-
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      const payload: EventBinding[] = bindings.map(({ isNew: _, ...b }) => b)
-      await updateEventBindings(payload)
-      const saved = payload.map(b => ({ ...b }))
-      setBindings(saved)
-      setOrigBindings(JSON.parse(JSON.stringify(saved)))
-      toast.success("事件绑定已保存")
-    } catch { toast.error("保存失败") }
-    finally { setSaving(false) }
   }
 
   // 当前选中事件的变量列表（用于添加绑定时预览）
@@ -220,7 +219,7 @@ export function EventBindingsCard() {
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => handleTest(b.webhook_name, b.event)} disabled={testing === testKey}>
                       <Play className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0 text-destructive" onClick={() => removeBinding(idx)}>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0 text-destructive" onClick={() => setDeleteTarget({ idx, event: b.event, webhook: b.webhook_name })}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -241,19 +240,23 @@ export function EventBindingsCard() {
               )
             })
           )}
-
-          {/* 保存按钮 */}
-          <AnimatePresence>
-            {dirty && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-                <Button onClick={handleSave} disabled={saving} className="w-full">
-                  <Save className="h-4 w-4 mr-1.5" />{saving ? "保存中..." : "保存绑定"}
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除事件绑定「{deleteTarget?.event} → {deleteTarget?.webhook}」吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemove} className="bg-destructive text-white hover:bg-destructive/90">删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   )
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,6 +20,7 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   webhook?: Webhook | null
+  copyFrom?: Webhook | null
   onSaved: () => void
   events?: EventDefinition[]
 }
@@ -28,7 +29,7 @@ const emptyWebhook: Webhook = {
   name: "", url: "", method: "POST", headers: {}, query_params: {}, body: "", timeout_seconds: 10,
 }
 
-export function WebhookDialog({ open, onOpenChange, webhook, onSaved, events }: Props) {
+export function WebhookDialog({ open, onOpenChange, webhook, copyFrom, onSaved, events }: Props) {
   const isEdit = !!webhook
   const [form, setForm] = useState<Webhook>(emptyWebhook)
   const [headers, setHeaders] = useState<[string, string][]>([])
@@ -53,6 +54,10 @@ export function WebhookDialog({ open, onOpenChange, webhook, onSaved, events }: 
         setForm(webhook)
         setHeaders(Object.entries(webhook.headers || {}))
         setQueryParams(Object.entries(webhook.query_params || {}))
+      } else if (copyFrom) {
+        setForm({ ...copyFrom, name: "" })
+        setHeaders(Object.entries(copyFrom.headers || {}))
+        setQueryParams(Object.entries(copyFrom.query_params || {}))
       } else {
         setForm(emptyWebhook)
         setHeaders([])
@@ -62,7 +67,7 @@ export function WebhookDialog({ open, onOpenChange, webhook, onSaved, events }: 
       setAutoBind(false)
       setTestResult(null)
     }
-  }, [open, webhook])
+  }, [open, webhook, copyFrom])
 
   const selectedEventDef = events?.find(e => e.name === selectedEvent)
 
@@ -180,7 +185,7 @@ export function WebhookDialog({ open, onOpenChange, webhook, onSaved, events }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0">
         <DialogHeader className="shrink-0 p-6 pb-3">
-          <DialogTitle>{isEdit ? "编辑 Webhook" : "新建 Webhook"}</DialogTitle>
+          <DialogTitle>{isEdit ? "编辑 Webhook" : copyFrom ? "复制 Webhook" : "新建 Webhook"}</DialogTitle>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto min-h-0 px-6 space-y-3">
           {/* 事件选择 */}
@@ -299,12 +304,8 @@ export function WebhookDialog({ open, onOpenChange, webhook, onSaved, events }: 
           <p className="text-xs text-muted-foreground">
             支持占位符 {"{{变量名}}"}，在事件触发时自动替换为对应值
           </p>
-          {/* 测试按钮和结果 */}
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={handleTest} disabled={testing}>
-              <Play className="h-3 w-3 mr-1" />{testing ? "测试中..." : "测试调用"}
-            </Button>
-          </div>
+        </div>
+        <div className="shrink-0 px-6 pb-6 pt-3 space-y-2 border-t">
           {testResult?.data && (
             <div className="border rounded-md p-2 text-xs space-y-1 bg-muted/30">
               <div className="flex items-center gap-2">
@@ -318,11 +319,16 @@ export function WebhookDialog({ open, onOpenChange, webhook, onSaved, events }: 
               )}
             </div>
           )}
+          <div className="flex items-center justify-between">
+            <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={handleTest} disabled={testing}>
+              <Play className="h-3 w-3 mr-1" />{testing ? "测试中..." : "测试调用"}
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
+              <Button onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "保存"}</Button>
+            </div>
+          </div>
         </div>
-        <DialogFooter className="shrink-0 p-6 pt-3">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
-          <Button onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "保存"}</Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

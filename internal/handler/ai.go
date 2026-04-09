@@ -76,7 +76,7 @@ func AddAIProvider(c *gin.Context) {
 	}
 	slog.Info("AI提供商已添加", "name", req.Name, "endpoint", req.Endpoint, "model", req.Model)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "添加成功"})
-	go events.Fire("ai.provider.created", map[string]string{"provider_name": req.Name, "timestamp": time.Now().Format(time.RFC3339)})
+	go events.Publish("ai.provider.created", map[string]string{"provider_name": req.Name, "timestamp": time.Now().Format(time.RFC3339)})
 }
 
 // UpdateAIProvider 更新AI服务提供商
@@ -127,7 +127,7 @@ func UpdateAIProvider(c *gin.Context) {
 	}
 	slog.Info("AI提供商已更新", "name", name)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "更新成功"})
-	go events.Fire("ai.provider.updated", map[string]string{"provider_name": name, "timestamp": time.Now().Format(time.RFC3339)})
+	go events.Publish("ai.provider.updated", map[string]string{"provider_name": name, "timestamp": time.Now().Format(time.RFC3339)})
 }
 
 // DeleteAIProvider 删除AI服务提供商
@@ -161,7 +161,7 @@ func DeleteAIProvider(c *gin.Context) {
 	}
 	slog.Info("AI提供商已删除", "name", name)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "删除成功"})
-	go events.Fire("ai.provider.deleted", map[string]string{"provider_name": name, "timestamp": time.Now().Format(time.RFC3339)})
+	go events.Publish("ai.provider.deleted", map[string]string{"provider_name": name, "timestamp": time.Now().Format(time.RFC3339)})
 }
 
 // TestAIProvider 测试AI服务提供商连接
