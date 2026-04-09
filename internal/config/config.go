@@ -1,235 +1,333 @@
 package config
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/hxuanyu/lifelog/internal/model"
 	"github.com/spf13/viper"
+	"go.yaml.in/yaml/v3"
 )
 
-const defaultConfigYAML = `server:
-  port: 8080
-  db_path: "./data/lifelog.db"
+const (
+	baseConfigFileName       = "config.yaml"
+	categoriesConfigFileName = "categories.yaml"
+	webhookConfigFileName    = "webhooks.yaml"
+)
 
-auth:
-  password_hash: ""
-  jwt_secret: "change-me-to-a-random-string"
-  jwt_expire_hours: 168
+type serverConfig struct {
+	Port   int    `mapstructure:"port" yaml:"port"`
+	DBPath string `mapstructure:"db_path" yaml:"db_path"`
+}
 
-time_point_mode: "end"
+type authConfig struct {
+	PasswordHash   string `mapstructure:"password_hash" yaml:"password_hash"`
+	JWTSecret      string `mapstructure:"jwt_secret" yaml:"jwt_secret"`
+	JWTExpireHours int    `mapstructure:"jwt_expire_hours" yaml:"jwt_expire_hours"`
+}
 
-categories:
-  - name: "工作"
-    color: "#3b82f6"
-    rules:
-      - type: fixed
-        pattern: "开会"
-      - type: fixed
-        pattern: "写文档"
-      - type: fixed
-        pattern: "编程"
-      - type: fixed
-        pattern: "沟通"
-      - type: fixed
-        pattern: "汇报"
-      - type: fixed
-        pattern: "工单"
-  - name: "成长"
-    color: "#10b981"
-    rules:
-      - type: fixed
-        pattern: "学习"
-      - type: fixed
-        pattern: "阅读"
-      - type: fixed
-        pattern: "课程"
-      - type: fixed
-        pattern: "健身"
-      - type: fixed
-        pattern: "考试"
-  - name: "休息"
-    color: "#8b5cf6"
-    rules:
-      - type: regex
-        pattern: "^(睡觉|午睡)$"
-      - type: fixed
-        pattern: "午睡"
-      - type: fixed
-        pattern: "睡觉"
-      - type: fixed
-        pattern: "放松"
-      - type: fixed
-        pattern: "发呆"
-  - name: "交通"
-    color: "#0ea5e9"
-    rules:
-      - type: regex
-        pattern: "^(步行|打车|地铁|公交|高铁|飞机|骑车)$"
-      - type: fixed
-        pattern: "步行"
-      - type: fixed
-        pattern: "飞机"
-      - type: fixed
-        pattern: "高铁"
-      - type: fixed
-        pattern: "打车"
-      - type: fixed
-        pattern: "骑车"
-      - type: fixed
-        pattern: "地铁"
-      - type: fixed
-        pattern: "开车"
-      - type: fixed
-        pattern: "通勤"
-      - type: fixed
-        pattern: "候机"
-      - type: fixed
-        pattern: "候车"
-  - name: "吃喝"
-    color: "#f97316"
-    rules:
-      - type: fixed
-        pattern: "早饭"
-      - type: fixed
-        pattern: "晚饭"
-      - type: fixed
-        pattern: "午饭"
-      - type: fixed
-        pattern: "饭"
-      - type: fixed
-        pattern: "聚餐"
-      - type: fixed
-        pattern: "下午茶"
-      - type: fixed
-        pattern: "夜宵"
-      - type: fixed
-        pattern: "零食"
-  - name: "玩乐"
-    color: "#ec4899"
-    rules:
-      - type: fixed
-        pattern: "游戏"
-      - type: fixed
-        pattern: "视频"
-      - type: fixed
-        pattern: "追剧"
-      - type: fixed
-        pattern: "逛街"
-      - type: fixed
-        pattern: "兴趣活动"
-  - name: "家务"
-    color: "#78716c"
-    rules:
-      - type: fixed
-        pattern: "打扫"
-      - type: fixed
-        pattern: "洗衣"
-      - type: fixed
-        pattern: "收纳"
-      - type: fixed
-        pattern: "修理"
-      - type: fixed
-        pattern: "做饭"
+type mcpConfig struct {
+	Enabled bool `mapstructure:"enabled" yaml:"enabled"`
+	Port    int  `mapstructure:"port" yaml:"port"`
+}
 
-mcp:
-  enabled: false
-  port: 8081
-`
+type aiProvidersConfig struct {
+	Providers []model.AIProvider `mapstructure:"providers" yaml:"providers"`
+}
+
+type baseFileConfig struct {
+	Server        serverConfig      `mapstructure:"server" yaml:"server"`
+	Auth          authConfig        `mapstructure:"auth" yaml:"auth"`
+	TimePointMode string            `mapstructure:"time_point_mode" yaml:"time_point_mode"`
+	AI            aiProvidersConfig `mapstructure:"ai" yaml:"ai"`
+	MCP           mcpConfig         `mapstructure:"mcp" yaml:"mcp"`
+}
+
+type categoriesFileConfig struct {
+	Categories []model.Category `mapstructure:"categories" yaml:"categories"`
+}
+
+type webhookFileConfig struct {
+	Webhooks      []model.Webhook      `mapstructure:"webhooks" yaml:"webhooks"`
+	EventBindings []model.EventBinding `mapstructure:"event_bindings" yaml:"event_bindings"`
+}
 
 var (
 	mu          sync.RWMutex
 	categories  []model.Category
 	aiProviders []model.AIProvider
-	configDir   = "./config" // 默认配置目录
+	configDir   = "./config"
+
+	baseViper       = viper.New()
+	categoriesViper = viper.New()
+	webhookViper    = viper.New()
 )
 
-// SetConfigDir 设置配置文件目录（需在 Init 之前调用）
+// SetConfigDir sets the config directory before Init is called.
 func SetConfigDir(dir string) {
-	configDir = dir
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return
+	}
+	configDir = filepath.Clean(dir)
 }
 
-// Init 初始化配置，如果 config.yaml 不存在则创建默认配置
-// 配置文件固定在 configDir 目录下（默认 ./config/）
-// 支持环境变量覆盖，前缀为 LIFELOG_，层级用 _ 分隔
-// 例如: LIFELOG_SERVER_PORT=9090 覆盖 server.port
+// Init loads config files.
 func Init() {
-	ensureConfigFile()
-
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(configDir)
-
-	if err := viper.ReadInConfig(); err != nil {
-		slog.Error("读取配置文件失败", "error", err)
+	if err := ensureSplitConfigFiles(); err != nil {
+		slog.Error("failed to prepare config files", "error", err, "dir", configDir)
 		os.Exit(1)
 	}
 
-	// 环境变量覆盖：LIFELOG_SERVER_PORT -> server.port
-	viper.SetEnvPrefix("LIFELOG")
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viper.AutomaticEnv()
+	var err error
+	baseViper, err = loadConfigViper(baseConfigFileName)
+	if err != nil {
+		slog.Error("failed to load base config", "error", err)
+		os.Exit(1)
+	}
+	applyBaseDefaults(baseViper)
 
-	// 显式绑定所有已知配置项，确保环境变量能正确覆盖
-	bindEnvKeys()
+	categoriesViper, err = loadConfigViper(categoriesConfigFileName)
+	if err != nil {
+		slog.Error("failed to load categories config", "error", err)
+		os.Exit(1)
+	}
+
+	webhookViper, err = loadConfigViper(webhookConfigFileName)
+	if err != nil {
+		slog.Error("failed to load webhook config", "error", err)
+		os.Exit(1)
+	}
 
 	loadCategories()
 	loadAIProviders()
 	loadWebhooks()
 	loadEventBindings()
 
-	viper.OnConfigChange(func(e fsnotify.Event) {
-		slog.Info("配置文件已变更，重新加载", "file", e.Name)
-		loadCategories()
-		loadAIProviders()
+	watchConfigFile(baseViper, loadAIProviders)
+	watchConfigFile(categoriesViper, loadCategories)
+	watchConfigFile(webhookViper, func() {
 		loadWebhooks()
 		loadEventBindings()
 	})
-	viper.WatchConfig()
 
-	slog.Info("配置加载完成",
+	slog.Info("configuration loaded",
+		"dir", configDir,
 		"port", GetPort(),
 		"db_path", GetDBPath(),
 		"time_point_mode", GetTimePointMode(),
 		"categories_count", len(GetCategories()),
+		"webhooks_count", len(GetWebhooks()),
+		"ai_providers_count", len(GetAIProviders()),
 	)
 }
 
-// bindEnvKeys 显式绑定配置键到环境变量
-// viper.AutomaticEnv 仅对已知键生效，需显式绑定嵌套键
-func bindEnvKeys() {
-	keys := []string{
-		"server.port",
-		"server.db_path",
-		"auth.password_hash",
-		"auth.jwt_secret",
-		"auth.jwt_expire_hours",
-		"time_point_mode",
-		"mcp.enabled",
-		"mcp.port",
+func ensureSplitConfigFiles() error {
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("create config dir: %w", err)
 	}
-	for _, key := range keys {
-		_ = viper.BindEnv(key)
+
+	files := []struct {
+		name string
+		data interface{}
+	}{
+		{name: baseConfigFileName, data: defaultBaseConfig()},
+		{name: categoriesConfigFileName, data: defaultCategoriesConfig()},
+		{name: webhookConfigFileName, data: defaultWebhookConfig()},
+	}
+
+	for _, file := range files {
+		path := configPath(file.name)
+		if fileExists(path) {
+			continue
+		}
+		if err := writeYAMLFile(path, file.data); err != nil {
+			return fmt.Errorf("write %s: %w", file.name, err)
+		}
+	}
+
+	return nil
+}
+
+func loadConfigViper(filename string) (*viper.Viper, error) {
+	cfg := viper.New()
+	cfg.SetConfigFile(configPath(filename))
+	cfg.SetConfigType("yaml")
+	if err := cfg.ReadInConfig(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func watchConfigFile(cfg *viper.Viper, reload func()) {
+	cfg.OnConfigChange(func(e fsnotify.Event) {
+		slog.Info("config file changed", "file", filepath.Base(e.Name))
+		if reload != nil {
+			reload()
+		}
+	})
+	cfg.WatchConfig()
+}
+
+func applyBaseDefaults(cfg *viper.Viper) {
+	defaults := defaultBaseConfig()
+	cfg.SetDefault("server.port", defaults.Server.Port)
+	cfg.SetDefault("server.db_path", defaults.Server.DBPath)
+	cfg.SetDefault("auth.password_hash", defaults.Auth.PasswordHash)
+	cfg.SetDefault("auth.jwt_secret", defaults.Auth.JWTSecret)
+	cfg.SetDefault("auth.jwt_expire_hours", defaults.Auth.JWTExpireHours)
+	cfg.SetDefault("time_point_mode", defaults.TimePointMode)
+	cfg.SetDefault("ai.providers", defaults.AI.Providers)
+	cfg.SetDefault("mcp.enabled", defaults.MCP.Enabled)
+	cfg.SetDefault("mcp.port", defaults.MCP.Port)
+}
+
+func writeYAMLFile(path string, data interface{}) error {
+	content, err := yaml.Marshal(data)
+	if err != nil {
+		return err
+	}
+	if len(content) == 0 || content[len(content)-1] != '\n' {
+		content = append(content, '\n')
+	}
+	return os.WriteFile(path, content, 0644)
+}
+
+func configPath(filename string) string {
+	return filepath.Join(configDir, filename)
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+func defaultBaseConfig() baseFileConfig {
+	return baseFileConfig{
+		Server: serverConfig{
+			Port:   8080,
+			DBPath: "./data/lifelog.db",
+		},
+		Auth: authConfig{
+			PasswordHash:   "",
+			JWTSecret:      "change-me-to-a-random-string",
+			JWTExpireHours: 168,
+		},
+		TimePointMode: "end",
+		AI: aiProvidersConfig{
+			Providers: []model.AIProvider{},
+		},
+		MCP: mcpConfig{
+			Enabled: false,
+			Port:    8081,
+		},
 	}
 }
 
-func ensureConfigFile() {
-	configPath := filepath.Join(configDir, "config.yaml")
-	if info, err := os.Stat(configPath); err == nil && !info.IsDir() {
-		return
+func defaultCategoriesConfig() categoriesFileConfig {
+	return categoriesFileConfig{
+		Categories: []model.Category{
+			{
+				Name:  "工作",
+				Color: "#3b82f6",
+				Rules: []model.CategoryRule{
+					{Type: "fixed", Pattern: "开会"},
+					{Type: "fixed", Pattern: "写文档"},
+					{Type: "fixed", Pattern: "编程"},
+					{Type: "fixed", Pattern: "沟通"},
+					{Type: "fixed", Pattern: "汇报"},
+					{Type: "fixed", Pattern: "工单"},
+				},
+			},
+			{
+				Name:  "成长",
+				Color: "#10b981",
+				Rules: []model.CategoryRule{
+					{Type: "fixed", Pattern: "学习"},
+					{Type: "fixed", Pattern: "阅读"},
+					{Type: "fixed", Pattern: "课程"},
+					{Type: "fixed", Pattern: "健身"},
+					{Type: "fixed", Pattern: "考试"},
+				},
+			},
+			{
+				Name:  "休息",
+				Color: "#8b5cf6",
+				Rules: []model.CategoryRule{
+					{Type: "regex", Pattern: "^(睡觉|午睡)$"},
+					{Type: "fixed", Pattern: "午睡"},
+					{Type: "fixed", Pattern: "睡觉"},
+					{Type: "fixed", Pattern: "放松"},
+					{Type: "fixed", Pattern: "发呆"},
+				},
+			},
+			{
+				Name:  "交通",
+				Color: "#0ea5e9",
+				Rules: []model.CategoryRule{
+					{Type: "regex", Pattern: "^(步行|打车|地铁|公交|高铁|飞机|骑车)$"},
+					{Type: "fixed", Pattern: "步行"},
+					{Type: "fixed", Pattern: "飞机"},
+					{Type: "fixed", Pattern: "高铁"},
+					{Type: "fixed", Pattern: "打车"},
+					{Type: "fixed", Pattern: "骑车"},
+					{Type: "fixed", Pattern: "地铁"},
+					{Type: "fixed", Pattern: "开车"},
+					{Type: "fixed", Pattern: "通勤"},
+					{Type: "fixed", Pattern: "候机"},
+					{Type: "fixed", Pattern: "候车"},
+				},
+			},
+			{
+				Name:  "吃喝",
+				Color: "#f97316",
+				Rules: []model.CategoryRule{
+					{Type: "fixed", Pattern: "早饭"},
+					{Type: "fixed", Pattern: "晚饭"},
+					{Type: "fixed", Pattern: "午饭"},
+					{Type: "fixed", Pattern: "饭"},
+					{Type: "fixed", Pattern: "聚餐"},
+					{Type: "fixed", Pattern: "下午茶"},
+					{Type: "fixed", Pattern: "夜宵"},
+					{Type: "fixed", Pattern: "零食"},
+				},
+			},
+			{
+				Name:  "玩乐",
+				Color: "#ec4899",
+				Rules: []model.CategoryRule{
+					{Type: "fixed", Pattern: "游戏"},
+					{Type: "fixed", Pattern: "视频"},
+					{Type: "fixed", Pattern: "追剧"},
+					{Type: "fixed", Pattern: "逛街"},
+					{Type: "fixed", Pattern: "兴趣活动"},
+				},
+			},
+			{
+				Name:  "家务",
+				Color: "#78716c",
+				Rules: []model.CategoryRule{
+					{Type: "fixed", Pattern: "打扫"},
+					{Type: "fixed", Pattern: "洗衣"},
+					{Type: "fixed", Pattern: "收纳"},
+					{Type: "fixed", Pattern: "修理"},
+					{Type: "fixed", Pattern: "做饭"},
+				},
+			},
+		},
 	}
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		slog.Error("创建配置目录失败", "error", err, "dir", configDir)
-		os.Exit(1)
-	}
-	slog.Info("配置文件不存在，创建默认配置", "path", configPath)
-	if err := os.WriteFile(configPath, []byte(defaultConfigYAML), 0644); err != nil {
-		slog.Error("创建默认配置文件失败", "error", err)
-		os.Exit(1)
+}
+
+func defaultWebhookConfig() webhookFileConfig {
+	return webhookFileConfig{
+		Webhooks:      []model.Webhook{},
+		EventBindings: []model.EventBinding{},
 	}
 }
 
@@ -238,83 +336,113 @@ func loadCategories() {
 	defer mu.Unlock()
 
 	var cats []model.Category
-	if err := viper.UnmarshalKey("categories", &cats); err != nil {
-		slog.Error("解析大类配置失败", "error", err)
+	if err := categoriesViper.UnmarshalKey("categories", &cats); err != nil {
+		slog.Error("failed to parse categories config", "error", err)
 		return
 	}
+
 	categories = cats
-	slog.Info("大类配置已加载", "count", len(categories))
+	slog.Info("categories config loaded", "count", len(categories))
 }
 
-// GetCategories 获取当前大类配置（并发安全）
+// GetCategories returns the current category rules.
 func GetCategories() []model.Category {
 	mu.RLock()
 	defer mu.RUnlock()
+
 	result := make([]model.Category, len(categories))
 	copy(result, categories)
 	return result
 }
 
-// GetPort 获取服务端口
+// GetPort returns the HTTP server port.
 func GetPort() int {
-	return viper.GetInt("server.port")
+	if port, ok := envInt("LIFELOG_SERVER_PORT"); ok && port > 0 {
+		return port
+	}
+	port := baseViper.GetInt("server.port")
+	if port <= 0 {
+		return defaultBaseConfig().Server.Port
+	}
+	return port
 }
 
-// GetDBPath 获取数据库路径
+// GetDBPath returns the sqlite database path.
 func GetDBPath() string {
-	return viper.GetString("server.db_path")
+	if dbPath, ok := envString("LIFELOG_SERVER_DB_PATH"); ok && dbPath != "" {
+		return dbPath
+	}
+	dbPath := strings.TrimSpace(baseViper.GetString("server.db_path"))
+	if dbPath == "" {
+		return defaultBaseConfig().Server.DBPath
+	}
+	return dbPath
 }
 
-// GetTimePointMode 获取时间点模式 ("end" 或 "start")
+// GetTimePointMode returns start or end mode.
 func GetTimePointMode() string {
-	mode := viper.GetString("time_point_mode")
+	mode := strings.TrimSpace(baseViper.GetString("time_point_mode"))
+	if envMode, ok := envString("LIFELOG_TIME_POINT_MODE"); ok {
+		mode = envMode
+	}
 	if mode != "start" {
 		return "end"
 	}
 	return "start"
 }
 
-// GetJWTSecret 获取 JWT 密钥
+// GetJWTSecret returns the JWT secret.
 func GetJWTSecret() string {
-	return viper.GetString("auth.jwt_secret")
-}
-
-// GetJWTExpireHours 获取 JWT 过期时间（小时）
-func GetJWTExpireHours() int {
-	h := viper.GetInt("auth.jwt_expire_hours")
-	if h <= 0 {
-		return 168
+	if secret, ok := envString("LIFELOG_AUTH_JWT_SECRET"); ok {
+		return secret
 	}
-	return h
+	return baseViper.GetString("auth.jwt_secret")
 }
 
-// GetPasswordHash 获取密码 hash
+// GetJWTExpireHours returns JWT expiry hours.
+func GetJWTExpireHours() int {
+	if hours, ok := envInt("LIFELOG_AUTH_JWT_EXPIRE_HOURS"); ok {
+		if hours > 0 {
+			return hours
+		}
+		return defaultBaseConfig().Auth.JWTExpireHours
+	}
+	hours := baseViper.GetInt("auth.jwt_expire_hours")
+	if hours <= 0 {
+		return defaultBaseConfig().Auth.JWTExpireHours
+	}
+	return hours
+}
+
+// GetPasswordHash returns the stored password hash.
 func GetPasswordHash() string {
-	return viper.GetString("auth.password_hash")
+	if hash, ok := envString("LIFELOG_AUTH_PASSWORD_HASH"); ok {
+		return hash
+	}
+	return baseViper.GetString("auth.password_hash")
 }
 
-// SetPasswordHash 写入密码 hash 到配置文件
+// SetPasswordHash persists the password hash into config.yaml.
 func SetPasswordHash(hash string) error {
-	viper.Set("auth.password_hash", hash)
-	return viper.WriteConfig()
+	baseViper.Set("auth.password_hash", hash)
+	return baseViper.WriteConfig()
 }
 
-// SetTimePointMode 设置时间点模式并写入配置文件（热重载生效）
+// SetTimePointMode persists the time point mode into config.yaml.
 func SetTimePointMode(mode string) error {
 	if mode != "start" && mode != "end" {
 		mode = "end"
 	}
-	viper.Set("time_point_mode", mode)
-	return viper.WriteConfig()
+	baseViper.Set("time_point_mode", mode)
+	return baseViper.WriteConfig()
 }
 
-// SetCategoriesConfig 设置分类规则并写入配置文件（热重载生效）
+// SetCategoriesConfig persists category rules into categories.yaml.
 func SetCategoriesConfig(cats []model.Category) error {
-	viper.Set("categories", cats)
-	if err := viper.WriteConfig(); err != nil {
+	categoriesViper.Set("categories", cats)
+	if err := categoriesViper.WriteConfig(); err != nil {
 		return err
 	}
-	// 主动触发重新加载
 	loadCategories()
 	return nil
 }
@@ -324,37 +452,40 @@ func loadAIProviders() {
 	defer mu.Unlock()
 
 	var providers []model.AIProvider
-	if err := viper.UnmarshalKey("ai.providers", &providers); err != nil {
-		slog.Error("解析AI配置失败", "error", err)
+	if err := baseViper.UnmarshalKey("ai.providers", &providers); err != nil {
+		slog.Error("failed to parse ai config", "error", err)
 		return
 	}
+
 	aiProviders = providers
-	slog.Info("AI配置已加载", "count", len(aiProviders))
+	slog.Info("ai config loaded", "count", len(aiProviders))
 }
 
-// GetAIProviders 获取AI服务提供商列表（并发安全）
+// GetAIProviders returns all configured AI providers.
 func GetAIProviders() []model.AIProvider {
 	mu.RLock()
 	defer mu.RUnlock()
+
 	result := make([]model.AIProvider, len(aiProviders))
 	copy(result, aiProviders)
 	return result
 }
 
-// SetAIProviders 设置AI服务提供商并写入配置文件
+// SetAIProviders persists AI providers into config.yaml.
 func SetAIProviders(providers []model.AIProvider) error {
-	viper.Set("ai.providers", providers)
-	if err := viper.WriteConfig(); err != nil {
+	baseViper.Set("ai.providers", providers)
+	if err := baseViper.WriteConfig(); err != nil {
 		return err
 	}
 	loadAIProviders()
 	return nil
 }
 
-// GetDefaultAIProvider 获取默认AI服务提供商
+// GetDefaultAIProvider returns the default provider or the first configured provider.
 func GetDefaultAIProvider() *model.AIProvider {
 	mu.RLock()
 	defer mu.RUnlock()
+
 	for _, p := range aiProviders {
 		if p.Default {
 			cp := p
@@ -368,21 +499,30 @@ func GetDefaultAIProvider() *model.AIProvider {
 	return nil
 }
 
-// GetMCPEnabled 获取MCP是否启用
+// GetMCPEnabled returns whether the MCP server is enabled.
 func GetMCPEnabled() bool {
-	return viper.GetBool("mcp.enabled")
-}
-
-// GetMCPPort 获取MCP服务端口
-func GetMCPPort() int {
-	p := viper.GetInt("mcp.port")
-	if p <= 0 {
-		return 8081
+	if enabled, ok := envBool("LIFELOG_MCP_ENABLED"); ok {
+		return enabled
 	}
-	return p
+	return baseViper.GetBool("mcp.enabled")
 }
 
-// GetMCPConfig 获取MCP配置
+// GetMCPPort returns the MCP server port.
+func GetMCPPort() int {
+	if port, ok := envInt("LIFELOG_MCP_PORT"); ok {
+		if port > 0 {
+			return port
+		}
+		return defaultBaseConfig().MCP.Port
+	}
+	port := baseViper.GetInt("mcp.port")
+	if port <= 0 {
+		return defaultBaseConfig().MCP.Port
+	}
+	return port
+}
+
+// GetMCPConfig returns the MCP config for API responses.
 func GetMCPConfig() map[string]interface{} {
 	return map[string]interface{}{
 		"enabled": GetMCPEnabled(),
@@ -390,18 +530,18 @@ func GetMCPConfig() map[string]interface{} {
 	}
 }
 
-// SetMCPConfig 设置MCP配置（需重启生效）
+// SetMCPConfig persists MCP settings into config.yaml.
 func SetMCPConfig(enabled *bool, port *int) error {
 	if enabled != nil {
-		viper.Set("mcp.enabled", *enabled)
+		baseViper.Set("mcp.enabled", *enabled)
 	}
 	if port != nil && *port > 0 {
-		viper.Set("mcp.port", *port)
+		baseViper.Set("mcp.port", *port)
 	}
-	return viper.WriteConfig()
+	return baseViper.WriteConfig()
 }
 
-// GetServerConfig 获取服务器配置（端口、数据库路径）
+// GetServerConfig returns the current server config for API responses.
 func GetServerConfig() map[string]interface{} {
 	return map[string]interface{}{
 		"port":    GetPort(),
@@ -409,28 +549,66 @@ func GetServerConfig() map[string]interface{} {
 	}
 }
 
-// GetAuthConfig 获取认证配置（不含密码哈希）
+// GetAuthConfig returns the auth config exposed by the API.
 func GetAuthConfig() map[string]interface{} {
 	return map[string]interface{}{
 		"jwt_expire_hours": GetJWTExpireHours(),
 	}
 }
 
-// SetServerConfig 设置服务器配置（需重启生效）
+// SetServerConfig persists server settings into config.yaml.
 func SetServerConfig(port int, dbPath string) error {
 	if port > 0 {
-		viper.Set("server.port", port)
+		baseViper.Set("server.port", port)
 	}
 	if dbPath != "" {
-		viper.Set("server.db_path", dbPath)
+		baseViper.Set("server.db_path", dbPath)
 	}
-	return viper.WriteConfig()
+	return baseViper.WriteConfig()
 }
 
-// SetAuthConfig 设置认证配置
+// SetAuthConfig persists auth settings into config.yaml.
 func SetAuthConfig(jwtExpireHours int) error {
 	if jwtExpireHours > 0 {
-		viper.Set("auth.jwt_expire_hours", jwtExpireHours)
+		baseViper.Set("auth.jwt_expire_hours", jwtExpireHours)
 	}
-	return viper.WriteConfig()
+	return baseViper.WriteConfig()
+}
+
+func envString(key string) (string, bool) {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		return "", false
+	}
+	return strings.TrimSpace(value), true
+}
+
+func envInt(key string) (int, bool) {
+	raw, ok := envString(key)
+	if !ok || raw == "" {
+		return 0, false
+	}
+
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		slog.Warn("ignoring invalid integer env override", "env", key, "value", raw, "error", err)
+		return 0, false
+	}
+
+	return value, true
+}
+
+func envBool(key string) (bool, bool) {
+	raw, ok := envString(key)
+	if !ok || raw == "" {
+		return false, false
+	}
+
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		slog.Warn("ignoring invalid boolean env override", "env", key, "value", raw, "error", err)
+		return false, false
+	}
+
+	return value, true
 }
