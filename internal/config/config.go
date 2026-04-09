@@ -428,6 +428,20 @@ func SetPasswordHash(hash string) error {
 	return baseViper.WriteConfig()
 }
 
+// SetAuthBackupConfig persists auth settings from backup import into config.yaml.
+func SetAuthBackupConfig(passwordHash, jwtSecret *string, jwtExpireHours *int) error {
+	if passwordHash != nil {
+		baseViper.Set("auth.password_hash", *passwordHash)
+	}
+	if jwtSecret != nil {
+		baseViper.Set("auth.jwt_secret", *jwtSecret)
+	}
+	if jwtExpireHours != nil && *jwtExpireHours > 0 {
+		baseViper.Set("auth.jwt_expire_hours", *jwtExpireHours)
+	}
+	return baseViper.WriteConfig()
+}
+
 // SetTimePointMode persists the time point mode into config.yaml.
 func SetTimePointMode(mode string) error {
 	if mode != "start" && mode != "end" {

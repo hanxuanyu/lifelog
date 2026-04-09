@@ -126,6 +126,19 @@ export interface UpdateSettingsResponse {
   need_restart: boolean
 }
 
+export type ImportConfigType = "basic" | "auth" | "ai" | "categories" | "webhooks"
+
+export interface ImportDataResult {
+  logs_imported?: number
+  logs_skipped?: number
+  logs_total?: number
+  config_imported?: boolean
+  config_imported_types?: ImportConfigType[]
+  config_need_restart?: boolean
+  config_error?: string
+  config_errors?: string[]
+}
+
 export interface AIProvider {
   name: string
   endpoint: string

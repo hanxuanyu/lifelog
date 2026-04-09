@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -27,15 +28,49 @@ type exportData struct {
 // exportConfig 导出配置的结构
 type exportConfig struct {
 	TimePointMode string               `json:"time_point_mode"`
+	Server        exportServerConfig   `json:"server"`
+	Auth          exportAuthConfig     `json:"auth"`
+	AI            exportAIConfig       `json:"ai"`
 	Categories    []model.Category     `json:"categories"`
-	Webhooks      []model.Webhook      `json:"webhooks,omitempty"`
-	EventBindings []model.EventBinding `json:"event_bindings,omitempty"`
+	Webhooks      []model.Webhook      `json:"webhooks"`
+	EventBindings []model.EventBinding `json:"event_bindings"`
+	MCP           exportMCPConfig      `json:"mcp"`
 }
 
-// importRequest 导入请求参数
-type importRequest struct {
-	MergeLogs    bool `json:"merge_logs"`    // true: 合并, false: 替换
-	ImportConfig bool `json:"import_config"` // 是否导入配置
+type exportServerConfig struct {
+	Port   int    `json:"port"`
+	DBPath string `json:"db_path"`
+}
+
+type exportAuthConfig struct {
+	PasswordHash   string `json:"password_hash"`
+	JWTSecret      string `json:"jwt_secret"`
+	JWTExpireHours int    `json:"jwt_expire_hours"`
+}
+
+type exportAIConfig struct {
+	Providers []model.AIProvider `json:"providers"`
+}
+
+type exportMCPConfig struct {
+	Enabled bool `json:"enabled"`
+	Port    int  `json:"port"`
+}
+
+const (
+	importConfigBasic      = "basic"
+	importConfigAuth       = "auth"
+	importConfigAI         = "ai"
+	importConfigCategories = "categories"
+	importConfigWebhooks   = "webhooks"
+)
+
+var allImportConfigTypes = []string{
+	importConfigBasic,
+	importConfigAuth,
+	importConfigAI,
+	importConfigCategories,
+	importConfigWebhooks,
 }
 
 // ExportData 导出全量数据和配置到 zip
@@ -61,9 +96,25 @@ func ExportData(c *gin.Context) {
 
 	cfg := exportConfig{
 		TimePointMode: config.GetTimePointMode(),
+		Server: exportServerConfig{
+			Port:   config.GetPort(),
+			DBPath: config.GetDBPath(),
+		},
+		Auth: exportAuthConfig{
+			PasswordHash:   config.GetPasswordHash(),
+			JWTSecret:      config.GetJWTSecret(),
+			JWTExpireHours: config.GetJWTExpireHours(),
+		},
+		AI: exportAIConfig{
+			Providers: config.GetAIProviders(),
+		},
 		Categories:    config.GetCategories(),
 		Webhooks:      config.GetWebhooks(),
 		EventBindings: config.GetEventBindings(),
+		MCP: exportMCPConfig{
+			Enabled: config.GetMCPEnabled(),
+			Port:    config.GetMCPPort(),
+		},
 	}
 
 	// 创建 zip
@@ -122,11 +173,19 @@ func ExportData(c *gin.Context) {
 // @Param file formData file true "导出的 zip 文件"
 // @Param merge_logs formData bool false "是否合并日志（true=合并，false=替换）"
 // @Param import_config formData bool false "是否导入配置"
+// @Param import_config_types formData []string false "导入的配置类型，可选：basic/auth/ai/categories/webhooks"
 // @Success 200 {object} model.Response
 // @Router /api/data/import [post]
 func ImportData(c *gin.Context) {
 	mergeLogs := c.PostForm("merge_logs") == "true"
 	importConfig := c.PostForm("import_config") == "true"
+	selectedConfigTypes := normalizeImportConfigTypes(c.PostFormArray("import_config_types"))
+	if len(selectedConfigTypes) > 0 {
+		importConfig = true
+	}
+	if importConfig && len(selectedConfigTypes) == 0 {
+		selectedConfigTypes = append([]string(nil), allImportConfigTypes...)
+	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -252,24 +311,91 @@ func ImportData(c *gin.Context) {
 	}
 
 	// 处理配置导入
-	if importConfig && cfgData != nil {
-		if err := config.SetTimePointMode(cfgData.TimePointMode); err != nil {
-			result["config_error"] = "设置时间模式失败: " + err.Error()
-		}
-		if err := config.SetCategoriesConfig(cfgData.Categories); err != nil {
-			result["config_error"] = "设置分类规则失败: " + err.Error()
-		}
-		if len(cfgData.Webhooks) > 0 {
-			if err := config.SetWebhooks(cfgData.Webhooks); err != nil {
-				result["config_error"] = "导入 Webhook 失败: " + err.Error()
+	if importConfig {
+		if cfgData == nil {
+			result["config_errors"] = []string{"zip 中未找到 config.json，无法导入配置"}
+		} else {
+			importedTypes := make([]string, 0, len(selectedConfigTypes))
+			configErrors := make([]string, 0)
+			needRestart := false
+
+			for _, configType := range selectedConfigTypes {
+				switch configType {
+				case importConfigBasic:
+					if err := config.SetTimePointMode(cfgData.TimePointMode); err != nil {
+						configErrors = append(configErrors, "设置时间模式失败: "+err.Error())
+						break
+					}
+					if err := config.SetServerConfig(cfgData.Server.Port, cfgData.Server.DBPath); err != nil {
+						configErrors = append(configErrors, "导入服务器配置失败: "+err.Error())
+						break
+					}
+					if err := config.SetMCPConfig(&cfgData.MCP.Enabled, &cfgData.MCP.Port); err != nil {
+						configErrors = append(configErrors, "导入 MCP 配置失败: "+err.Error())
+						break
+					}
+					importedTypes = append(importedTypes, configType)
+					needRestart = true
+				case importConfigAuth:
+					if err := config.SetAuthBackupConfig(&cfgData.Auth.PasswordHash, &cfgData.Auth.JWTSecret, &cfgData.Auth.JWTExpireHours); err != nil {
+						configErrors = append(configErrors, "导入认证配置失败: "+err.Error())
+						break
+					}
+					importedTypes = append(importedTypes, configType)
+					needRestart = true
+				case importConfigAI:
+					providers := cfgData.AI.Providers
+					if providers == nil {
+						providers = []model.AIProvider{}
+					}
+					if err := config.SetAIProviders(providers); err != nil {
+						configErrors = append(configErrors, "导入 AI 配置失败: "+err.Error())
+						break
+					}
+					importedTypes = append(importedTypes, configType)
+				case importConfigCategories:
+					categories := cfgData.Categories
+					if categories == nil {
+						categories = []model.Category{}
+					}
+					if err := config.SetCategoriesConfig(categories); err != nil {
+						configErrors = append(configErrors, "设置分类规则失败: "+err.Error())
+						break
+					}
+					importedTypes = append(importedTypes, configType)
+				case importConfigWebhooks:
+					webhooks := cfgData.Webhooks
+					if webhooks == nil {
+						webhooks = []model.Webhook{}
+					}
+					if err := config.SetWebhooks(webhooks); err != nil {
+						configErrors = append(configErrors, "导入 Webhook 失败: "+err.Error())
+						break
+					}
+					bindings := cfgData.EventBindings
+					if bindings == nil {
+						bindings = []model.EventBinding{}
+					}
+					if err := config.SetEventBindings(bindings); err != nil {
+						configErrors = append(configErrors, "导入事件绑定失败: "+err.Error())
+						break
+					}
+					importedTypes = append(importedTypes, configType)
+				}
+			}
+
+			if len(importedTypes) > 0 {
+				result["config_imported"] = true
+				result["config_imported_types"] = importedTypes
+			}
+			if len(configErrors) > 0 {
+				result["config_errors"] = configErrors
+				result["config_error"] = strings.Join(configErrors, "；")
+			}
+			if needRestart {
+				result["config_need_restart"] = true
 			}
 		}
-		if len(cfgData.EventBindings) > 0 {
-			if err := config.SetEventBindings(cfgData.EventBindings); err != nil {
-				result["config_error"] = "导入事件绑定失败: " + err.Error()
-			}
-		}
-		result["config_imported"] = true
 	}
 
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "导入完成", Data: result})
@@ -279,4 +405,36 @@ func ImportData(c *gin.Context) {
 		"logs_skipped":  fmt.Sprintf("%v", result["logs_skipped"]),
 		"timestamp":     time.Now().Format(time.RFC3339),
 	})
+}
+
+func normalizeImportConfigTypes(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	allowed := make(map[string]struct{}, len(allImportConfigTypes))
+	for _, item := range allImportConfigTypes {
+		allowed[item] = struct{}{}
+	}
+
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, raw := range values {
+		for _, item := range strings.Split(raw, ",") {
+			name := strings.TrimSpace(item)
+			if name == "" {
+				continue
+			}
+			if _, ok := allowed[name]; !ok {
+				continue
+			}
+			if _, exists := seen[name]; exists {
+				continue
+			}
+			seen[name] = struct{}{}
+			result = append(result, name)
+		}
+	}
+
+	return result
 }

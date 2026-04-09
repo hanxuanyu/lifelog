@@ -6,6 +6,8 @@ import type {
   PageResult,
   Category,
   DailyStatistics,
+  ImportConfigType,
+  ImportDataResult,
   PeriodStatistics,
   TrendStatistics,
   Settings,
@@ -171,18 +173,13 @@ export async function exportData() {
   URL.revokeObjectURL(url)
 }
 
-export async function importData(file: File, mergeLogs: boolean, importConfig: boolean) {
+export async function importData(file: File, mergeLogs: boolean, importConfigTypes: ImportConfigType[]) {
   const form = new FormData()
   form.append("file", file)
   form.append("merge_logs", String(mergeLogs))
-  form.append("import_config", String(importConfig))
-  const res = await http.post<ApiResponse<{
-    logs_imported?: number
-    logs_skipped?: number
-    logs_total?: number
-    config_imported?: boolean
-    config_error?: string
-  }>>("/data/import", form, {
+  form.append("import_config", String(importConfigTypes.length > 0))
+  importConfigTypes.forEach((type) => form.append("import_config_types", type))
+  const res = await http.post<ApiResponse<ImportDataResult>>("/data/import", form, {
     headers: { "Content-Type": "multipart/form-data" },
     timeout: 60000,
   })
