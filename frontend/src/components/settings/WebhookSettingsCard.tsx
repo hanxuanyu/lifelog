@@ -83,16 +83,16 @@ export function WebhookSettingsCard() {
               {webhooks.map(wh => {
                 const boundEvents = getBoundEvents(wh.name)
                 return (
-                  <div key={wh.name} className="flex items-center justify-between p-2 rounded-md border text-sm">
-                    <div className="flex items-center gap-2 min-w-0">
+                  <div key={wh.name} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between p-2 rounded-md border text-sm">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
                       <Badge variant="secondary" className="text-xs shrink-0">{wh.method}</Badge>
                       <span className="font-medium shrink-0">{wh.name}</span>
-                      <span className="text-muted-foreground truncate text-xs">{wh.url}</span>
+                      <span className="text-muted-foreground truncate text-xs max-w-[200px] sm:max-w-none">{wh.url}</span>
                       {boundEvents.length > 0 && (
                         <Badge variant="outline" className="text-[10px] shrink-0">{boundEvents.length} 个绑定</Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <div className="flex items-center gap-1 shrink-0 self-end sm:self-auto sm:ml-2">
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleTest(wh.name)} disabled={testing === wh.name} title="测试">
                         <Play className="h-3.5 w-3.5" />
                       </Button>
