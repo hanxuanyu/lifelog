@@ -2,8 +2,13 @@ import { useMemo, useEffect, useRef } from "react"
 import MarkdownIt from "markdown-it"
 import taskLists from "markdown-it-task-lists"
 
-const md = MarkdownIt({ html: true, linkify: true, typographer: true })
-  .use(taskLists, { enabled: false, label: true, labelAfter: true })
+function createMarkdownRenderer(breaks = false) {
+  return MarkdownIt({ html: true, linkify: true, typographer: true, breaks })
+    .use(taskLists, { enabled: false, label: true, labelAfter: true })
+}
+
+const md = createMarkdownRenderer()
+const mdWithBreaks = createMarkdownRenderer(true)
 
 // Sanitize: strip dangerous tags but keep safe inline formatting tags
 const ALLOWED_TAGS = new Set(["em", "strong", "u", "s", "del", "code", "br", "sub", "sup", "mark"])
@@ -29,10 +34,14 @@ function sanitizeHtml(html: string): string {
 interface MarkdownRendererProps {
   content: string
   className?: string
+  preserveLineBreaks?: boolean
 }
 
-export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
-  const html = useMemo(() => sanitizeHtml(md.render(content)), [content])
+export function MarkdownRenderer({ content, className, preserveLineBreaks = false }: MarkdownRendererProps) {
+  const html = useMemo(
+    () => sanitizeHtml((preserveLineBreaks ? mdWithBreaks : md).render(content)),
+    [content, preserveLineBreaks],
+  )
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
