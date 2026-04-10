@@ -246,7 +246,7 @@ export function StatisticsPage() {
                   </TabsContent>
 
                   {/* AI Summary Tab */}
-                  <TabsContent value="ai" className="mt-0">
+                  <TabsContent value="ai" className="mt-0 h-[calc(100dvh-10.5rem)] min-h-[420px] overflow-hidden">
                     <AISummaryChat />
                   </TabsContent>
                 </>

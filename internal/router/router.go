@@ -16,8 +16,8 @@ import (
 
 // Setup 注册所有路由
 func Setup(r *gin.Engine, staticFS fs.FS) {
-	// Gzip 压缩中间件
-	r.Use(gzip.Gzip(gzip.DefaultCompression))
+	// Gzip 压缩中间件；SSE 流式接口需要跳过压缩，否则可能被缓冲后一次性返回
+	r.Use(gzip.Gzip(gzip.DefaultCompression, gzip.WithExcludedPaths([]string{"/api/ai/chat"})))
 	// Swagger 文档
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
