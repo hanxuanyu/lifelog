@@ -1,6 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Clock, Play, RotateCcw, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react"
+import {
+  Clock,
+  Play,
+  RotateCcw,
+  ChevronDown,
+  ChevronRight,
+  AlertTriangle,
+  Check,
+  Loader2,
+} from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,56 +25,111 @@ function formatNextRun(ts?: string): string {
     const d = new Date(ts)
     if (isNaN(d.getTime())) return ""
     return d.toLocaleString()
-  } catch { return "" }
+  } catch {
+    return ""
+  }
 }
 
 export function ScheduledTasksCard() {
   const [tasks, setTasks] = useState<ScheduledTaskInfo[]>([])
+  const [draftCrons, setDraftCrons] = useState<Record<string, string>>({})
   const [running, setRunning] = useState<string | null>(null)
+  const [savingCron, setSavingCron] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const load = () => {
-    getScheduledTasks()
-      .then((list) => setTasks(list || []))
-      .catch(() => toast.error("加载定时任务失败"))
-  }
+  const syncTasks = useCallback((next: ScheduledTaskInfo[], clearedDrafts: string[] = []) => {
+    setTasks(next)
+    setDraftCrons((prev) => {
+      const cronByName = new Map(next.map((task) => [task.name, task.cron]))
+      const cleared = new Set(clearedDrafts)
+      let changed = false
+      const filtered: Record<string, string> = {}
 
-  useEffect(() => { load() }, [])
-
-  const persist = useCallback(async (next: ScheduledTaskInfo[]) => {
-    try {
-      const payload = next.map(t => ({ name: t.name, cron: t.cron, enabled: t.enabled }))
-      const res = await updateScheduledTasks(payload)
-      if (res.data) {
-        setTasks(res.data)
+      for (const [name, cron] of Object.entries(prev)) {
+        const savedCron = cronByName.get(name)
+        const keep = savedCron !== undefined && savedCron !== cron && !cleared.has(name)
+        if (keep) {
+          filtered[name] = cron
+        } else {
+          changed = true
+        }
       }
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "保存失败"
-      toast.error("保存失败", { description: msg })
-      load()
-    }
+
+      return changed ? filtered : prev
+    })
   }, [])
 
+  const load = useCallback(() => {
+    getScheduledTasks()
+      .then((list) => syncTasks(list || []))
+      .catch(() => toast.error("加载定时任务失败"))
+  }, [syncTasks])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const persist = useCallback(async (
+    next: ScheduledTaskInfo[],
+    options?: { reloadOnError?: boolean; clearedDrafts?: string[] },
+  ) => {
+    try {
+      const payload = next.map((task) => ({
+        name: task.name,
+        cron: task.cron,
+        enabled: task.enabled,
+      }))
+      const res = await updateScheduledTasks(payload)
+      if (res.data) {
+        syncTasks(res.data, options?.clearedDrafts)
+      }
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "保存失败"
+      toast.error("保存失败", { description: msg })
+      if (options?.reloadOnError !== false) {
+        void load()
+      }
+    }
+  }, [load, syncTasks])
+
   const toggleEnabled = (name: string, val: boolean) => {
-    const next = tasks.map(t => t.name === name ? { ...t, enabled: val } : t)
+    const next = tasks.map((task) => task.name === name ? { ...task, enabled: val } : task)
     setTasks(next)
-    persist(next)
+    void persist(next)
   }
 
   const updateCron = (name: string, cron: string) => {
-    const next = tasks.map(t => t.name === name ? { ...t, cron } : t)
-    setTasks(next)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => persist(next), 800)
+    const savedCron = tasks.find((task) => task.name === name)?.cron
+    setDraftCrons((prev) => {
+      if (savedCron === undefined || cron === savedCron) {
+        if (!(name in prev)) return prev
+        const next = { ...prev }
+        delete next[name]
+        return next
+      }
+      return { ...prev, [name]: cron }
+    })
   }
 
   const resetToDefault = (name: string) => {
-    const task = tasks.find(t => t.name === name)
-    if (!task || task.cron === task.default_cron) return
-    const next = tasks.map(t => t.name === name ? { ...t, cron: t.default_cron } : t)
-    setTasks(next)
-    persist(next)
+    const task = tasks.find((item) => item.name === name)
+    if (!task) return
+    updateCron(name, task.default_cron)
+  }
+
+  const saveCron = async (name: string) => {
+    const task = tasks.find((item) => item.name === name)
+    const cron = draftCrons[name]
+    if (!task || cron === undefined || cron === task.cron) return
+
+    setSavingCron(name)
+    try {
+      const next = tasks.map((item) => item.name === name ? { ...item, cron } : item)
+      await persist(next, { reloadOnError: false, clearedDrafts: [name] })
+    } finally {
+      setSavingCron((current) => current === name ? null : current)
+    }
   }
 
   const handleRun = async (name: string) => {
@@ -73,12 +137,15 @@ export function ScheduledTasksCard() {
     try {
       await runScheduledTask(name)
       toast.success("任务已触发，将异步执行")
-    } catch { toast.error("触发失败") }
-    finally { setRunning(null) }
+    } catch {
+      toast.error("触发失败")
+    } finally {
+      setRunning(null)
+    }
   }
 
   const toggleExpand = (name: string) => {
-    setExpanded(prev => {
+    setExpanded((prev) => {
       const next = new Set(prev)
       if (next.has(name)) next.delete(name)
       else next.add(name)
@@ -101,12 +168,14 @@ export function ScheduledTasksCard() {
           {tasks.length === 0 ? (
             <div className="text-sm text-muted-foreground text-center py-4">暂无定时任务</div>
           ) : (
-            tasks.map(task => {
+            tasks.map((task) => {
               const isExpanded = expanded.has(task.name)
+              const cronValue = draftCrons[task.name] ?? task.cron
+              const cronDirty = cronValue !== task.cron
               const unbound = task.enabled && task.bound_webhook_count === 0
+
               return (
                 <div key={task.name} className={`border rounded-md overflow-hidden ${unbound ? "border-amber-500/50" : ""}`}>
-                  {/* 折叠头部 */}
                   <div
                     className={`flex items-center gap-2 p-2.5 cursor-pointer hover:bg-muted/50 transition-colors ${unbound ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`}
                     onClick={() => toggleExpand(task.name)}
@@ -124,9 +193,11 @@ export function ScheduledTasksCard() {
                     <Badge variant={task.enabled ? "secondary" : "outline"} className="text-[10px] shrink-0">
                       {task.enabled ? "启用" : "停用"}
                     </Badge>
-                    <Badge variant="outline" className="text-[10px] font-mono shrink-0">{task.cron}</Badge>
+                    <Badge variant="outline" className="text-[10px] font-mono shrink-0">
+                      {cronValue}
+                    </Badge>
                   </div>
-                  {/* 折叠内容 */}
+
                   <AnimatePresence initial={false}>
                     {isExpanded && (
                       <motion.div
@@ -140,12 +211,18 @@ export function ScheduledTasksCard() {
                           {unbound && (
                             <div className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
                               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                              <span>任务已启用但未绑定 Webhook，执行时将跳过。请在上方「事件绑定」中将 <span className="font-mono">{task.event_name}</span> 绑定到 Webhook。</span>
+                              <span>
+                                任务已启用但未绑定 Webhook，执行时将跳过。请在上方“事件绑定”中将
+                                <span className="font-mono">{task.event_name}</span>
+                                绑定到 Webhook。
+                              </span>
                             </div>
                           )}
+
                           <div className="flex items-center justify-between gap-2">
                             <div className="text-xs text-muted-foreground min-w-0">
-                              <span>事件：</span><span className="font-mono">{task.event_name}</span>
+                              <span>事件：</span>
+                              <span className="font-mono">{task.event_name}</span>
                               {task.next_run && task.enabled && (
                                 <span className="ml-2">| 下次执行：{formatNextRun(task.next_run)}</span>
                               )}
@@ -153,12 +230,11 @@ export function ScheduledTasksCard() {
                             <div className="flex items-center gap-2 shrink-0">
                               <Switch
                                 checked={task.enabled}
-                                onCheckedChange={(v) => toggleEnabled(task.name, v)}
+                                onCheckedChange={(value) => toggleEnabled(task.name, value)}
                               />
                               <Button
                                 variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0"
+                                size="icon-sm"
                                 title="手动执行"
                                 onClick={() => handleRun(task.name)}
                                 disabled={running === task.name}
@@ -167,19 +243,36 @@ export function ScheduledTasksCard() {
                               </Button>
                             </div>
                           </div>
+
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground shrink-0">Cron</span>
                             <Input
-                              value={task.cron}
+                              value={cronValue}
                               onChange={(e) => updateCron(task.name, e.target.value)}
                               placeholder="分 时 日 月 周"
                               className="h-7 text-xs font-mono"
                             />
-                            {task.cron !== task.default_cron && (
+                            {cronDirty && (
                               <Button
                                 variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0 shrink-0"
+                                size="icon-sm"
+                                className="shrink-0 text-emerald-600 hover:text-emerald-700"
+                                title="保存 Cron"
+                                aria-label={`保存 ${task.description} 的 Cron`}
+                                onClick={() => saveCron(task.name)}
+                                disabled={savingCron === task.name}
+                              >
+                                {savingCron === task.name
+                                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  : <Check className="h-3.5 w-3.5" />
+                                }
+                              </Button>
+                            )}
+                            {cronValue !== task.default_cron && (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                className="shrink-0"
                                 title={`恢复默认: ${task.default_cron}`}
                                 onClick={() => resetToDefault(task.name)}
                               >
