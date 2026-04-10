@@ -17,7 +17,7 @@ type DailyReportTask struct{}
 
 func (t *DailyReportTask) Name() string        { return "daily_report" }
 func (t *DailyReportTask) Description() string { return "每日日报生成" }
-func (t *DailyReportTask) DefaultCron() string { return "0 22 * * *" }
+func (t *DailyReportTask) DefaultCron() string { return "0 0 22 * * *" }
 func (t *DailyReportTask) EventName() string   { return "task.daily_report" }
 
 func (t *DailyReportTask) Execute() (map[string]string, error) {
@@ -36,7 +36,7 @@ type WeeklyReportTask struct{}
 
 func (t *WeeklyReportTask) Name() string        { return "weekly_report" }
 func (t *WeeklyReportTask) Description() string { return "每周周报生成" }
-func (t *WeeklyReportTask) DefaultCron() string { return "0 10 * * 1" }
+func (t *WeeklyReportTask) DefaultCron() string { return "0 0 10 * * 1" }
 func (t *WeeklyReportTask) EventName() string   { return "task.weekly_report" }
 
 func (t *WeeklyReportTask) Execute() (map[string]string, error) {
@@ -56,7 +56,7 @@ type MonthlyReportTask struct{}
 
 func (t *MonthlyReportTask) Name() string        { return "monthly_report" }
 func (t *MonthlyReportTask) Description() string { return "每月月报生成" }
-func (t *MonthlyReportTask) DefaultCron() string { return "0 10 1 * *" }
+func (t *MonthlyReportTask) DefaultCron() string { return "0 0 10 1 * *" }
 func (t *MonthlyReportTask) EventName() string   { return "task.monthly_report" }
 
 func (t *MonthlyReportTask) Execute() (map[string]string, error) {
@@ -83,7 +83,7 @@ const noLogReminderThresholdHours = 4.0
 
 func (t *NoLogReminderTask) Name() string        { return "no_log_reminder" }
 func (t *NoLogReminderTask) Description() string { return "长时间未记录日志提醒" }
-func (t *NoLogReminderTask) DefaultCron() string { return "0 */2 * * *" }
+func (t *NoLogReminderTask) DefaultCron() string { return "0 0 */2 * * *" }
 func (t *NoLogReminderTask) EventName() string   { return "task.no_log_reminder" }
 
 func (t *NoLogReminderTask) Execute() (map[string]string, error) {
@@ -130,7 +130,7 @@ type UncategorizedReminderTask struct{}
 
 func (t *UncategorizedReminderTask) Name() string        { return "uncategorized_reminder" }
 func (t *UncategorizedReminderTask) Description() string { return "未分类事项提醒" }
-func (t *UncategorizedReminderTask) DefaultCron() string { return "30 21 * * *" }
+func (t *UncategorizedReminderTask) DefaultCron() string { return "0 30 21 * * *" }
 func (t *UncategorizedReminderTask) EventName() string   { return "task.uncategorized_reminder" }
 
 func (t *UncategorizedReminderTask) Execute() (map[string]string, error) {

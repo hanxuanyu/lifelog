@@ -19,6 +19,15 @@ import { getScheduledTasks, updateScheduledTasks, runScheduledTask } from "@/api
 import { toast } from "sonner"
 import type { ScheduledTaskInfo } from "@/types"
 
+const commonCronPresets = [
+  { label: "\u6bcf30\u5206\u949f", cron: "0 */30 * * * *" },
+  { label: "\u6bcf\u5c0f\u65f6", cron: "0 0 * * * *" },
+  { label: "\u6bcf\u5929 09:00", cron: "0 0 9 * * *" },
+  { label: "\u5de5\u4f5c\u65e5 09:00", cron: "0 0 9 * * 1-5" },
+  { label: "\u6bcf\u5468\u4e00 09:00", cron: "0 0 9 * * 1" },
+  { label: "\u6bcf\u67081\u65e5 09:00", cron: "0 0 9 1 * *" },
+]
+
 function formatNextRun(ts?: string): string {
   if (!ts) return ""
   try {
@@ -30,9 +39,20 @@ function formatNextRun(ts?: string): string {
   }
 }
 
+function getCronPresets(task: ScheduledTaskInfo) {
+  const presets = [{ label: "\u9ed8\u8ba4\u63a8\u8350", cron: task.default_cron }, ...commonCronPresets]
+  const seen = new Set<string>()
+  return presets.filter((preset) => {
+    if (seen.has(preset.cron)) return false
+    seen.add(preset.cron)
+    return true
+  })
+}
+
 export function ScheduledTasksCard() {
   const [tasks, setTasks] = useState<ScheduledTaskInfo[]>([])
   const [draftCrons, setDraftCrons] = useState<Record<string, string>>({})
+  const [editingCron, setEditingCron] = useState<string | null>(null)
   const [running, setRunning] = useState<string | null>(null)
   const [savingCron, setSavingCron] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -172,6 +192,8 @@ export function ScheduledTasksCard() {
               const isExpanded = expanded.has(task.name)
               const cronValue = draftCrons[task.name] ?? task.cron
               const cronDirty = cronValue !== task.cron
+              const showCronPresets = editingCron === task.name
+              const presets = getCronPresets(task)
               const unbound = task.enabled && task.bound_webhook_count === 0
 
               return (
@@ -244,41 +266,82 @@ export function ScheduledTasksCard() {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground shrink-0">Cron</span>
-                            <Input
-                              value={cronValue}
-                              onChange={(e) => updateCron(task.name, e.target.value)}
-                              placeholder="分 时 日 月 周"
-                              className="h-7 text-xs font-mono"
-                            />
-                            {cronDirty && (
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                className="shrink-0 text-emerald-600 hover:text-emerald-700"
-                                title="保存 Cron"
-                                aria-label={`保存 ${task.description} 的 Cron`}
-                                onClick={() => saveCron(task.name)}
-                                disabled={savingCron === task.name}
-                              >
-                                {savingCron === task.name
-                                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  : <Check className="h-3.5 w-3.5" />
-                                }
-                              </Button>
-                            )}
-                            {cronValue !== task.default_cron && (
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                className="shrink-0"
-                                title={`恢复默认: ${task.default_cron}`}
-                                onClick={() => resetToDefault(task.name)}
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
+                          <div
+                            className="space-y-2"
+                            onFocusCapture={() => setEditingCron(task.name)}
+                            onBlurCapture={(e) => {
+                              const nextFocused = e.relatedTarget
+                              if (nextFocused instanceof Node && e.currentTarget.contains(nextFocused)) {
+                                return
+                              }
+                              setEditingCron((current) => current === task.name ? null : current)
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground shrink-0">Cron</span>
+                              <Input
+                                value={cronValue}
+                                onChange={(e) => updateCron(task.name, e.target.value)}
+                                placeholder="\u79d2 \u5206 \u65f6 \u65e5 \u6708 \u5468"
+                                className="h-7 text-xs font-mono"
+                              />
+                              {cronDirty && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="shrink-0 text-emerald-600 hover:text-emerald-700"
+                                  title="保存 Cron"
+                                  aria-label={`保存 ${task.description} 的 Cron`}
+                                  onClick={() => saveCron(task.name)}
+                                  disabled={savingCron === task.name}
+                                >
+                                  {savingCron === task.name
+                                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    : <Check className="h-3.5 w-3.5" />
+                                  }
+                                </Button>
+                              )}
+                              {cronValue !== task.default_cron && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="shrink-0"
+                                  title={`恢复默认: ${task.default_cron}`}
+                                  onClick={() => resetToDefault(task.name)}
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+
+                            <AnimatePresence initial={false}>
+                              {showCronPresets && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.18 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="pl-10 flex flex-wrap items-center gap-1.5">
+                                    <span className="text-[11px] text-muted-foreground mr-1">\u5feb\u901f\u9884\u8bbe</span>
+                                    {presets.map((preset) => (
+                                      <Button
+                                        key={preset.cron}
+                                        type="button"
+                                        variant={cronValue === preset.cron ? "secondary" : "outline"}
+                                        size="xs"
+                                        className="rounded-full font-normal"
+                                        title={preset.cron}
+                                        onClick={() => updateCron(task.name, preset.cron)}
+                                      >
+                                        {preset.label}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
                         </div>
                       </motion.div>
