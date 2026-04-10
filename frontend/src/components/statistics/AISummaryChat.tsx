@@ -337,6 +337,7 @@ export function AISummaryChat() {
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
 
   const abortRef = useRef<AbortController | null>(null)
+  const streamTokenRef = useRef(0)
   const scrollRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<ChatMsg[]>(messages)
   const sessionsRef = useRef<ChatSession[]>(sessions)
@@ -853,7 +854,7 @@ export function AISummaryChat() {
                             </div>
                           ) : (
                             <div className="text-sm leading-relaxed">
-                              <MarkdownRenderer content={message.content} />
+                              <MarkdownRenderer content={message.content} preserveLineBreaks />
                             </div>
                           )}
                           {message.content && !isStreamingAssistant && (

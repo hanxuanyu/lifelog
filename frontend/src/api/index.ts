@@ -219,6 +219,26 @@ export async function fetchAIModels(endpoint: string, apiKey: string, name?: str
   return res.data
 }
 
+function extractSSEEvents(buffer: string): { events: string[]; rest: string } {
+  const normalized = buffer.replace(/\r\n/g, "\n")
+  const segments = normalized.split("\n\n")
+  const rest = segments.pop() || ""
+  const events = segments
+    .map((segment) => {
+      const dataLines = segment
+        .split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => {
+          const value = line.slice(5)
+          return value.startsWith(" ") ? value.slice(1) : value
+        })
+      return dataLines.join("\n")
+    })
+    .filter(Boolean)
+
+  return { events, rest }
+}
+
 // AI Chat (SSE streaming via fetch)
 export function streamAIChat(
   req: AIChatRequest,
@@ -259,13 +279,14 @@ export function streamAIChat(
       let buffer = ""
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {
+          buffer += decoder.decode()
+          break
+        }
         buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split("\n")
-        buffer = lines.pop() || ""
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue
-          const data = line.slice(6)
+        const { events, rest } = extractSSEEvents(buffer)
+        buffer = rest
+        for (const data of events) {
           if (data === "[DONE]") {
             onDone()
             return
@@ -282,6 +303,26 @@ export function streamAIChat(
           } catch {
             // ignore parse errors
           }
+        }
+      }
+
+      const { events } = extractSSEEvents(buffer)
+      for (const data of events) {
+        if (data === "[DONE]") {
+          onDone()
+          return
+        }
+        try {
+          const parsed = JSON.parse(data)
+          if (parsed.error) {
+            onError(parsed.error)
+            return
+          }
+          if (parsed.content) {
+            onChunk(parsed.content)
+          }
+        } catch {
+          // ignore parse errors
         }
       }
       onDone()

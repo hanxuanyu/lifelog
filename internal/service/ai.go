@@ -215,10 +215,10 @@ func extractStreamContent(payload string) string {
 	if len(chunk.Choices) == 0 {
 		return ""
 	}
-	if content := extractMessageContent(chunk.Choices[0].Delta.Content); content != "" {
+	if content := extractMessageContent(chunk.Choices[0].Delta.Content, false); content != "" {
 		return content
 	}
-	return extractMessageContent(chunk.Choices[0].Message.Content)
+	return extractMessageContent(chunk.Choices[0].Message.Content, false)
 }
 
 // ChatCompletion 调用 AI 提供商的 OpenAI 兼容接口进行非流式对话
@@ -266,17 +266,20 @@ func ChatCompletion(provider model.AIProvider, systemPrompt string, messages []m
 		return "", fmt.Errorf("AI响应为空")
 	}
 
-	content := extractMessageContent(result.Choices[0].Message.Content)
+	content := extractMessageContent(result.Choices[0].Message.Content, true)
 	if content == "" {
 		return "", fmt.Errorf("AI响应内容为空")
 	}
 	return content, nil
 }
 
-func extractMessageContent(content any) string {
+func extractMessageContent(content any, trim bool) string {
 	switch v := content.(type) {
 	case string:
-		return strings.TrimSpace(v)
+		if trim {
+			return strings.TrimSpace(v)
+		}
+		return v
 	case []any:
 		var parts []string
 		for _, item := range v {
@@ -293,7 +296,11 @@ func extractMessageContent(content any) string {
 				}
 			}
 		}
-		return strings.TrimSpace(strings.Join(parts, "\n"))
+		joined := strings.Join(parts, "\n")
+		if trim {
+			return strings.TrimSpace(joined)
+		}
+		return joined
 	default:
 		return ""
 	}
