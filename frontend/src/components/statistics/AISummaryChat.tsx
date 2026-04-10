@@ -385,10 +385,6 @@ export function AISummaryChat() {
   )
 
   useEffect(() => {
-    messagesRef.current = messages
-  }, [messages])
-
-  useEffect(() => {
     sessionsRef.current = sessions
   }, [sessions])
 
