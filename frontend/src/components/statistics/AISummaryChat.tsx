@@ -632,7 +632,11 @@ export function AISummaryChat() {
       setCurrentSessionId(sessionId)
     }
 
-    const nextMessages = [...messagesRef.current, { role: "user", content: text }, { role: "assistant", content: "" }]
+    const nextMessages: ChatMsg[] = [
+      ...messagesRef.current,
+      { role: "user", content: text },
+      { role: "assistant", content: "" },
+    ]
     replaceMessages(nextMessages)
     upsertSessionSnapshot(sessionId, nextMessages)
     setInput("")
