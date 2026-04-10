@@ -265,6 +265,10 @@ func AIChat(c *gin.Context) {
 		return
 	}
 
+	if strings.TrimSpace(req.Model) != "" {
+		provider.Model = strings.TrimSpace(req.Model)
+	}
+
 	slog.Info("AI对话请求", "provider", provider.Name, "model", provider.Model, "start", req.StartDate, "end", req.EndDate)
 
 	// 构建日志上下文

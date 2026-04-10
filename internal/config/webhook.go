@@ -178,9 +178,21 @@ func normalizeScheduledTasks(items []model.ScheduledTaskConfig) []model.Schedule
 	for i := range items {
 		normalized[i] = items[i]
 		normalized[i].Name = strings.TrimSpace(normalized[i].Name)
-		normalized[i].Cron = strings.TrimSpace(normalized[i].Cron)
+		normalized[i].Cron = normalizeScheduledTaskCron(normalized[i].Cron)
 	}
 	return normalized
+}
+
+func normalizeScheduledTaskCron(expr string) string {
+	fields := strings.Fields(strings.TrimSpace(expr))
+	switch len(fields) {
+	case 5:
+		return "0 " + strings.Join(fields, " ")
+	case 6:
+		return strings.Join(fields, " ")
+	default:
+		return strings.TrimSpace(expr)
+	}
 }
 
 func validateScheduledTasks(items []model.ScheduledTaskConfig) ([]model.ScheduledTaskConfig, error) {

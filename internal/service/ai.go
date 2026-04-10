@@ -89,6 +89,8 @@ func StreamChat(provider model.AIProvider, systemPrompt string, messages []model
 		return fmt.Errorf("创建请求失败: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Cache-Control", "no-cache")
 	if provider.APIKey != "" {
 		req.Header.Set("Authorization", "Bearer "+provider.APIKey)
 	}
@@ -106,39 +108,117 @@ func StreamChat(provider model.AIProvider, systemPrompt string, messages []model
 		return fmt.Errorf("AI服务返回错误 (%d): %s", resp.StatusCode, string(respBody))
 	}
 
-	scanner := bufio.NewScanner(resp.Body)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "data: ") {
-			continue
-		}
-		data := strings.TrimPrefix(line, "data: ")
-		if data == "[DONE]" {
-			fmt.Fprintf(writer, "data: [DONE]\n\n")
-			if flusher != nil {
-				flusher.Flush()
+	reader := bufio.NewReader(resp.Body)
+	eventLines := make([]string, 0, 4)
+	for {
+		line, readErr := reader.ReadString('\n')
+		line = strings.TrimRight(line, "\r\n")
+
+		if line == "" {
+			done, err := forwardStreamEvent(eventLines, writer, flusher)
+			if err != nil {
+				return err
 			}
-			break
-		}
-		var chunk struct {
-			Choices []struct {
-				Delta struct {
-					Content string `json:"content"`
-				} `json:"delta"`
-			} `json:"choices"`
-		}
-		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-			continue
-		}
-		if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
-			sseData, _ := json.Marshal(map[string]string{"content": chunk.Choices[0].Delta.Content})
-			fmt.Fprintf(writer, "data: %s\n\n", sseData)
-			if flusher != nil {
-				flusher.Flush()
+			if done {
+				return nil
 			}
+			eventLines = eventLines[:0]
+		} else {
+			eventLines = append(eventLines, line)
+		}
+
+		if readErr != nil {
+			if readErr == io.EOF {
+				break
+			}
+			return readErr
 		}
 	}
-	return scanner.Err()
+
+	done, err := forwardStreamEvent(eventLines, writer, flusher)
+	if err != nil {
+		return err
+	}
+	if !done {
+		if _, err := fmt.Fprint(writer, "data: [DONE]\n\n"); err != nil {
+			return err
+		}
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+
+	return nil
+}
+
+func forwardStreamEvent(lines []string, writer io.Writer, flusher http.Flusher) (bool, error) {
+	if len(lines) == 0 {
+		return false, nil
+	}
+
+	payloadLines := make([]string, 0, len(lines))
+	for _, line := range lines {
+		switch {
+		case strings.HasPrefix(line, "data:"):
+			payloadLines = append(payloadLines, strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+		case strings.HasPrefix(line, ":"):
+			continue
+		default:
+			payloadLines = append(payloadLines, strings.TrimSpace(line))
+		}
+	}
+
+	payload := strings.TrimSpace(strings.Join(payloadLines, "\n"))
+	if payload == "" {
+		return false, nil
+	}
+	if payload == "[DONE]" {
+		if _, err := fmt.Fprint(writer, "data: [DONE]\n\n"); err != nil {
+			return false, err
+		}
+		if flusher != nil {
+			flusher.Flush()
+		}
+		return true, nil
+	}
+
+	content := extractStreamContent(payload)
+	if content == "" {
+		return false, nil
+	}
+
+	sseData, _ := json.Marshal(map[string]string{"content": content})
+	if _, err := fmt.Fprintf(writer, "data: %s\n\n", sseData); err != nil {
+		return false, err
+	}
+	if flusher != nil {
+		flusher.Flush()
+	}
+
+	return false, nil
+}
+
+func extractStreamContent(payload string) string {
+	var chunk struct {
+		Choices []struct {
+			Delta struct {
+				Content any `json:"content"`
+			} `json:"delta"`
+			Message struct {
+				Content any `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+		return ""
+	}
+	if len(chunk.Choices) == 0 {
+		return ""
+	}
+	if content := extractMessageContent(chunk.Choices[0].Delta.Content); content != "" {
+		return content
+	}
+	return extractMessageContent(chunk.Choices[0].Message.Content)
 }
 
 // ChatCompletion 调用 AI 提供商的 OpenAI 兼容接口进行非流式对话

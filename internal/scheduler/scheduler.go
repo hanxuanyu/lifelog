@@ -53,8 +53,8 @@ func Start() {
 		return
 	}
 
-	// 使用标准 5 字段 cron（分、时、日、月、周），支持秒可选的话可以使用 WithSeconds
-	cronRunner = cron.New()
+	// 使用标准 6 字段 cron（秒、分、时、日、月、周）
+	cronRunner = cron.New(cron.WithSeconds())
 
 	// 确保配置中存在所有内置任务（缺失则添加默认配置）
 	if err := ensureBuiltinTaskConfigs(); err != nil {
@@ -263,8 +263,8 @@ func UpdateTasks(updates []model.ScheduledTaskConfig) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	// 校验 cron 表达式
-	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	// 校验 6 字段 cron 表达式（秒、分、时、日、月、周）
+	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 	for _, u := range updates {
 		if _, ok := registeredMap[u.Name]; !ok {
 			return fmt.Errorf("未知的任务: %s", u.Name)

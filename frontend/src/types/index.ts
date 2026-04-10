@@ -154,6 +154,7 @@ export interface AIChatMessage {
 
 export interface AIChatRequest {
   provider_name?: string
+  model?: string
   start_date: string
   end_date: string
   message: string

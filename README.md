@@ -255,32 +255,32 @@ Webhook 的 URL、Headers、Query Params、Body 中可使用 `{{变量名}}` 占
 
 | 任务 | 事件 | 默认 Cron | 说明 |
 | ---- | ---- | --------- | ---- |
-| 每日日报 | `task.daily_report` | `0 22 * * *` | 每天 22:00 生成当日活动汇总 |
-| 每周周报 | `task.weekly_report` | `0 10 * * 1` | 每周一 10:00 生成上周汇总 |
-| 每月月报 | `task.monthly_report` | `0 10 1 * *` | 每月 1 日 10:00 生成上月汇总 |
-| 未记录提醒 | `task.no_log_reminder` | `0 */2 * * *` | 每 2 小时检查，超过 4 小时未记录则提醒 |
-| 未分类提醒 | `task.uncategorized_reminder` | `30 21 * * *` | 每天 21:30 检查当天未分类事项，提醒完善分类规则 |
+| 每日日报 | `task.daily_report` | `0 0 22 * * *` | 每天 22:00:00 生成当日活动汇总 |
+| 每周周报 | `task.weekly_report` | `0 0 10 * * 1` | 每周一 10:00:00 生成上周汇总 |
+| 每月月报 | `task.monthly_report` | `0 0 10 1 * *` | 每月 1 日 10:00:00 生成上月汇总 |
+| 未记录提醒 | `task.no_log_reminder` | `0 0 */2 * * *` | 每 2 小时检查，超过 4 小时未记录则提醒 |
+| 未分类提醒 | `task.uncategorized_reminder` | `0 30 21 * * *` | 每天 21:30:00 检查当天未分类事项，提醒完善分类规则 |
 
-Cron 表达式格式：`分 时 日 月 周`，可在设置页面的「事件绑定」标签页中修改。
+Cron 表达式格式：`秒 分 时 日 月 周`，可在设置页面的「事件绑定」标签页中修改。
 
 `webhooks.yaml` 中的定时任务配置：
 
 ```yaml
 scheduled_tasks:
   - name: daily_report
-    cron: "0 22 * * *"
+    cron: "0 0 22 * * *"
     enabled: false
   - name: weekly_report
-    cron: "0 10 * * 1"
+    cron: "0 0 10 * * 1"
     enabled: false
   - name: monthly_report
-    cron: "0 10 1 * *"
+    cron: "0 0 10 1 * *"
     enabled: false
   - name: no_log_reminder
-    cron: "0 */2 * * *"
+    cron: "0 0 */2 * * *"
     enabled: false
   - name: uncategorized_reminder
-    cron: "30 21 * * *"
+    cron: "0 30 21 * * *"
     enabled: false
 ```
 

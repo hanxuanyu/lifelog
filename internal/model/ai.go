@@ -12,6 +12,7 @@ type AIProvider struct {
 // AIChatRequest AI 对话请求
 type AIChatRequest struct {
 	ProviderName string          `json:"provider_name"`
+	Model        string          `json:"model"`
 	StartDate    string          `json:"start_date" binding:"required"`
 	EndDate      string          `json:"end_date" binding:"required"`
 	Message      string          `json:"message" binding:"required"`
