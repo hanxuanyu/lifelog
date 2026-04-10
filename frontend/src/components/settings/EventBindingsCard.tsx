@@ -144,7 +144,7 @@ export function EventBindingsCard() {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="text-sm flex items-center gap-2">
                 <Zap className="h-4 w-4" /> 事件绑定
@@ -153,7 +153,7 @@ export function EventBindingsCard() {
                 将事件发送到目标 Webhook，并在绑定前检查变量是否匹配
               </CardDescription>
             </div>
-            <Button size="xs" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => setAdding(true)} disabled={adding}>
+            <Button size="xs" variant="outline" className="h-7 px-2 text-[11px] self-end sm:self-auto" onClick={() => setAdding(true)} disabled={adding}>
               <Plus className="h-3 w-3 mr-1" />添加绑定
             </Button>
           </div>
@@ -164,15 +164,15 @@ export function EventBindingsCard() {
             {adding && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                 <div className="rounded-md border bg-muted/20 p-3 space-y-2.5">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-xs font-medium text-foreground">新建事件绑定</p>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
                       <Button size="xs" variant="ghost" className="h-7 px-2 text-[11px]" onClick={resetAddingForm}>取消</Button>
                       <Button size="xs" className="h-7 px-2 text-[11px]" onClick={addBinding}>确认添加</Button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <span className="text-xs text-muted-foreground">事件</span>
                       <Select value={newEvent || NONE_VALUE} onValueChange={v => setNewEvent(v === NONE_VALUE ? "" : v)}>
@@ -240,14 +240,14 @@ export function EventBindingsCard() {
               const testKey = `${b.event}|${b.webhook_name}`
               return (
                 <div key={`${b.event}-${b.webhook_name}`} className={`rounded-md border p-2.5 space-y-1.5 ${unmatched.length > 0 ? "border-amber-500/50 bg-amber-50/30 dark:bg-amber-950/10" : ""}`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                       <span className="text-sm font-medium shrink-0">{b.event}</span>
                       <span className="text-[11px] text-muted-foreground shrink-0">→</span>
                       <Badge variant="outline" className="text-[11px] shrink-0">{b.webhook_name}</Badge>
                       {!b.enabled && <Badge variant="outline" className="text-[11px] text-muted-foreground shrink-0">已停用</Badge>}
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
                       <Switch checked={b.enabled} onCheckedChange={v => toggleEnabled(idx, v)} />
                       <Button
                         variant="ghost"
