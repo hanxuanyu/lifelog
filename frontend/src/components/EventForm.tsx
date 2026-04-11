@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, lazy, Suspense } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Tag, FileText, X, ChevronDown } from "lucide-react"
+import { Tag, FileText, X, ChevronDown, Clock3 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -30,6 +30,12 @@ export interface SuggestionTag {
   categoryColor?: string
 }
 
+export interface DurationPreview {
+  tone: "info" | "muted"
+  label: string
+  detail: string
+}
+
 export interface EventFormProps {
   time: string
   event: string
@@ -48,6 +54,7 @@ export interface EventFormProps {
   cancelIcon?: React.ReactNode
 
   suggestions?: SuggestionTag[]
+  durationPreview?: DurationPreview | null
 
   eventInputRef?: React.RefObject<HTMLInputElement | null>
   initialDetailOpen?: boolean
@@ -69,6 +76,7 @@ export function EventForm({
   cancelLabel = "取消",
   cancelIcon = <X className="h-3.5 w-3.5 mr-1" />,
   suggestions,
+  durationPreview,
   eventInputRef,
   initialDetailOpen = false,
 }: EventFormProps) {
@@ -156,6 +164,26 @@ export function EventForm({
           </div>
         </div>
       </div>
+
+      {durationPreview && (
+        <div
+          className={`flex items-start gap-2 rounded-xl border px-3 py-2 ${
+            durationPreview.tone === "info"
+              ? "border-primary/20 bg-primary/5"
+              : "border-border/60 bg-accent/40"
+          }`}
+        >
+          <Clock3
+            className={`mt-0.5 h-4 w-4 shrink-0 ${
+              durationPreview.tone === "info" ? "text-primary" : "text-muted-foreground"
+            }`}
+          />
+          <div className="min-w-0">
+            <p className="text-xs font-medium">{durationPreview.label}</p>
+            <p className="text-[11px] text-muted-foreground">{durationPreview.detail}</p>
+          </div>
+        </div>
+      )}
 
       {/* Suggestion tags — two-level or flat search */}
       {isSearching ? (
