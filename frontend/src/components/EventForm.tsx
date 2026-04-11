@@ -1,4 +1,4 @@
-import React, { useState, useMemo, lazy, Suspense } from "react"
+import React, { useState, useMemo, useEffect, lazy, Suspense } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Tag, FileText, X, ChevronDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -6,6 +6,23 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MobileTimePicker } from "@/components/MobileTimePicker"
 const MarkdownEditor = lazy(() => import("@/components/MarkdownEditor").then(m => ({ default: m.MarkdownEditor })))
+
+const DESKTOP_MEDIA_QUERY = "(min-width: 640px)"
+
+function isDetailToggleShortcut(event: KeyboardEvent) {
+  if (event.isComposing) return false
+  if (!event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return false
+  return event.code === "Space" || event.key === " " || event.key === "Spacebar"
+}
+
+function isDesktopViewport() {
+  return typeof window !== "undefined" && window.matchMedia(DESKTOP_MEDIA_QUERY).matches
+}
+
+function isWithinDetailEditor(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false
+  return !!target.closest("[contenteditable='true'], textarea, .mdx-editor-root")
+}
 
 export interface SuggestionTag {
   name: string
@@ -58,6 +75,17 @@ export function EventForm({
   const [showDetail, setShowDetail] = useState(initialDetailOpen)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isDesktopViewport() || !isDetailToggleShortcut(event) || isWithinDetailEditor(event.target)) return
+      event.preventDefault()
+      setShowDetail((prev) => !prev)
+    }
+
+    document.addEventListener("keydown", handleKeyDown, true)
+    return () => document.removeEventListener("keydown", handleKeyDown, true)
+  }, [])
+
   // Group suggestions by category
   const categoryGroups = useMemo(() => {
     if (!suggestions || suggestions.length === 0) return []
@@ -82,6 +110,7 @@ export function EventForm({
   }, [suggestions, event])
 
   const isSearching = event.trim().length > 0
+  const detailToggleTitle = showDetail ? "收起详情 (Shift + Space)" : "展开详情 (Shift + Space)"
 
   return (
     <div className="flex flex-col gap-3">
@@ -114,11 +143,13 @@ export function EventForm({
               type="button"
               size="icon-sm"
               variant="ghost"
-              onClick={() => setShowDetail(!showDetail)}
+              onClick={() => setShowDetail((prev) => !prev)}
               className={`shrink-0 ${
                 showDetail ? "text-primary bg-primary/10" : "text-muted-foreground"
               }`}
-              title="添加详情"
+              aria-label={detailToggleTitle}
+              aria-pressed={showDetail}
+              title={detailToggleTitle}
             >
               <FileText className="h-4 w-4" />
             </Button>
