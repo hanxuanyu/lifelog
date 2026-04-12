@@ -62,6 +62,7 @@ export interface DailyStatistics {
   total_known: string
   time_point_mode: string
   cross_day_hints?: CrossDayHint[]
+  prev_day_last_time?: string
 }
 
 export interface PeriodStatistics {

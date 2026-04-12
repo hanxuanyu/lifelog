@@ -22,6 +22,7 @@ interface RailSvgProps {
   isTouching: boolean
   timePointMode: string
   currentTime: string
+  hoverGapInfo: { gapDisplay: string; prevTime: string; detail: string; crossDay: boolean } | null
 }
 
 export function RailSvg({
@@ -29,6 +30,7 @@ export function RailSvg({
   getCategoryColor, getDurationForEntry, getEntryMode, durationToEntryMap,
   highlightIndex, highlightSourceRef, setHighlightIndex,
   isToday, currentTimeRailY, hoverTime, hoverRailY, isTouching, timePointMode, currentTime,
+  hoverGapInfo,
 }: RailSvgProps) {
   if (railHeight <= 0) return null
   const cx = RAIL_LINE_X
@@ -136,15 +138,27 @@ export function RailSvg({
           <circle cx={cx} cy={hoverRailY} r={isTouching ? 5 : 3} className={isTouching ? "fill-primary" : "fill-muted-foreground/50"} />
           {isTouching ? (
             <>
-              <rect x={0} y={Math.max(0, hoverRailY - 55)} width={cx - 2} height={20} rx={4} className="fill-primary-foreground dark:fill-primary" />
+              <rect x={0} y={Math.max(0, hoverRailY - 55)} width={cx - 2} height={hoverGapInfo ? 34 : 20} rx={4} className="fill-primary-foreground dark:fill-primary" />
               <text x={(cx - 2) / 2} y={Math.max(0, hoverRailY - 55) + 14} textAnchor="middle" className="fill-primary dark:fill-primary-foreground" fontSize={13} fontFamily="monospace" fontWeight="bold">
                 {hoverTime}
               </text>
+              {hoverGapInfo && (
+                <text x={(cx - 2) / 2} y={Math.max(0, hoverRailY - 55) + 28} textAnchor="middle" className="fill-primary/70 dark:fill-primary-foreground/70" fontSize={9} fontFamily="monospace">
+                  {hoverGapInfo.gapDisplay}
+                </text>
+              )}
             </>
           ) : (
-            <text x={cx - 7} y={hoverRailY - 5} textAnchor="end" className="fill-foreground/70" fontSize={10} fontFamily="monospace">
-              {hoverTime}
-            </text>
+            <>
+              <text x={cx - 7} y={hoverRailY - 5} textAnchor="end" className="fill-foreground/70" fontSize={10} fontFamily="monospace">
+                {hoverTime}
+              </text>
+              {hoverGapInfo && (
+                <text x={cx - 7} y={hoverRailY + 9} textAnchor="end" className="fill-muted-foreground/60" fontSize={8} fontFamily="monospace">
+                  {hoverGapInfo.gapDisplay}
+                </text>
+              )}
+            </>
           )}
         </g>
       )}

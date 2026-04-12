@@ -21,6 +21,7 @@ export function HomePage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [durationItems, setDurationItems] = useState<DurationItem[]>([])
   const [crossDayHints, setCrossDayHints] = useState<CrossDayHint[]>([])
+  const [prevDayLastTime, setPrevDayLastTime] = useState<string | undefined>(undefined)
   const [timePointMode, setTimePointMode] = useState("end")
   const [loading, setLoading] = useState(false)
 
@@ -36,11 +37,13 @@ export function HomePage() {
       setEntries(data || [])
       setDurationItems(stats?.items || [])
       setCrossDayHints(stats?.cross_day_hints || [])
+      setPrevDayLastTime(stats?.prev_day_last_time)
       if (stats?.time_point_mode) setTimePointMode(stats.time_point_mode)
     } catch {
       setEntries([])
       setDurationItems([])
       setCrossDayHints([])
+      setPrevDayLastTime(undefined)
     } finally {
       setLoading(false)
     }
@@ -183,6 +186,7 @@ export function HomePage() {
             isToday={isToday(currentDate)}
             durationItems={durationItems}
             crossDayHints={crossDayHints}
+            prevDayLastTime={prevDayLastTime}
             timePointMode={timePointMode}
             onEditRequest={(entry) => {
               window.dispatchEvent(new CustomEvent("openQuickAddEdit", {

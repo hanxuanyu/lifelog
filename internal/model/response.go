@@ -82,12 +82,13 @@ type CrossDayHint struct {
 
 // DailyStatistics 日统计
 type DailyStatistics struct {
-	Date          string            `json:"date"`
-	Items         []DurationItem    `json:"items"`
-	Summary       []CategorySummary `json:"summary"`
-	TotalKnown    int               `json:"total_known"` // 已知时长总秒数
-	TimePointMode string            `json:"time_point_mode"`
-	CrossDayHints []CrossDayHint    `json:"cross_day_hints,omitempty"`
+	Date            string            `json:"date"`
+	Items           []DurationItem    `json:"items"`
+	Summary         []CategorySummary `json:"summary"`
+	TotalKnown      int               `json:"total_known"` // 已知时长总秒数
+	TimePointMode   string            `json:"time_point_mode"`
+	CrossDayHints   []CrossDayHint    `json:"cross_day_hints,omitempty"`
+	PrevDayLastTime string            `json:"prev_day_last_time,omitempty"` // 前一天最后一条日志的时间
 }
 
 // PeriodStatistics 周/月统计
