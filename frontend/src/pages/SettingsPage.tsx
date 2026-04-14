@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { VersionInfoCard } from "@/components/settings/VersionInfoCard"
 import { ServerMonitorCard } from "@/components/settings/ServerMonitorCard"
 import { TimePointModeCard } from "@/components/settings/TimePointModeCard"
+import { NavigationStyleCard } from "@/components/settings/NavigationStyleCard"
 import { ServerConfigCard } from "@/components/settings/ServerConfigCard"
 import { AuthConfigCard } from "@/components/settings/AuthConfigCard"
 import { MCPServiceCard } from "@/components/settings/MCPServiceCard"
@@ -19,9 +20,13 @@ import { CategoriesCard } from "@/components/settings/CategoriesCard"
 import { WebhookSettingsCard } from "@/components/settings/WebhookSettingsCard"
 import { EventBindingsCard } from "@/components/settings/EventBindingsCard"
 import { ScheduledTasksCard } from "@/components/settings/ScheduledTasksCard"
+import { useNavigationStyle } from "@/hooks/use-navigation-style"
+import { useTransientPageScrollbar } from "@/hooks/use-transient-page-scrollbar"
 
 export function SettingsPage() {
+  useTransientPageScrollbar()
   const [loading, setLoading] = useState(true)
+  const { navigationStyle, setNavigationStyle } = useNavigationStyle()
 
   // Settings save group
   const [timePointMode, setTimePointMode] = useState("end")
@@ -160,6 +165,7 @@ export function SettingsPage() {
             <TabsContent value="basic">
               <div className="space-y-4">
                 <TimePointModeCard value={timePointMode} onChange={setTimePointMode} />
+                <NavigationStyleCard value={navigationStyle} onChange={setNavigationStyle} />
                 <ServerConfigCard serverPort={serverPort} onServerPortChange={setServerPort} dbPath={dbPath} onDbPathChange={setDbPath} />
                 <AuthConfigCard jwtExpireHours={jwtExpireHours} onJwtExpireHoursChange={setJwtExpireHours} />
                 <MCPServiceCard mcpEnabled={mcpEnabled} onMcpEnabledChange={setMcpEnabled} mcpPort={mcpPort} onMcpPortChange={setMcpPort} />
