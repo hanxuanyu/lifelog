@@ -17,15 +17,16 @@ func GetDailyStatistics(date string) (*model.DailyStatistics, error) {
 		return nil, err
 	}
 
-	// 始终查询跨天衔接数据（因为日志可能包含混合模式）
+	// 始终查询前一天最后一条日志（用于跨日时间差计算）
 	var prevEntry *model.LogEntry
 	var nextEntry *model.LogEntry
 
+	prev, err := repository.GetLastEntryBefore(date)
+	if err == nil {
+		prevEntry = prev
+	}
+
 	if len(entries) > 0 {
-		prev, err := repository.GetLastEntryBefore(date)
-		if err == nil {
-			prevEntry = prev
-		}
 		next, err := repository.GetFirstEntryAfter(date)
 		if err == nil {
 			nextEntry = next
@@ -63,13 +64,20 @@ func GetDailyStatistics(date string) (*model.DailyStatistics, error) {
 		}
 	}
 
+	// 获取前一天最后一条日志时间
+	var prevDayLastTime string
+	if prevEntry != nil && prevEntry.LogDate != date {
+		prevDayLastTime = prevEntry.LogTime[:5]
+	}
+
 	return &model.DailyStatistics{
-		Date:          date,
-		Items:         items,
-		Summary:       summary,
-		TotalKnown:    totalKnown,
-		TimePointMode: config.GetTimePointMode(),
-		CrossDayHints: hints,
+		Date:            date,
+		Items:           items,
+		Summary:         summary,
+		TotalKnown:      totalKnown,
+		TimePointMode:   config.GetTimePointMode(),
+		CrossDayHints:   hints,
+		PrevDayLastTime: prevDayLastTime,
 	}, nil
 }
 

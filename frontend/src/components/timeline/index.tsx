@@ -23,6 +23,7 @@ interface TimelineProps {
   isToday?: boolean
   durationItems?: DurationItem[]
   crossDayHints?: CrossDayHint[]
+  prevDayLastTime?: string
   timePointMode?: string
   onEditRequest?: (entry: LogEntry) => void
   onRailCreate?: (time: string) => void
@@ -36,6 +37,7 @@ export function Timeline({
   isToday = false,
   durationItems = [],
   crossDayHints = [],
+  prevDayLastTime,
   timePointMode = "end",
   onEditRequest,
   onRailCreate,
@@ -96,6 +98,7 @@ export function Timeline({
           getCategoryColor={getCategoryColor}
           getDurationForEntry={getDurationForEntry}
           crossDayHints={crossDayHints}
+          prevDayLastTime={prevDayLastTime}
           isToday={isToday}
           currentTime={currentTime}
           timePointMode={timePointMode}

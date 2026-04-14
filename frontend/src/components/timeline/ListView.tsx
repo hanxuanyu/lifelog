@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import {
   formatTime,
+  formatDuration,
   timeToMinutes,
   RAIL_WIDTH,
   GAP,
@@ -34,6 +35,7 @@ interface ListViewProps {
   getCategoryColor: (category: string) => string
   getDurationForEntry: (index: number) => DurationItem | null
   crossDayHints?: CrossDayHint[]
+  prevDayLastTime?: string
   isToday: boolean
   currentTime: string
   timePointMode?: string
@@ -43,7 +45,7 @@ interface ListViewProps {
 
 export function ListView({
   entries, durationItems, onUpdate, onDeleteRequest, getCategoryColor,
-  getDurationForEntry, crossDayHints = [], isToday, currentTime,
+  getDurationForEntry, crossDayHints = [], prevDayLastTime, isToday, currentTime,
   timePointMode = "end", onEditRequest, onRailCreate,
 }: ListViewProps) {
   const getEntryMode = useCallback(
@@ -92,6 +94,46 @@ export function ListView({
   )
   const currentTimeRailY = isToday ? timeToRailY(currentTime) : -1
   const hoverRailY = hoverTime ? timeToRailY(hoverTime) : -1
+
+  const hoverGapInfo = useMemo(() => {
+    if (!hoverTime) return null
+    const hoverMins = timeToMinutes(hoverTime)
+
+    // Find the closest entry whose log_time <= hoverTime
+    let prev: LogEntry | null = null
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (timeToMinutes(formatTime(entries[i].log_time)) <= hoverMins) {
+        prev = entries[i]
+        break
+      }
+    }
+
+    // Cross-day fallback: use previous day's last entry time
+    const prevTime = prev
+      ? formatTime(prev.log_time)
+      : prevDayLastTime || null
+
+    if (!prevTime) return null
+
+    // Respect time_point_mode: only show gap when previous entry is "end" mode
+    if (prev) {
+      const prevMode = prev.time_point_mode || timePointMode
+      if (prevMode !== "end") return null
+    }
+
+    const gap = prev
+      ? hoverMins - timeToMinutes(prevTime)
+      : hoverMins + (24 * 60 - timeToMinutes(prevTime)) // cross-day: remaining of prev day + current day
+
+    if (gap <= 0) return null
+
+    const gapDisplay = formatDuration(gap * 60)
+    const detail = prev
+      ? `${prevTime} ~ ${hoverTime}`
+      : `昨日 ${prevTime} ~ ${hoverTime}`
+
+    return { gapDisplay, prevTime, detail, crossDay: !prev }
+  }, [hoverTime, entries, prevDayLastTime, timePointMode])
 
   const durationToEntryMap = useMemo(() => {
     const map = new Map<number, number>()
@@ -262,6 +304,7 @@ export function ListView({
     getCategoryColor, getDurationForEntry, getEntryMode, durationToEntryMap,
     highlightIndex, highlightSourceRef, setHighlightIndex,
     isToday, currentTimeRailY, hoverTime, hoverRailY, isTouching, timePointMode, currentTime,
+    hoverGapInfo,
   }
 
   // Empty state

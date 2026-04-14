@@ -24,6 +24,10 @@ build-server:
 web:
 	cd frontend && npm run dev
 
+# 启动前端开发模式（支持局域网访问）
+web-host:
+	cd frontend && npm run dev-host
+
 # 启动后端开发模式
 server:
 	go run .

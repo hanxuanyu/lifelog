@@ -1,16 +1,39 @@
-import React, { useState, useMemo, lazy, Suspense } from "react"
+import React, { useState, useMemo, useEffect, lazy, Suspense } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Tag, FileText, X, ChevronDown } from "lucide-react"
+import { Tag, FileText, X, ChevronDown, Clock3 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MobileTimePicker } from "@/components/MobileTimePicker"
 const MarkdownEditor = lazy(() => import("@/components/MarkdownEditor").then(m => ({ default: m.MarkdownEditor })))
 
+const DESKTOP_MEDIA_QUERY = "(min-width: 640px)"
+
+function isDetailToggleShortcut(event: KeyboardEvent) {
+  if (event.isComposing) return false
+  if (!event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return false
+  return event.code === "Space" || event.key === " " || event.key === "Spacebar"
+}
+
+function isDesktopViewport() {
+  return typeof window !== "undefined" && window.matchMedia(DESKTOP_MEDIA_QUERY).matches
+}
+
+function isWithinDetailEditor(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false
+  return !!target.closest("[contenteditable='true'], textarea, .mdx-editor-root")
+}
+
 export interface SuggestionTag {
   name: string
   categoryName?: string
   categoryColor?: string
+}
+
+export interface DurationPreview {
+  tone: "info" | "muted"
+  label: string
+  detail: string
 }
 
 export interface EventFormProps {
@@ -31,6 +54,7 @@ export interface EventFormProps {
   cancelIcon?: React.ReactNode
 
   suggestions?: SuggestionTag[]
+  durationPreview?: DurationPreview | null
 
   eventInputRef?: React.RefObject<HTMLInputElement | null>
   initialDetailOpen?: boolean
@@ -52,11 +76,23 @@ export function EventForm({
   cancelLabel = "取消",
   cancelIcon = <X className="h-3.5 w-3.5 mr-1" />,
   suggestions,
+  durationPreview,
   eventInputRef,
   initialDetailOpen = false,
 }: EventFormProps) {
   const [showDetail, setShowDetail] = useState(initialDetailOpen)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isDesktopViewport() || !isDetailToggleShortcut(event) || isWithinDetailEditor(event.target)) return
+      event.preventDefault()
+      setShowDetail((prev) => !prev)
+    }
+
+    document.addEventListener("keydown", handleKeyDown, true)
+    return () => document.removeEventListener("keydown", handleKeyDown, true)
+  }, [])
 
   // Group suggestions by category
   const categoryGroups = useMemo(() => {
@@ -82,6 +118,7 @@ export function EventForm({
   }, [suggestions, event])
 
   const isSearching = event.trim().length > 0
+  const detailToggleTitle = showDetail ? "收起详情 (Shift + Space)" : "展开详情 (Shift + Space)"
 
   return (
     <div className="flex flex-col gap-3">
@@ -114,17 +151,39 @@ export function EventForm({
               type="button"
               size="icon-sm"
               variant="ghost"
-              onClick={() => setShowDetail(!showDetail)}
+              onClick={() => setShowDetail((prev) => !prev)}
               className={`shrink-0 ${
                 showDetail ? "text-primary bg-primary/10" : "text-muted-foreground"
               }`}
-              title="添加详情"
+              aria-label={detailToggleTitle}
+              aria-pressed={showDetail}
+              title={detailToggleTitle}
             >
               <FileText className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </div>
+
+      {durationPreview && (
+        <div
+          className={`flex items-start gap-2 rounded-xl border px-3 py-2 ${
+            durationPreview.tone === "info"
+              ? "border-primary/20 bg-primary/5"
+              : "border-border/60 bg-accent/40"
+          }`}
+        >
+          <Clock3
+            className={`mt-0.5 h-4 w-4 shrink-0 ${
+              durationPreview.tone === "info" ? "text-primary" : "text-muted-foreground"
+            }`}
+          />
+          <div className="min-w-0">
+            <p className="text-xs font-medium">{durationPreview.label}</p>
+            <p className="text-[11px] text-muted-foreground">{durationPreview.detail}</p>
+          </div>
+        </div>
+      )}
 
       {/* Suggestion tags — two-level or flat search */}
       {isSearching ? (

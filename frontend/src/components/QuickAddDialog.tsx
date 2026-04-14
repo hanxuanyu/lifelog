@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from "framer-motion"
 import { X, Send, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { EventForm, type SuggestionTag } from "@/components/EventForm"
-import { createLog, updateLog, getCategories, getEventTypes, getTimeline } from "@/api"
-import type { Category } from "@/types"
+import { createLog, updateLog, getCategories, getEventTypes, getTimeline, getSettings } from "@/api"
+import { formatDuration } from "@/components/timeline/shared"
+import type { Category, LogEntry } from "@/types"
+import { format, parseISO, subDays } from "date-fns"
 import { toast } from "sonner"
 
 interface QuickAddDialogProps {
@@ -15,6 +17,84 @@ interface QuickAddDialogProps {
   date: string
   editEntry?: { id: number; time: string; event: string; detail: string } | null
   initialTime?: string | null
+}
+
+interface DurationPreview {
+  tone: "info" | "muted"
+  label: string
+  detail: string
+}
+
+function parseTimeToMinutes(time: string): number | null {
+  const match = time.trim().match(/^(\d{1,2}):(\d{2})/)
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (Number.isNaN(hours) || Number.isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null
+  }
+  return hours * 60 + minutes
+}
+
+function getEntryMode(entry: Pick<LogEntry, "time_point_mode">, fallbackMode: string) {
+  return entry.time_point_mode || fallbackMode
+}
+
+function diffMinutes(fromDate: string, fromTime: string, toDate: string, toTime: string) {
+  const from = new Date(`${fromDate}T${fromTime.slice(0, 5)}:00`)
+  const to = new Date(`${toDate}T${toTime.slice(0, 5)}:00`)
+  const diff = Math.floor((to.getTime() - from.getTime()) / 60000)
+  return Math.max(0, diff)
+}
+
+function buildEndModeDurationPreview(
+  currentDate: string,
+  currentTime: string,
+  entries: LogEntry[],
+  previousDayLastEntry: LogEntry | null,
+  fallbackMode: string,
+): DurationPreview | null {
+  const currentMinutes = parseTimeToMinutes(currentTime)
+  if (currentMinutes === null) return null
+
+  const previousSameDay = [...entries]
+    .filter((entry) => {
+      const entryMinutes = parseTimeToMinutes(entry.log_time)
+      return entryMinutes !== null && entryMinutes <= currentMinutes
+    })
+    .sort((a, b) => a.log_time.localeCompare(b.log_time))
+  const lastSameDayEntry = previousSameDay.length > 0 ? previousSameDay[previousSameDay.length - 1] : null
+
+  const previousEntry = lastSameDayEntry || previousDayLastEntry
+  if (!previousEntry) {
+    return {
+      tone: "muted",
+      label: "持续待定",
+      detail: "暂无起点",
+    }
+  }
+
+  const previousMode = getEntryMode(previousEntry, fallbackMode)
+  if (previousMode !== "end") {
+    return {
+      tone: "muted",
+      label: "持续待定",
+      detail: "模式边界",
+    }
+  }
+
+  const durationMinutes = diffMinutes(previousEntry.log_date, previousEntry.log_time, currentDate, currentTime)
+  const display = durationMinutes > 0 ? formatDuration(durationMinutes * 60) : "0m"
+  const previousTime = previousEntry.log_time.slice(0, 5)
+  const rangeText = previousEntry.log_date === currentDate
+    ? `${previousTime} ~ ${currentTime.slice(0, 5)}`
+    : `昨日 ${previousTime} ~ 今日 ${currentTime.slice(0, 5)}`
+
+  return {
+    tone: "info",
+    label: `持续 ${display}`,
+    detail: rangeText,
+  }
 }
 
 export function QuickAddDialog({ open, onClose, onCreated, onUncategorized, date, editEntry, initialTime }: QuickAddDialogProps) {
@@ -58,6 +138,9 @@ function QuickAddDialogInner({
   const [submitting, setSubmitting] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [allEvents, setAllEvents] = useState<string[]>([])
+  const [timelineEntries, setTimelineEntries] = useState<LogEntry[]>([])
+  const [previousDayEntries, setPreviousDayEntries] = useState<LogEntry[]>([])
+  const [timePointMode, setTimePointMode] = useState<string | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
   const [dataReady, setDataReady] = useState(false)
 
@@ -87,14 +170,20 @@ function QuickAddDialogInner({
 
   useEffect(() => {
     if (!date) return
+    const previousDate = format(subDays(parseISO(date), 1), "yyyy-MM-dd")
     // Defer data loading to avoid layout shift during enter animation
     const timer = setTimeout(() => {
       Promise.all([
         getCategories().catch(() => [] as Category[]),
         getEventTypes().catch(() => [] as string[]),
-        getTimeline(date).catch(() => []),
-      ]).then(([cats, types, entries]) => {
+        getTimeline(date).catch(() => [] as LogEntry[]),
+        getTimeline(previousDate).catch(() => [] as LogEntry[]),
+        getSettings().catch(() => null),
+      ]).then(([cats, types, entries, prevEntries, settings]) => {
         setCategories(cats || [])
+        setTimelineEntries(entries || [])
+        setPreviousDayEntries(prevEntries || [])
+        setTimePointMode(settings?.time_point_mode || null)
         const recent = [...new Set(entries.map((e) => e.event_type))].reverse()
         const fixedEvents: string[] = []
         ;(cats || []).forEach((cat) =>
@@ -121,6 +210,18 @@ function QuickAddDialogInner({
       return { name, categoryName: cat?.name, categoryColor: cat?.color }
     })
   }, [allEvents, categories])
+
+  const endModeDurationPreview = useMemo(() => {
+    if (!dataReady || isEdit || timePointMode !== "end") return null
+    const previousDayLastEntry = previousDayEntries.length > 0 ? previousDayEntries[previousDayEntries.length - 1] : null
+    return buildEndModeDurationPreview(
+      date,
+      timeValue,
+      timelineEntries,
+      previousDayLastEntry,
+      timePointMode,
+    )
+  }, [dataReady, isEdit, timePointMode, previousDayEntries, date, timeValue, timelineEntries])
 
   const handleSubmit = async () => {
     if (!timeValue.trim() || !eventValue.trim()) {
@@ -203,6 +304,7 @@ function QuickAddDialogInner({
             suggestions={suggestions}
             eventInputRef={eventInputRef}
             initialDetailOpen={isEdit && !!detailValue}
+            durationPreview={endModeDurationPreview}
           />
         </div>
 
