@@ -80,6 +80,34 @@ input, textarea, [contenteditable="true"], pre, code {
 body.no-scroll {
   overflow: hidden;
 }
+
+body.page-scrollbars {
+  scrollbar-width: none;
+}
+
+body.page-scrollbars::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+body.page-scrollbars.page-is-scrolling {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--foreground) 28%, transparent) transparent;
+}
+
+body.page-scrollbars.page-is-scrolling::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+body.page-scrollbars.page-is-scrolling::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body.page-scrollbars.page-is-scrolling::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--foreground) 28%, transparent);
+  border-radius: 999px;
+}
 #root {
   padding-top: env(safe-area-inset-top, 0px);
   padding-left: env(safe-area-inset-left, 0px);

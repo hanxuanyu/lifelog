@@ -20,6 +20,7 @@ import { StackedBarChart } from "@/components/statistics/StackedBarChart"
 import { TopEventsCard } from "@/components/statistics/TopEventsCard"
 import { DailyAveragePills } from "@/components/statistics/DailyAveragePills"
 import { AISummaryChat } from "@/components/statistics/AISummaryChat"
+import { useTransientPageScrollbar } from "@/hooks/use-transient-page-scrollbar"
 
 const FALLBACK_COLORS = [
   "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6",
@@ -28,6 +29,7 @@ const FALLBACK_COLORS = [
 ]
 
 export function StatisticsPage() {
+  useTransientPageScrollbar()
   const [tab, setTab] = useState<"daily" | "period" | "ai">("daily")
   const [dailyDate, setDailyDate] = useState(new Date())
   const [periodMode, setPeriodMode] = useState<"weekly" | "monthly">("weekly")
