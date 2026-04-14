@@ -222,7 +222,7 @@ function MobileActionDock({ hidden }: { hidden: boolean }) {
   return (
     <div
       className="sm:hidden fixed right-4 z-50 flex flex-col items-center gap-3"
-      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 1.25rem)" }}
+      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.85rem)" }}
     >
       <AnimatePresence initial={false}>
         {open && actions.map((action, index) => (
@@ -248,7 +248,7 @@ function MobileActionDock({ hidden }: { hidden: boolean }) {
         animate={{ opacity: 1, scale: 1 }}
         whileTap={{ scale: 0.9 }}
         onClick={() => setOpen((prev) => !prev)}
-        className={`flex h-12 w-12 items-center justify-center rounded-full shadow-lg active:shadow-xl ${
+        className={`flex h-[3.125rem] w-[3.125rem] items-center justify-center rounded-full shadow-lg active:shadow-xl ${
           open
             ? "border bg-secondary text-secondary-foreground"
             : "bg-primary text-primary-foreground"
@@ -348,81 +348,59 @@ function MobileBottomNavGlass({ collapsed }: { collapsed: boolean }) {
   )
 }
 
-function MobileBottomNav({ fabHidden = false, collapsed = false }: { fabHidden?: boolean; collapsed?: boolean }) {
+function MobileBottomNav({ collapsed = false }: { collapsed?: boolean }) {
   const navigate = useNavigate()
   const location = useLocation()
 
   const isHome = location.pathname === "/"
   const isStats = location.pathname === "/statistics"
 
-  const navWidth = collapsed ? "12rem" : "18rem"
+  const navWidth = collapsed ? "5.25rem" : "10.5rem"
   const buttonClass = (active: boolean) =>
-    `flex h-10 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1.15rem] px-1.5 transition-colors duration-150 ${
-      active ? "border border-white/15 bg-white/16 text-foreground shadow-sm" : "text-muted-foreground hover:bg-white/8 hover:text-foreground"
+    `flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-1.5 transition-colors duration-150 ${
+      active ? "text-primary" : "text-muted-foreground hover:text-foreground"
     }`
 
-  const labelClass = `overflow-hidden text-[10px] leading-none transition-[max-height,opacity,transform] duration-160 ${collapsed ? "max-h-0 -translate-y-0.5 opacity-0" : "max-h-3 translate-y-0 opacity-100"}`
+  const labelClass = (active: boolean) =>
+    `overflow-hidden text-[10px] leading-none font-medium transition-[max-height,opacity,transform] duration-160 ${
+      active ? "text-primary" : ""
+    } ${collapsed ? "max-h-0 -translate-y-0.5 opacity-0" : "max-h-3 translate-y-0 opacity-100"}`
 
   return (
     <div className="pointer-events-none sm:hidden fixed inset-x-0 bottom-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.85rem)]">
-      <div className="pointer-events-auto relative mx-auto" style={{ maxWidth: "calc(100vw - 2rem)" }}>
-        {!fabHidden && (
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center">
-            <motion.button
-              initial={{ opacity: 0, scale: 0.88, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: collapsed ? 4 : 0 }}
-              whileTap={{ scale: 0.92 }}
-              transition={{ type: "spring", stiffness: 320, damping: 28 }}
-              onClick={() => window.dispatchEvent(new CustomEvent("openQuickAdd"))}
-              className="pointer-events-auto -mt-2 flex h-14 w-14 items-center justify-center rounded-full bg-primary/96 text-primary-foreground"
-              style={{
-                boxShadow: collapsed
-                  ? "0 10px 24px rgba(0,0,0,0.18)"
-                  : "0 14px 32px rgba(0,0,0,0.22)",
-                backdropFilter: collapsed ? "blur(10px)" : "blur(6px)",
-              }}
-              title="快速记录"
-              aria-label="快速记录"
-            >
-              <Plus className="h-5 w-5" />
-            </motion.button>
-          </div>
-        )}
+      <div className="pointer-events-auto relative mx-auto flex items-end justify-center" style={{ maxWidth: "calc(100vw - 2rem)" }}>
 
         <motion.nav
-          className="relative isolate mx-auto overflow-hidden rounded-[1.5rem] border shadow-xl"
+          className="relative isolate overflow-hidden rounded-full border shadow-lg"
           animate={{
             width: navWidth,
-            y: collapsed ? 10 : 0,
-            opacity: collapsed ? 0.92 : 1,
-            padding: collapsed ? "0.25rem" : "0.375rem",
+            y: collapsed ? 14 : 0,
+            opacity: collapsed ? 0.88 : 1,
+            padding: collapsed ? "0.2rem 0.25rem" : "0.25rem 0.375rem",
           }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           style={{
-            maxWidth: "calc(100vw - 2rem)",
             transformOrigin: "center bottom",
-            backgroundColor: collapsed ? "color-mix(in srgb, var(--background) 72%, transparent)" : "color-mix(in srgb, var(--background) 80%, transparent)",
-            backdropFilter: collapsed ? "blur(24px) saturate(155%)" : "blur(20px) saturate(145%)",
-            borderColor: collapsed ? "color-mix(in srgb, white 16%, var(--border) 54%)" : "color-mix(in srgb, white 22%, var(--border) 62%)",
+            backgroundColor: collapsed ? "color-mix(in srgb, var(--background) 58%, transparent)" : "color-mix(in srgb, var(--background) 88%, transparent)",
+            backdropFilter: collapsed ? "blur(10px) saturate(118%)" : "blur(20px) saturate(145%)",
+            borderColor: collapsed ? "color-mix(in srgb, white 10%, var(--border) 42%)" : "color-mix(in srgb, white 18%, var(--border) 55%)",
             boxShadow: collapsed
-              ? "0 12px 28px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255,255,255,0.2)"
-              : "0 18px 36px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255,255,255,0.24)",
+              ? "0 8px 18px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255,255,255,0.12)"
+              : "0 12px 28px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255,255,255,0.2)",
           }}
         >
           <MobileBottomNavGlass collapsed={collapsed} />
 
-          <div className="relative z-10 grid grid-cols-[1fr_2.75rem_1fr] items-center gap-1.25">
+          <div className={`relative z-10 flex items-center justify-evenly ${collapsed ? "gap-0.5" : "gap-1"}`}>
             <button
               type="button"
               onClick={() => !isHome && navigateWithReplace(navigate, isHome, "/")}
               className={buttonClass(isHome)}
               aria-current={isHome ? "page" : undefined}
             >
-              <Home className="h-4 w-4 shrink-0" />
-              <span className={labelClass}>首页</span>
+              <Home className={`shrink-0 transition-transform duration-150 ${isHome ? "h-[1.125rem] w-[1.125rem]" : "h-4 w-4"}`} />
+              <span className={labelClass(isHome)}>首页</span>
             </button>
-
-            <div className="h-10 w-11" aria-hidden="true" />
 
             <button
               type="button"
@@ -430,12 +408,34 @@ function MobileBottomNav({ fabHidden = false, collapsed = false }: { fabHidden?:
               className={buttonClass(isStats)}
               aria-current={isStats ? "page" : undefined}
             >
-              <BarChart3 className="h-4 w-4 shrink-0" />
-              <span className={labelClass}>统计</span>
+              <BarChart3 className={`shrink-0 transition-transform duration-150 ${isStats ? "h-[1.125rem] w-[1.125rem]" : "h-4 w-4"}`} />
+              <span className={labelClass(isStats)}>统计</span>
             </button>
           </div>
         </motion.nav>
       </div>
+
+      <AnimatePresence initial={false}>
+        {!collapsed && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 10 }}
+            onClick={() => window.dispatchEvent(new CustomEvent("openQuickAdd"))}
+            className="pointer-events-auto fixed right-4 z-50 flex h-[3.125rem] w-[3.125rem] items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+            whileTap={{ scale: 0.92 }}
+            transition={{ type: "spring", stiffness: 360, damping: 26 }}
+            style={{
+              bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.85rem)",
+              boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+            }}
+            title="快速记录"
+            aria-label="快速记录"
+          >
+            <Plus className="h-5 w-5" />
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -616,7 +616,7 @@ function AppLayout() {
       <TopNav showOnMobile={showTopNavOnMobile} />
       {showAutoMobileNav && <MobileTopActions />}
       <MobileActionDock hidden={!showFloatingDock || mobileFabHidden} />
-      {showAutoMobileNav && <MobileBottomNav fabHidden={mobileFabHidden} collapsed={bottomNavCollapsed} />}
+      {showAutoMobileNav && <MobileBottomNav collapsed={bottomNavCollapsed} />}
       <GlobalShortcutListener />
       <main className={`${isHome ? "flex-1 min-h-0 overflow-hidden flex flex-col" : "flex-1"} ${showAutoMobileNav && !isHome ? "pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] sm:pb-0" : ""}`}>
         <Outlet />
