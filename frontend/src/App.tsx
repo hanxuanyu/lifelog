@@ -169,6 +169,10 @@ function AppLayout() {
     if (!showAutoMobileNav || typeof window === "undefined") return
 
     const positions = new WeakMap<object, number>()
+    const travelDistances = new WeakMap<object, number>()
+    const lastDirections = new WeakMap<object, 1 | -1 | 0>()
+    const COLLAPSE_DISTANCE = 72
+    const EXPAND_DISTANCE = 40
 
     const getSource = (target: EventTarget | null) => {
       if (target instanceof HTMLElement) return target
@@ -191,19 +195,40 @@ function AppLayout() {
       positions.set(source, nextTop)
 
       const delta = nextTop - prevTop
-      if (Math.abs(delta) < 24) return
+      if (Math.abs(delta) < 8) return
 
       if (nextTop <= 8) {
         setBottomNavCollapsed(false)
+        travelDistances.set(source, 0)
+        lastDirections.set(source, 0)
         return
       }
 
-      setBottomNavCollapsed(delta > 0)
+      const direction: 1 | -1 = delta > 0 ? 1 : -1
+      const lastDirection = lastDirections.get(source) ?? 0
+      const previousTravel = travelDistances.get(source) ?? 0
+      const nextTravel = lastDirection === direction
+        ? previousTravel + Math.abs(delta)
+        : Math.abs(delta)
+
+      lastDirections.set(source, direction)
+      travelDistances.set(source, nextTravel)
+
+      if (direction > 0 && !bottomNavCollapsed && nextTravel >= COLLAPSE_DISTANCE) {
+        setBottomNavCollapsed(true)
+        travelDistances.set(source, 0)
+        return
+      }
+
+      if (direction < 0 && bottomNavCollapsed && nextTravel >= EXPAND_DISTANCE) {
+        setBottomNavCollapsed(false)
+        travelDistances.set(source, 0)
+      }
     }
 
     window.addEventListener("scroll", onScroll, { capture: true, passive: true })
     return () => window.removeEventListener("scroll", onScroll, true)
-  }, [showAutoMobileNav, quickAddOpen])
+  }, [bottomNavCollapsed, showAutoMobileNav, quickAddOpen])
 
   return (
     <div className={`flex flex-col ${isHome ? "app-view-height overflow-hidden" : "app-min-view-height"}`}>

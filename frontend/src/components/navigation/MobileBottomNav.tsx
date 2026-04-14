@@ -8,26 +8,41 @@ function MobileBottomNavGlass({ collapsed }: { collapsed: boolean }) {
     <>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-3 top-0 h-1/2 rounded-full opacity-80"
+        className="pointer-events-none absolute inset-x-[10%] top-[7%] h-[44%] rounded-full opacity-90"
         style={{
           background: collapsed
-            ? "linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 100%)"
-            : "linear-gradient(180deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.05) 100%)",
+            ? "linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.03) 100%)"
+            : "linear-gradient(180deg, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.05) 100%)",
+          filter: "blur(10px)",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-[8%] top-[18%] h-[58%] w-[30%] rounded-full opacity-80"
+        style={{
+          background: "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.02) 52%, rgba(255,255,255,0) 76%)",
           filter: "blur(8px)",
         }}
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -left-6 top-2 h-12 w-[4.5rem] rounded-full opacity-70"
+        className="pointer-events-none absolute inset-x-[18%] bottom-[8%] h-[35%] rounded-full opacity-75"
         style={{
-          background: "radial-gradient(circle at center, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 72%)",
-          filter: "blur(6px)",
+          background: collapsed
+            ? "linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.10) 100%)"
+            : "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.12) 100%)",
+          filter: "blur(10px)",
         }}
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-2 bottom-1 h-px"
-        style={{ background: "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.22) 50%, rgba(255,255,255,0) 100%)" }}
+        className="pointer-events-none absolute inset-x-[10%] top-[1px] h-px"
+        style={{ background: "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.52) 50%, rgba(255,255,255,0) 100%)" }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-[14%] bottom-[2px] h-px opacity-70"
+        style={{ background: "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.24) 50%, rgba(255,255,255,0) 100%)" }}
       />
     </>
   )
@@ -52,11 +67,13 @@ export function MobileBottomNav({ collapsed = false }: { collapsed?: boolean }) 
     } ${collapsed ? "max-h-0 -translate-y-0.5 opacity-0" : "max-h-3 translate-y-0 opacity-100"}`
 
   return (
-    <div className="pointer-events-none sm:hidden fixed inset-x-0 bottom-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.85rem)]">
+    <div
+      className="pointer-events-none sm:hidden fixed inset-x-0 bottom-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.85rem+var(--mobile-toast-lift,0px))] transition-[padding-bottom] duration-300 ease-out"
+    >
       <div className="pointer-events-auto relative mx-auto flex items-end justify-center" style={{ maxWidth: "calc(100vw - 2rem)" }}>
 
         <motion.nav
-          className="relative isolate overflow-hidden rounded-full border shadow-lg"
+          className="liquid-glass-nav relative isolate overflow-hidden rounded-full border"
           animate={{
             width: navWidth,
             y: collapsed ? 14 : 0,
@@ -66,12 +83,16 @@ export function MobileBottomNav({ collapsed = false }: { collapsed?: boolean }) 
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           style={{
             transformOrigin: "center bottom",
-            backgroundColor: collapsed ? "color-mix(in srgb, var(--background) 58%, transparent)" : "color-mix(in srgb, var(--background) 88%, transparent)",
-            backdropFilter: collapsed ? "blur(10px) saturate(118%)" : "blur(20px) saturate(145%)",
-            borderColor: collapsed ? "color-mix(in srgb, white 10%, var(--border) 42%)" : "color-mix(in srgb, white 18%, var(--border) 55%)",
-            boxShadow: collapsed
-              ? "0 8px 18px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255,255,255,0.12)"
-              : "0 12px 28px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255,255,255,0.2)",
+            ["--liquid-glass-bg" as string]: collapsed
+              ? "color-mix(in srgb, var(--background) 14%, transparent)"
+              : "color-mix(in srgb, var(--background) 10%, transparent)",
+            ["--liquid-glass-border" as string]: collapsed
+              ? "color-mix(in srgb, white 14%, var(--border) 26%)"
+              : "color-mix(in srgb, white 20%, var(--border) 34%)",
+            ["--liquid-glass-shadow" as string]: collapsed
+              ? "0 10px 22px rgba(15,23,42,0.08)"
+              : "0 16px 34px rgba(15,23,42,0.12)",
+            ["--liquid-glass-blur" as string]: collapsed ? "14px" : "22px",
           }}
         >
           <MobileBottomNavGlass collapsed={collapsed} />
@@ -107,11 +128,11 @@ export function MobileBottomNav({ collapsed = false }: { collapsed?: boolean }) 
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 10 }}
             onClick={() => window.dispatchEvent(new CustomEvent("openQuickAdd"))}
-            className="pointer-events-auto fixed right-4 z-50 flex h-[3.125rem] w-[3.125rem] items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+            className="pointer-events-auto fixed right-4 z-50 flex h-[3.125rem] w-[3.125rem] items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-[bottom,box-shadow] duration-300 ease-out"
             whileTap={{ scale: 0.92 }}
             transition={{ type: "spring", stiffness: 360, damping: 26 }}
             style={{
-              bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.85rem)",
+              bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.85rem + var(--mobile-toast-lift, 0px))",
               boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
             }}
             title="快速记录"

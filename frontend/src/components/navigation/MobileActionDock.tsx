@@ -91,8 +91,8 @@ export function MobileActionDock({ hidden }: { hidden: boolean }) {
 
   return (
     <div
-      className="sm:hidden fixed right-4 z-50 flex flex-col items-center gap-3"
-      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.85rem)" }}
+      className="sm:hidden fixed right-4 z-50 flex flex-col items-center gap-3 transition-[bottom] duration-300 ease-out"
+      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.85rem + var(--mobile-toast-lift, 0px))" }}
     >
       <AnimatePresence initial={false}>
         {open && actions.map((action, index) => (
