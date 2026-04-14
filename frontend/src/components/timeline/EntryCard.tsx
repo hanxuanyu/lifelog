@@ -28,13 +28,14 @@ interface EntryCardProps {
   onAssignCategory: (eventType: string) => void
   setCardRef: (id: number) => (el: HTMLDivElement | null) => void
   setSwipedEntryId: (id: number | null) => void
+  highlighted?: boolean
 }
 
 export function EntryCard({
   entry, index, color, durItem, highlightIndex, expandedEntryId, swipedEntryId,
   getEntryMode, onCardClick, onCardContextMenu, onCardTouchStart, onCardTouchMove,
   onCardTouchEnd, onHighlightEnter, onHighlightLeave, onEditRequest, onDeleteRequest,
-  onDetailView, onAssignCategory, setCardRef, setSwipedEntryId,
+  onDetailView, onAssignCategory, setCardRef, setSwipedEntryId, highlighted,
 }: EntryCardProps) {
   // Extract plain text preview from markdown for collapsed state
   const detailPreview = useMemo(() => {
@@ -61,7 +62,7 @@ export function EntryCard({
         <motion.div
           className={`group rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer select-none active:brightness-90 ${
             highlightIndex === index ? "brightness-95 shadow-md" : "hover:brightness-95"
-          }`}
+          } ${highlighted ? "ring-2 ring-primary/30 animate-[pulse_0.8s_ease-in-out_2]" : ""}`}
           style={{
             backgroundColor: highlightIndex === index ? `${color}33` : `${color}1a`,
             borderColor: highlightIndex === index ? `${color}50` : `${color}33`,

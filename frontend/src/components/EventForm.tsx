@@ -55,6 +55,7 @@ export interface EventFormProps {
 
   suggestions?: SuggestionTag[]
   durationPreview?: DurationPreview | null
+  validationError?: boolean
 
   eventInputRef?: React.RefObject<HTMLInputElement | null>
   initialDetailOpen?: boolean
@@ -77,6 +78,7 @@ export function EventForm({
   cancelIcon = <X className="h-3.5 w-3.5 mr-1" />,
   suggestions,
   durationPreview,
+  validationError,
   eventInputRef,
   initialDetailOpen = false,
 }: EventFormProps) {
@@ -145,7 +147,9 @@ export function EventForm({
                 if (e.key === "Escape") onCancel?.()
               }}
               placeholder="做了什么..."
-              className="h-10 rounded-xl bg-accent/50 border-0 text-base"
+              className={`h-10 rounded-xl bg-accent/50 border-0 text-base transition-colors ${
+                validationError && !event.trim() ? "ring-2 ring-destructive/50 animate-[shake_0.3s_ease-in-out]" : ""
+              }`}
             />
             <Button
               type="button"

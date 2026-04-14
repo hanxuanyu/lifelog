@@ -136,6 +136,11 @@ export function RailSvg({
           <line x1={cx - 4} y1={hoverRailY} x2={cx + 4} y2={hoverRailY}
             stroke="currentColor" strokeWidth={isTouching ? 2 : 1} strokeDasharray="3 3" className="text-muted-foreground/40" />
           <circle cx={cx} cy={hoverRailY} r={isTouching ? 5 : 3} className={isTouching ? "fill-primary" : "fill-muted-foreground/50"} />
+          {/* Plus icon hint */}
+          <g className={isTouching ? "fill-primary" : "fill-muted-foreground/60"}>
+            <rect x={cx + 7} y={hoverRailY - 0.75} width={7} height={1.5} rx={0.75} />
+            <rect x={cx + 9.75} y={hoverRailY - 3.5} width={1.5} height={7} rx={0.75} />
+          </g>
           {isTouching ? (
             <>
               <rect x={0} y={Math.max(0, hoverRailY - 55)} width={cx - 2} height={hoverGapInfo ? 34 : 20} rx={4} className="fill-primary-foreground dark:fill-primary" />

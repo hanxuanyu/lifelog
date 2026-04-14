@@ -1,5 +1,5 @@
-import React, { useState, useEffect, lazy, Suspense } from "react"
-import { createBrowserRouter, RouterProvider, useNavigate, useLocation, Outlet } from "react-router-dom"
+import { useState, useEffect, lazy, Suspense } from "react"
+import { createBrowserRouter, RouterProvider, useLocation, Outlet } from "react-router-dom"
 import { motion } from "framer-motion"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
@@ -171,7 +171,7 @@ function AppLayout() {
       positions.set(source, nextTop)
 
       const delta = nextTop - prevTop
-      if (Math.abs(delta) < 10) return
+      if (Math.abs(delta) < 24) return
 
       if (nextTop <= 8) {
         setBottomNavCollapsed(false)

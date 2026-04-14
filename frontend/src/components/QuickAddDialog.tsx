@@ -143,6 +143,7 @@ function QuickAddDialogInner({
   const [timePointMode, setTimePointMode] = useState<string | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
   const [dataReady, setDataReady] = useState(false)
+  const [validationError, setValidationError] = useState(false)
 
   const eventInputRef = useRef<HTMLInputElement>(null)
 
@@ -225,7 +226,8 @@ function QuickAddDialogInner({
 
   const handleSubmit = async () => {
     if (!timeValue.trim() || !eventValue.trim()) {
-      toast.error("请填写完整", { description: "时间和事项不能为空" })
+      setValidationError(true)
+      setTimeout(() => setValidationError(false), 600)
       return
     }
     setSubmitting(true)
@@ -237,6 +239,7 @@ function QuickAddDialogInner({
           detail: detailValue.trim() || undefined,
         })
         toast.success("更新成功")
+        window.dispatchEvent(new CustomEvent("entryUpdated", { detail: editEntry.id }))
       } else {
         const entry = await createLog({
           log_date: date,
@@ -305,6 +308,7 @@ function QuickAddDialogInner({
             eventInputRef={eventInputRef}
             initialDetailOpen={isEdit && !!detailValue}
             durationPreview={endModeDurationPreview}
+            validationError={validationError}
           />
         </div>
 
