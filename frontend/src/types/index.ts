@@ -2,6 +2,7 @@ export interface LogEntry {
   id: number
   log_date: string
   log_time: string
+  time_range?: string
   event_type: string
   detail: string
   category: string

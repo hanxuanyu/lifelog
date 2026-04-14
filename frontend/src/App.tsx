@@ -16,6 +16,7 @@ import { MobileActionDock } from "@/components/navigation/MobileActionDock"
 import { MobileTopActions } from "@/components/navigation/MobileTopActions"
 import { MobileBottomNav } from "@/components/navigation/MobileBottomNav"
 import { GlobalShortcutListener } from "@/components/navigation/GlobalShortcutListener"
+import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog"
 import { format } from "date-fns"
 
 const StatisticsPage = lazy(() => import("@/pages/StatisticsPage").then((m) => ({ default: m.StatisticsPage })))
@@ -30,6 +31,7 @@ function AppLayout() {
   const { isAutoNavigation, isTopNavigation, isFloatingNavigation } = useNavigationStyle()
 
   const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<{
     id: number
     time: string
@@ -55,6 +57,24 @@ function AppLayout() {
 
     window.addEventListener("openQuickAdd", handler)
     return () => window.removeEventListener("openQuickAdd", handler)
+  }, [])
+
+  useEffect(() => {
+    const handler = () => setGlobalSearchOpen(true)
+
+    window.addEventListener("openGlobalSearch", handler)
+    return () => window.removeEventListener("openGlobalSearch", handler)
+  }, [])
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return
+      event.preventDefault()
+      setGlobalSearchOpen(true)
+    }
+
+    document.addEventListener("keydown", handler)
+    return () => document.removeEventListener("keydown", handler)
   }, [])
 
   useEffect(() => {
@@ -192,6 +212,7 @@ function AppLayout() {
       <MobileActionDock hidden={!showFloatingDock || mobileFabHidden} />
       {showAutoMobileNav && <MobileBottomNav collapsed={bottomNavCollapsed} />}
       <GlobalShortcutListener />
+      <GlobalSearchDialog open={globalSearchOpen} onOpenChange={setGlobalSearchOpen} />
       <main className={`${isHome ? "flex-1 min-h-0 overflow-hidden flex flex-col" : "flex-1"} ${showAutoMobileNav && !isHome ? "pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] sm:pb-0" : ""}`}>
         <Outlet />
       </main>

@@ -17,6 +17,7 @@ interface TimelineProps {
   timePointMode?: string
   onEditRequest?: (entry: LogEntry) => void
   onRailCreate?: (time: string) => void
+  externalHighlightedEntryId?: number | null
 }
 
 export function Timeline({
@@ -31,6 +32,7 @@ export function Timeline({
   timePointMode = "end",
   onEditRequest,
   onRailCreate,
+  externalHighlightedEntryId,
 }: TimelineProps) {
   const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set())
   const [highlightedEntryId, setHighlightedEntryId] = useState<number | null>(null)
@@ -143,7 +145,7 @@ export function Timeline({
           timePointMode={timePointMode}
           onEditRequest={onEditRequest}
           onRailCreate={onRailCreate}
-          highlightedEntryId={highlightedEntryId}
+          highlightedEntryId={externalHighlightedEntryId ?? highlightedEntryId}
         />
       </div>
     </div>

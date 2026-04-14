@@ -188,6 +188,12 @@ export function ListView({
     if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" })
   }, [highlightIndex, entries])
 
+  useEffect(() => {
+    if (typeof highlightedEntryId !== "number") return
+    const el = cardRefs.current.get(highlightedEntryId)
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [highlightedEntryId])
+
   // Curve path updates (imperative DOM manipulation)
   const updateCurvePaths = useCallback(() => {
     const svg = curveSvgRef.current

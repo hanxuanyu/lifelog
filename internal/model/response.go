@@ -24,6 +24,7 @@ type LogEntryResponse struct {
 	Detail        string `json:"detail"`
 	Category      string `json:"category"`
 	TimePointMode string `json:"time_point_mode,omitempty"`
+	TimeRange     string `json:"time_range,omitempty"`
 }
 
 // LogEntryRequest 新增/修改日志请求
