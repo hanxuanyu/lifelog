@@ -1,14 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { deleteLog } from "@/api"
 import type { LogEntry, Category, DurationItem, CrossDayHint } from "@/types"
 import { toast } from "sonner"
@@ -42,7 +32,69 @@ export function Timeline({
   onEditRequest,
   onRailCreate,
 }: TimelineProps) {
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
+  const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set())
+  const [highlightedEntryId, setHighlightedEntryId] = useState<number | null>(null)
+  const pendingDeleteRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
+
+  // Listen for entry update events to highlight the edited card
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent).detail as number
+      setHighlightedEntryId(id)
+      setTimeout(() => setHighlightedEntryId(null), 1500)
+    }
+    window.addEventListener("entryUpdated", handler)
+    return () => window.removeEventListener("entryUpdated", handler)
+  }, [])
+
+  const visibleEntries = useMemo(
+    () => entries.filter((e) => !hiddenIds.has(e.id)),
+    [entries, hiddenIds],
+  )
+
+  const handleDeleteRequest = useCallback((id: number) => {
+    // Optimistically hide the entry
+    setHiddenIds((prev) => new Set(prev).add(id))
+
+    // Show undo toast, delete on dismiss
+    toast("已删除记录", {
+      action: {
+        label: "撤销",
+        onClick: () => {
+          // Cancel pending delete and restore
+          const timer = pendingDeleteRef.current.get(id)
+          if (timer) clearTimeout(timer)
+          pendingDeleteRef.current.delete(id)
+          setHiddenIds((prev) => {
+            const next = new Set(prev)
+            next.delete(id)
+            return next
+          })
+        },
+      },
+      duration: 4000,
+      onDismiss: () => scheduleDelete(id),
+      onAutoClose: () => scheduleDelete(id),
+    })
+  }, [])
+
+  const scheduleDelete = useCallback((id: number) => {
+    if (pendingDeleteRef.current.has(id)) return
+    const timer = setTimeout(() => {
+      pendingDeleteRef.current.delete(id)
+      deleteLog(id)
+        .then(() => onUpdate())
+        .catch(() => {
+          toast.error("删除失败")
+          setHiddenIds((prev) => {
+            const next = new Set(prev)
+            next.delete(id)
+            return next
+          })
+        })
+    }, 0)
+    pendingDeleteRef.current.set(id, timer)
+  }, [onUpdate])
   const [currentTime, setCurrentTime] = useState(() => {
     const now = new Date()
     return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
@@ -74,27 +126,14 @@ export function Timeline({
     [durationItems]
   )
 
-  const confirmDelete = async () => {
-    if (deleteTarget === null) return
-    try {
-      await deleteLog(deleteTarget)
-      toast.success("已删除")
-      setDeleteTarget(null)
-      onUpdate()
-    } catch {
-      toast.error("删除失败")
-    }
-  }
-
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* View content — fills remaining space */}
       <div className="flex-1 min-h-0 flex flex-col">
         <ListView
-          entries={entries}
+          entries={visibleEntries}
           durationItems={durationItems}
           onUpdate={onUpdate}
-          onDeleteRequest={setDeleteTarget}
+          onDeleteRequest={handleDeleteRequest}
           getCategoryColor={getCategoryColor}
           getDurationForEntry={getDurationForEntry}
           crossDayHints={crossDayHints}
@@ -104,32 +143,9 @@ export function Timeline({
           timePointMode={timePointMode}
           onEditRequest={onEditRequest}
           onRailCreate={onRailCreate}
+          highlightedEntryId={highlightedEntryId}
         />
       </div>
-
-      {/* Delete confirmation dialog */}
-      <AlertDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
-            <AlertDialogDescription>
-              此操作不可撤销，确定要删除这条记录吗？
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-destructive text-white hover:bg-destructive/90"
-            >
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

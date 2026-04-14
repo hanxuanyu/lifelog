@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from "react"
-import { motion } from "framer-motion"
 import { format, subDays } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -154,9 +153,9 @@ export function StatisticsPage() {
     <div>
       <div className="fixed top-0 left-0 right-0 z-40 bg-background" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-5xl mx-auto px-4 w-full pt-4 pb-3">
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+          <div>
             <h1 className="text-lg font-semibold">数据统计</h1>
-          </motion.div>
+          </div>
         </div>
       </div>
       <div className="pt-14" />
@@ -172,11 +171,7 @@ export function StatisticsPage() {
             <div className="mt-4">
               {loading ? (
                 <div className="flex items-center justify-center py-20">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                    className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full"
-                  />
+                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : (
                 <>

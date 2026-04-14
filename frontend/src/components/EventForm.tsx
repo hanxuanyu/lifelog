@@ -55,6 +55,7 @@ export interface EventFormProps {
 
   suggestions?: SuggestionTag[]
   durationPreview?: DurationPreview | null
+  validationError?: boolean
 
   eventInputRef?: React.RefObject<HTMLInputElement | null>
   initialDetailOpen?: boolean
@@ -77,6 +78,7 @@ export function EventForm({
   cancelIcon = <X className="h-3.5 w-3.5 mr-1" />,
   suggestions,
   durationPreview,
+  validationError,
   eventInputRef,
   initialDetailOpen = false,
 }: EventFormProps) {
@@ -130,7 +132,7 @@ export function EventForm({
         </div>
 
         {/* Right side: event input */}
-        <div className="flex-1 min-w-0 flex flex-col gap-2 justify-center">
+        <div className="flex-1 min-w-0 flex flex-col gap-1.5 justify-center">
           <div className="flex items-center gap-2">
             <Tag className="h-4 w-4 text-muted-foreground shrink-0" />
             <Input
@@ -145,7 +147,9 @@ export function EventForm({
                 if (e.key === "Escape") onCancel?.()
               }}
               placeholder="做了什么..."
-              className="h-10 rounded-xl bg-accent/50 border-0 text-base"
+              className={`h-10 rounded-xl bg-accent/50 border-0 text-base transition-colors ${
+                validationError && !event.trim() ? "ring-2 ring-destructive/50 animate-[shake_0.3s_ease-in-out]" : ""
+              }`}
             />
             <Button
               type="button"
@@ -162,28 +166,17 @@ export function EventForm({
               <FileText className="h-4 w-4" />
             </Button>
           </div>
+          {durationPreview && (
+            <div className={`flex items-center gap-1 pl-6 ${
+              durationPreview.tone === "info" ? "text-primary" : "text-muted-foreground"
+            }`}>
+              <Clock3 className="h-3 w-3 shrink-0" />
+              <span className="text-[11px] font-medium">{durationPreview.label}</span>
+              <span className="text-[11px] text-muted-foreground">{durationPreview.detail}</span>
+            </div>
+          )}
         </div>
       </div>
-
-      {durationPreview && (
-        <div
-          className={`flex items-start gap-2 rounded-xl border px-3 py-2 ${
-            durationPreview.tone === "info"
-              ? "border-primary/20 bg-primary/5"
-              : "border-border/60 bg-accent/40"
-          }`}
-        >
-          <Clock3
-            className={`mt-0.5 h-4 w-4 shrink-0 ${
-              durationPreview.tone === "info" ? "text-primary" : "text-muted-foreground"
-            }`}
-          />
-          <div className="min-w-0">
-            <p className="text-xs font-medium">{durationPreview.label}</p>
-            <p className="text-[11px] text-muted-foreground">{durationPreview.detail}</p>
-          </div>
-        </div>
-      )}
 
       {/* Suggestion tags — two-level or flat search */}
       {isSearching ? (

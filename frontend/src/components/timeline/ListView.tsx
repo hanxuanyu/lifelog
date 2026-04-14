@@ -41,12 +41,13 @@ interface ListViewProps {
   timePointMode?: string
   onEditRequest?: (entry: LogEntry) => void
   onRailCreate?: (time: string) => void
+  highlightedEntryId?: number | null
 }
 
 export function ListView({
   entries, durationItems, onUpdate, onDeleteRequest, getCategoryColor,
   getDurationForEntry, crossDayHints = [], prevDayLastTime, isToday, currentTime,
-  timePointMode = "end", onEditRequest, onRailCreate,
+  timePointMode = "end", onEditRequest, onRailCreate, highlightedEntryId,
 }: ListViewProps) {
   const getEntryMode = useCallback(
     (entry: LogEntry) => entry.time_point_mode || timePointMode,
@@ -85,6 +86,20 @@ export function ListView({
 
   const { hoverTime, setHoverTime, isTouching, handleRailHover, handleRailClick } =
     useRailInteraction({ railRef, railHeight, onRailCreate })
+
+  // One-time swipe hint: auto-peek first card on mobile
+  useEffect(() => {
+    if (typeof window === "undefined" || window.innerWidth >= 640) return
+    if (entries.length === 0) return
+    if (localStorage.getItem("swipe_hint_shown")) return
+
+    const timer = setTimeout(() => {
+      setSwipedEntryId(entries[0].id)
+      localStorage.setItem("swipe_hint_shown", "1")
+      setTimeout(() => setSwipedEntryId(null), 1200)
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [entries, setSwipedEntryId])
 
   // Computed
   const usableHeight = Math.max(0, railHeight - RAIL_PADDING * 2)
@@ -353,6 +368,7 @@ export function ListView({
                 onDetailView={(title, detail, time) => setDetailDialog({ title, detail, time })}
                 onAssignCategory={(eventType) => setAssignDialog({ open: true, eventType })}
                 setCardRef={setCardRef} setSwipedEntryId={setSwipedEntryId}
+                highlighted={highlightedEntryId === entry.id}
               />
             </div>
           ))}
