@@ -23,3 +23,6 @@ coverage.out
 node_modules/
 web/
 logs/
+.gocache/
+.gomodcache/
+.env

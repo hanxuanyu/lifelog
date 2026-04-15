@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { Settings, Sun, Moon } from "lucide-react"
+import { Search, Settings, Sun, Moon } from "lucide-react"
 import { useTheme } from "@/hooks/use-theme"
 import { navigateWithReplace } from "@/lib/navigation"
 
@@ -17,6 +17,19 @@ export function MobileTopActions() {
       className="sm:hidden fixed right-4 top-4 z-50 flex items-center gap-1.5"
       style={{ top: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
     >
+      <motion.button
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08, type: "spring", stiffness: 300, damping: 20 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => window.dispatchEvent(new CustomEvent("openGlobalSearch"))}
+        className="flex h-9 w-9 items-center justify-center rounded-full border bg-background/70 text-muted-foreground shadow-sm backdrop-blur-sm"
+        title="搜索"
+        aria-label="搜索"
+      >
+        <Search className="h-[15px] w-[15px]" />
+      </motion.button>
+
       {!isSettings && (
         <motion.button
           initial={{ opacity: 0, y: -10 }}

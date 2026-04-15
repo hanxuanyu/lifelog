@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { BarChart3, Settings, Home, Plus, Sun, Moon } from "lucide-react"
+import { BarChart3, Search, Settings, Home, Plus, Sun, Moon } from "lucide-react"
 import { useTheme } from "@/hooks/use-theme"
 import { navigateWithReplace } from "@/lib/navigation"
 
@@ -63,6 +63,15 @@ export function MobileActionDock({ hidden }: { hidden: boolean }) {
       icon: <Settings className="h-4 w-4" />,
     } : null,
     {
+      key: "search",
+      title: "搜索",
+      onClick: () => {
+        window.dispatchEvent(new CustomEvent("openGlobalSearch"))
+        setOpen(false)
+      },
+      icon: <Search className="h-4 w-4" />,
+    },
+    {
       key: "theme",
       title: isDark ? "切换浅色模式" : "切换深色模式",
       onClick: () => {
@@ -82,8 +91,8 @@ export function MobileActionDock({ hidden }: { hidden: boolean }) {
 
   return (
     <div
-      className="sm:hidden fixed right-4 z-50 flex flex-col items-center gap-3"
-      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.85rem)" }}
+      className="sm:hidden fixed right-4 z-50 flex flex-col items-center gap-3 transition-[bottom] duration-300 ease-out"
+      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.85rem + var(--mobile-toast-lift, 0px))" }}
     >
       <AnimatePresence initial={false}>
         {open && actions.map((action, index) => (

@@ -12,21 +12,21 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-// Task 定时任务接口
+// Task defines a builtin scheduled task.
 type Task interface {
-	Name() string                        // 任务唯一标识
-	Description() string                 // 任务描述
-	DefaultCron() string                 // 默认 cron 表达式
-	EventName() string                   // 执行完成后发布的事件名
-	Execute() (map[string]string, error) // 执行任务并返回事件数据
+	Name() string
+	Description() string
+	DefaultCron() string
+	EventName() string
+	ParameterDefinitions(model.ScheduledTaskConfig) []model.ScheduledTaskParamDefinition
+	Execute(model.ScheduledTaskConfig) (map[string]string, error)
 }
 
-// TaskEntry 已注册任务的状态
+// TaskEntry stores the runtime state of a registered task.
 type TaskEntry struct {
-	Task     Task
-	CronExpr string
-	Enabled  bool
-	EntryID  cron.EntryID // 0 表示未调度
+	Task    Task
+	Config  model.ScheduledTaskConfig
+	EntryID cron.EntryID
 }
 
 var (
@@ -36,58 +36,61 @@ var (
 	builtinTasks  []Task
 )
 
-// RegisterBuiltinTask 注册内置任务（在 Start 之前调用）
+// RegisterBuiltinTask registers a builtin task before Start is called.
 func RegisterBuiltinTask(t Task) {
 	mu.Lock()
 	defer mu.Unlock()
 	builtinTasks = append(builtinTasks, t)
 }
 
-// Start 启动调度器并加载所有任务
+// Start boots the scheduler and loads all builtin tasks from config.
 func Start() {
 	mu.Lock()
 	defer mu.Unlock()
 
 	if cronRunner != nil {
-		slog.Warn("调度器已经启动")
+		slog.Warn("scheduler already started")
 		return
 	}
 
-	// 使用标准 6 字段 cron（秒、分、时、日、月、周）
 	cronRunner = cron.New(cron.WithSeconds())
 
-	// 确保配置中存在所有内置任务（缺失则添加默认配置）
 	if err := ensureBuiltinTaskConfigs(); err != nil {
-		slog.Error("确保内置任务配置失败", "error", err)
+		slog.Error("failed to ensure builtin task configs", "error", err)
 	}
 
-	// 根据配置注册到 cron
+	registeredMap = make(map[string]*TaskEntry, len(builtinTasks))
 	for _, t := range builtinTasks {
-		entry := &TaskEntry{
-			Task:     t,
-			CronExpr: t.DefaultCron(),
-			Enabled:  true,
+		cfg := model.ScheduledTaskConfig{
+			Name:    t.Name(),
+			Cron:    t.DefaultCron(),
+			Enabled: false,
 		}
-		if cfg := config.GetScheduledTaskByName(t.Name()); cfg != nil {
-			if cfg.Cron != "" {
-				entry.CronExpr = cfg.Cron
+		if saved := config.GetScheduledTaskByName(t.Name()); saved != nil {
+			cfg = copyScheduledTaskConfig(*saved)
+			if cfg.Cron == "" {
+				cfg.Cron = t.DefaultCron()
 			}
-			entry.Enabled = cfg.Enabled
+		}
+
+		entry := &TaskEntry{
+			Task:   t,
+			Config: cfg,
 		}
 		registeredMap[t.Name()] = entry
 
-		if entry.Enabled {
+		if entry.Config.Enabled {
 			if err := scheduleEntry(entry); err != nil {
-				slog.Error("注册定时任务失败", "task", t.Name(), "cron", entry.CronExpr, "error", err)
+				slog.Error("failed to schedule task", "task", t.Name(), "cron", entry.Config.Cron, "error", err)
 			}
 		}
 	}
 
 	cronRunner.Start()
-	slog.Info("调度器已启动", "tasks_count", len(registeredMap))
+	slog.Info("scheduler started", "tasks_count", len(registeredMap))
 }
 
-// Stop 停止调度器
+// Stop shuts down the scheduler.
 func Stop() {
 	mu.Lock()
 	defer mu.Unlock()
@@ -96,11 +99,10 @@ func Stop() {
 		ctx := cronRunner.Stop()
 		<-ctx.Done()
 		cronRunner = nil
-		slog.Info("调度器已停止")
+		slog.Info("scheduler stopped")
 	}
 }
 
-// ensureBuiltinTaskConfigs 如果配置中缺少内置任务项则补充默认值
 func ensureBuiltinTaskConfigs() error {
 	existing := config.GetScheduledTasks()
 	existingMap := make(map[string]struct{}, len(existing))
@@ -110,39 +112,40 @@ func ensureBuiltinTaskConfigs() error {
 
 	changed := false
 	for _, t := range builtinTasks {
-		if _, ok := existingMap[t.Name()]; !ok {
-			existing = append(existing, model.ScheduledTaskConfig{
-				Name:    t.Name(),
-				Cron:    t.DefaultCron(),
-				Enabled: false,
-			})
-			changed = true
+		if _, ok := existingMap[t.Name()]; ok {
+			continue
 		}
+		existing = append(existing, model.ScheduledTaskConfig{
+			Name:    t.Name(),
+			Cron:    t.DefaultCron(),
+			Enabled: false,
+		})
+		changed = true
 	}
 
-	if changed {
-		return config.SetScheduledTasks(existing)
+	if !changed {
+		return nil
 	}
-	return nil
+	return config.SetScheduledTasks(existing)
 }
 
-// scheduleEntry 将任务加入 cron；调用方需持锁
 func scheduleEntry(entry *TaskEntry) error {
 	if cronRunner == nil {
-		return fmt.Errorf("调度器未启动")
+		return fmt.Errorf("scheduler not started")
 	}
-	id, err := cronRunner.AddFunc(entry.CronExpr, func() {
-		runTask(entry.Task)
+
+	id, err := cronRunner.AddFunc(entry.Config.Cron, func() {
+		runTaskByName(entry.Task.Name())
 	})
 	if err != nil {
 		return err
 	}
+
 	entry.EntryID = id
-	slog.Info("定时任务已注册", "task", entry.Task.Name(), "cron", entry.CronExpr)
+	slog.Info("scheduled task registered", "task", entry.Task.Name(), "cron", entry.Config.Cron)
 	return nil
 }
 
-// unscheduleEntry 从 cron 中移除任务；调用方需持锁
 func unscheduleEntry(entry *TaskEntry) {
 	if cronRunner == nil || entry.EntryID == 0 {
 		return
@@ -151,7 +154,6 @@ func unscheduleEntry(entry *TaskEntry) {
 	entry.EntryID = 0
 }
 
-// hasEnabledBindings 检查事件是否有已启用的下游 webhook 绑定
 func hasEnabledBindings(eventName string) bool {
 	for _, b := range config.GetEventBindings() {
 		if b.Event == eventName && b.Enabled && b.WebhookName != "" {
@@ -163,7 +165,6 @@ func hasEnabledBindings(eventName string) bool {
 	return false
 }
 
-// countEnabledBindings 统计事件已启用的下游 webhook 绑定数
 func countEnabledBindings(eventName string) int {
 	count := 0
 	for _, b := range config.GetEventBindings() {
@@ -176,34 +177,45 @@ func countEnabledBindings(eventName string) int {
 	return count
 }
 
-// runTask 执行一次任务并发布事件
-func runTask(t Task) {
+func runTaskByName(name string) {
+	mu.RLock()
+	entry, ok := registeredMap[name]
+	if !ok {
+		mu.RUnlock()
+		slog.Warn("skip unknown scheduled task", "task", name)
+		return
+	}
+	task := entry.Task
+	cfg := copyScheduledTaskConfig(entry.Config)
+	mu.RUnlock()
+
+	runTask(task, cfg)
+}
+
+func runTask(task Task, cfg model.ScheduledTaskConfig) {
 	start := time.Now()
 
-	// 检查是否有下游 webhook 绑定，无绑定则跳过执行
-	if !hasEnabledBindings(t.EventName()) {
-		slog.Info("定时任务跳过：事件无已启用的 webhook 绑定", "task", t.Name(), "event", t.EventName())
+	if !hasEnabledBindings(task.EventName()) {
+		slog.Info("scheduled task skipped because no enabled webhook bindings exist", "task", task.Name(), "event", task.EventName())
 		return
 	}
 
-	slog.Info("开始执行定时任务", "task", t.Name())
+	slog.Info("running scheduled task", "task", task.Name())
 
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Error("定时任务 panic", "task", t.Name(), "error", r)
+			slog.Error("scheduled task panic", "task", task.Name(), "error", r)
 		}
 	}()
 
-	data, err := t.Execute()
+	data, err := task.Execute(cfg)
 	if err != nil {
-		slog.Error("定时任务执行失败", "task", t.Name(), "error", err, "duration", time.Since(start))
-		// 即使失败也可以发布事件（包含错误信息），但这里先简单记录
+		slog.Error("scheduled task failed", "task", task.Name(), "error", err, "duration", time.Since(start))
 		return
 	}
 
 	if data == nil {
-		// 任务可以返回 nil data 表示不需要发布事件（例如无日志提醒时没到阈值）
-		slog.Info("定时任务无需发布事件", "task", t.Name(), "duration", time.Since(start))
+		slog.Info("scheduled task produced no event data", "task", task.Name(), "duration", time.Since(start))
 		return
 	}
 
@@ -211,23 +223,24 @@ func runTask(t Task) {
 		data["timestamp"] = time.Now().Format("2006-01-02 15:04:05")
 	}
 
-	events.Publish(t.EventName(), data)
-	slog.Info("定时任务执行完成", "task", t.Name(), "event", t.EventName(), "duration", time.Since(start))
+	events.Publish(task.EventName(), data)
+	slog.Info("scheduled task finished", "task", task.Name(), "event", task.EventName(), "duration", time.Since(start))
 }
 
-// TaskInfo 对外暴露的任务信息
+// TaskInfo is the API payload for builtin tasks.
 type TaskInfo struct {
-	Name              string    `json:"name"`
-	Description       string    `json:"description"`
-	Cron              string    `json:"cron"`
-	Enabled           bool      `json:"enabled"`
-	EventName         string    `json:"event_name"`
-	DefaultCron       string    `json:"default_cron"`
-	NextRun           time.Time `json:"next_run,omitempty"`
-	BoundWebhookCount int       `json:"bound_webhook_count"`
+	Name              string                               `json:"name"`
+	Description       string                               `json:"description"`
+	Cron              string                               `json:"cron"`
+	Enabled           bool                                 `json:"enabled"`
+	EventName         string                               `json:"event_name"`
+	DefaultCron       string                               `json:"default_cron"`
+	NextRun           time.Time                            `json:"next_run,omitempty"`
+	BoundWebhookCount int                                  `json:"bound_webhook_count"`
+	ParamDefinitions  []model.ScheduledTaskParamDefinition `json:"param_definitions,omitempty"`
 }
 
-// GetTasks 返回所有注册的任务信息
+// GetTasks returns all registered builtin tasks.
 func GetTasks() []TaskInfo {
 	mu.RLock()
 	defer mu.RUnlock()
@@ -238,14 +251,16 @@ func GetTasks() []TaskInfo {
 		if !ok {
 			continue
 		}
+
 		info := TaskInfo{
 			Name:              t.Name(),
 			Description:       t.Description(),
-			Cron:              entry.CronExpr,
-			Enabled:           entry.Enabled,
+			Cron:              entry.Config.Cron,
+			Enabled:           entry.Config.Enabled,
 			EventName:         t.EventName(),
 			DefaultCron:       t.DefaultCron(),
 			BoundWebhookCount: countEnabledBindings(t.EventName()),
+			ParamDefinitions:  t.ParameterDefinitions(copyScheduledTaskConfig(entry.Config)),
 		}
 		if cronRunner != nil && entry.EntryID != 0 {
 			e := cronRunner.Entry(entry.EntryID)
@@ -255,40 +270,43 @@ func GetTasks() []TaskInfo {
 		}
 		result = append(result, info)
 	}
+
 	return result
 }
 
-// UpdateTasks 批量更新任务配置（cron + enabled），持久化并重新调度
+// UpdateTasks updates cron, enabled state, and task params, then persists and reschedules.
 func UpdateTasks(updates []model.ScheduledTaskConfig) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	// 校验 6 字段 cron 表达式（秒、分、时、日、月、周）
 	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 	for _, u := range updates {
-		if _, ok := registeredMap[u.Name]; !ok {
-			return fmt.Errorf("未知的任务: %s", u.Name)
+		entry, ok := registeredMap[u.Name]
+		if !ok {
+			return fmt.Errorf("unknown task: %s", u.Name)
 		}
 		if _, err := parser.Parse(u.Cron); err != nil {
-			return fmt.Errorf("任务 %s 的 cron 表达式无效: %w", u.Name, err)
+			return fmt.Errorf("invalid cron for task %s: %w", u.Name, err)
+		}
+		if err := validateTaskParams(entry.Task, u.Params); err != nil {
+			return err
 		}
 	}
 
-	// 持久化
 	merged := mergeTaskConfigs(updates)
 	if err := config.SetScheduledTasks(merged); err != nil {
 		return err
 	}
 
-	// 重新调度
 	for _, u := range updates {
 		entry := registeredMap[u.Name]
 		unscheduleEntry(entry)
-		entry.CronExpr = u.Cron
-		entry.Enabled = u.Enabled
-		if entry.Enabled {
+		entry.Config.Cron = u.Cron
+		entry.Config.Enabled = u.Enabled
+		entry.Config.Params = copyStringMap(u.Params)
+		if entry.Config.Enabled {
 			if err := scheduleEntry(entry); err != nil {
-				slog.Error("重新注册定时任务失败", "task", u.Name, "error", err)
+				slog.Error("failed to reschedule task", "task", u.Name, "error", err)
 			}
 		}
 	}
@@ -296,38 +314,77 @@ func UpdateTasks(updates []model.ScheduledTaskConfig) error {
 	return nil
 }
 
-// mergeTaskConfigs 合并用户提交的更新和已注册任务的完整配置
+func validateTaskParams(task Task, params map[string]string) error {
+	if len(params) == 0 {
+		return nil
+	}
+
+	allowed := make(map[string]struct{})
+	for _, def := range task.ParameterDefinitions(model.ScheduledTaskConfig{Name: task.Name()}) {
+		if def.ReadOnly {
+			continue
+		}
+		allowed[def.Key] = struct{}{}
+	}
+
+	for key := range params {
+		if _, ok := allowed[key]; !ok {
+			return fmt.Errorf("task %s does not support parameter %s", task.Name(), key)
+		}
+	}
+	return nil
+}
+
 func mergeTaskConfigs(updates []model.ScheduledTaskConfig) []model.ScheduledTaskConfig {
 	updateMap := make(map[string]model.ScheduledTaskConfig, len(updates))
 	for _, u := range updates {
 		updateMap[u.Name] = u
 	}
+
 	result := make([]model.ScheduledTaskConfig, 0, len(registeredMap))
 	for _, t := range builtinTasks {
 		entry := registeredMap[t.Name()]
-		cfg := model.ScheduledTaskConfig{
-			Name:    t.Name(),
-			Cron:    entry.CronExpr,
-			Enabled: entry.Enabled,
-		}
+		cfg := copyScheduledTaskConfig(entry.Config)
 		if u, ok := updateMap[t.Name()]; ok {
 			cfg.Cron = u.Cron
 			cfg.Enabled = u.Enabled
+			if u.Params != nil {
+				cfg.Params = copyStringMap(u.Params)
+			}
 		}
 		result = append(result, cfg)
 	}
+
 	return result
 }
 
-// RunTaskNow 手动触发任务（异步执行）
+// RunTaskNow triggers a task immediately in the background.
 func RunTaskNow(name string) error {
 	mu.RLock()
-	entry, ok := registeredMap[name]
+	_, ok := registeredMap[name]
 	mu.RUnlock()
 
 	if !ok {
-		return fmt.Errorf("未知的任务: %s", name)
+		return fmt.Errorf("unknown task: %s", name)
 	}
-	go runTask(entry.Task)
+
+	go runTaskByName(name)
 	return nil
+}
+
+func copyScheduledTaskConfig(cfg model.ScheduledTaskConfig) model.ScheduledTaskConfig {
+	cfg.Params = copyStringMap(cfg.Params)
+	return cfg
+}
+
+func copyStringMap(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return nil
+	}
+
+	result := make(map[string]string, len(input))
+	for key, value := range input {
+		result[key] = value
+	}
+	return result
 }

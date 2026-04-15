@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Save, Info, Settings2, Webhook, Zap, Tags } from "lucide-react"
+import { useLocation } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { getSettings, updateSettings } from "@/api"
@@ -22,11 +23,15 @@ import { EventBindingsCard } from "@/components/settings/EventBindingsCard"
 import { ScheduledTasksCard } from "@/components/settings/ScheduledTasksCard"
 import { useNavigationStyle } from "@/hooks/use-navigation-style"
 import { useTransientPageScrollbar } from "@/hooks/use-transient-page-scrollbar"
+import { isSettingsSearchTab, type SettingsSearchTab } from "@/lib/search-index"
 
 export function SettingsPage() {
   useTransientPageScrollbar()
+  const location = useLocation()
   const [loading, setLoading] = useState(true)
   const { navigationStyle, setNavigationStyle } = useNavigationStyle()
+  const [activeTab, setActiveTab] = useState<SettingsSearchTab>("app-info")
+  const [highlightedSection, setHighlightedSection] = useState<string | null>(null)
 
   // Settings save group
   const [timePointMode, setTimePointMode] = useState("end")
@@ -62,6 +67,33 @@ export function SettingsPage() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    const state = location.state as { searchTab?: string; searchSection?: string } | null
+    if (!state?.searchTab && !state?.searchSection) return
+
+    if (state?.searchTab && isSettingsSearchTab(state.searchTab)) {
+      setActiveTab(state.searchTab)
+    }
+
+    if (!state?.searchSection) return
+
+    setHighlightedSection(state.searchSection)
+
+    const scrollTimer = window.setTimeout(() => {
+      const target = document.getElementById(state.searchSection!)
+      target?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, 120)
+
+    const clearTimer = window.setTimeout(() => {
+      setHighlightedSection((current) => current === state.searchSection ? null : current)
+    }, 2200)
+
+    return () => {
+      window.clearTimeout(scrollTimer)
+      window.clearTimeout(clearTimer)
+    }
+  }, [location.key, location.state])
 
   const settingsDirty =
     timePointMode !== origSettings.timePointMode ||
@@ -121,6 +153,11 @@ export function SettingsPage() {
     )
   }
 
+  const getSectionClassName = (sectionId: string) =>
+    `scroll-mt-24 rounded-2xl transition-[box-shadow,background-color] ${
+      highlightedSection === sectionId ? "bg-accent/35 ring-2 ring-primary/30 shadow-sm" : ""
+    }`
+
   return (
     <div>
       <div className="fixed top-0 left-0 right-0 z-40 bg-background" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
@@ -133,7 +170,7 @@ export function SettingsPage() {
       <div className="pt-14" />
       <div className="max-w-5xl mx-auto px-4 w-full">
         <div style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
-          <Tabs defaultValue="app-info">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsSearchTab)}>
             <TabsList className="w-full grid grid-cols-5 mb-4">
               <TabsTrigger value="app-info" className="gap-1.5">
                 <Info className="h-4 w-4" /><span className="hidden sm:inline">设置首页</span>
@@ -154,21 +191,41 @@ export function SettingsPage() {
 
             <TabsContent value="app-info">
               <div className="space-y-4">
-                <VersionInfoCard />
-                <ServerMonitorCard />
-                <PasswordCard />
-                <DataManagementCard onImportComplete={handleImportComplete} />
-                <ShortcutCard />
+                <div id="version-info" className={getSectionClassName("version-info")}>
+                  <VersionInfoCard />
+                </div>
+                <div id="server-monitor" className={getSectionClassName("server-monitor")}>
+                  <ServerMonitorCard />
+                </div>
+                <div id="password-settings" className={getSectionClassName("password-settings")}>
+                  <PasswordCard />
+                </div>
+                <div id="data-management" className={getSectionClassName("data-management")}>
+                  <DataManagementCard onImportComplete={handleImportComplete} />
+                </div>
+                <div id="shortcut-settings" className={getSectionClassName("shortcut-settings")}>
+                  <ShortcutCard />
+                </div>
               </div>
             </TabsContent>
 
             <TabsContent value="basic">
               <div className="space-y-4">
-                <TimePointModeCard value={timePointMode} onChange={setTimePointMode} />
-                <NavigationStyleCard value={navigationStyle} onChange={setNavigationStyle} />
-                <ServerConfigCard serverPort={serverPort} onServerPortChange={setServerPort} dbPath={dbPath} onDbPathChange={setDbPath} />
-                <AuthConfigCard jwtExpireHours={jwtExpireHours} onJwtExpireHoursChange={setJwtExpireHours} />
-                <MCPServiceCard mcpEnabled={mcpEnabled} onMcpEnabledChange={setMcpEnabled} mcpPort={mcpPort} onMcpPortChange={setMcpPort} />
+                <div id="time-point-mode" className={getSectionClassName("time-point-mode")}>
+                  <TimePointModeCard value={timePointMode} onChange={setTimePointMode} />
+                </div>
+                <div id="navigation-style" className={getSectionClassName("navigation-style")}>
+                  <NavigationStyleCard value={navigationStyle} onChange={setNavigationStyle} />
+                </div>
+                <div id="server-config" className={getSectionClassName("server-config")}>
+                  <ServerConfigCard serverPort={serverPort} onServerPortChange={setServerPort} dbPath={dbPath} onDbPathChange={setDbPath} />
+                </div>
+                <div id="auth-config" className={getSectionClassName("auth-config")}>
+                  <AuthConfigCard jwtExpireHours={jwtExpireHours} onJwtExpireHoursChange={setJwtExpireHours} />
+                </div>
+                <div id="mcp-service" className={getSectionClassName("mcp-service")}>
+                  <MCPServiceCard mcpEnabled={mcpEnabled} onMcpEnabledChange={setMcpEnabled} mcpPort={mcpPort} onMcpPortChange={setMcpPort} />
+                </div>
                 <AnimatePresence>
                   {settingsDirty && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
@@ -178,23 +235,33 @@ export function SettingsPage() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-                <AIProviderSettings />
+                <div id="ai-provider" className={getSectionClassName("ai-provider")}>
+                  <AIProviderSettings />
+                </div>
               </div>
             </TabsContent>
 
             <TabsContent value="webhooks">
-              <WebhookSettingsCard />
+              <div id="webhook-settings" className={getSectionClassName("webhook-settings")}>
+                <WebhookSettingsCard />
+              </div>
             </TabsContent>
 
             <TabsContent value="events">
               <div className="space-y-4">
-                <EventBindingsCard />
-                <ScheduledTasksCard />
+                <div id="event-bindings" className={getSectionClassName("event-bindings")}>
+                  <EventBindingsCard />
+                </div>
+                <div id="scheduled-tasks" className={getSectionClassName("scheduled-tasks")}>
+                  <ScheduledTasksCard />
+                </div>
               </div>
             </TabsContent>
 
             <TabsContent value="categories">
-              <CategoriesCard refreshKey={refreshKey} />
+              <div id="categories" className={getSectionClassName("categories")}>
+                <CategoriesCard refreshKey={refreshKey} />
+              </div>
             </TabsContent>
           </Tabs>
         </div>

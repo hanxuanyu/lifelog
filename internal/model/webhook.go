@@ -20,7 +20,20 @@ type EventBinding struct {
 
 // ScheduledTaskConfig 定时任务配置
 type ScheduledTaskConfig struct {
-	Name    string `json:"name" yaml:"name" mapstructure:"name"`
-	Cron    string `json:"cron" yaml:"cron" mapstructure:"cron"`
-	Enabled bool   `json:"enabled" yaml:"enabled" mapstructure:"enabled"`
+	Name    string            `json:"name" yaml:"name" mapstructure:"name"`
+	Cron    string            `json:"cron" yaml:"cron" mapstructure:"cron"`
+	Enabled bool              `json:"enabled" yaml:"enabled" mapstructure:"enabled"`
+	Params  map[string]string `json:"params,omitempty" yaml:"params,omitempty" mapstructure:"params"`
+}
+
+// ScheduledTaskParamDefinition 定义定时任务可展示/编辑的额外参数
+type ScheduledTaskParamDefinition struct {
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Description string `json:"description,omitempty"`
+	Type        string `json:"type"`
+	Placeholder string `json:"placeholder,omitempty"`
+	ReadOnly    bool   `json:"read_only,omitempty"`
+	Value       string `json:"value,omitempty"`
+	Rows        int    `json:"rows,omitempty"`
 }

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react"
-import { format, addDays, subDays, isToday } from "date-fns"
+import { format, addDays, subDays, isToday, isValid, parseISO } from "date-fns"
 import { zhCN } from "date-fns/locale"
+import { useLocation } from "react-router-dom"
 import { Timeline } from "@/components/timeline"
 import { getTimeline, getCategories, getDailyStats } from "@/api"
 import type { LogEntry, Category, DurationItem, CrossDayHint } from "@/types"
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/popover"
 
 export function HomePage() {
+  const location = useLocation()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [entries, setEntries] = useState<LogEntry[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -24,8 +26,24 @@ export function HomePage() {
   const [prevDayLastTime, setPrevDayLastTime] = useState<string | undefined>(undefined)
   const [timePointMode, setTimePointMode] = useState("end")
   const [loading, setLoading] = useState(false)
+  const [pendingHighlightEntryId, setPendingHighlightEntryId] = useState<number | null>(null)
+  const [highlightedEntryId, setHighlightedEntryId] = useState<number | null>(null)
 
   const dateStr = format(currentDate, "yyyy-MM-dd")
+
+  useEffect(() => {
+    const state = location.state as { focusDate?: string; focusEntryId?: number } | null
+    if (!state?.focusDate && typeof state?.focusEntryId !== "number") return
+
+    if (state?.focusDate) {
+      const parsedDate = parseISO(state.focusDate)
+      if (isValid(parsedDate)) setCurrentDate(parsedDate)
+    }
+
+    if (typeof state?.focusEntryId === "number") {
+      setPendingHighlightEntryId(state.focusEntryId)
+    }
+  }, [location.key, location.state])
 
   const loadTimeline = useCallback(async () => {
     setLoading(true)
@@ -63,6 +81,20 @@ export function HomePage() {
   useEffect(() => {
     getCategories().then(setCategories).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (loading || pendingHighlightEntryId === null) return
+    if (!entries.some((entry) => entry.id === pendingHighlightEntryId)) return
+
+    setHighlightedEntryId(pendingHighlightEntryId)
+    setPendingHighlightEntryId(null)
+
+    const timer = window.setTimeout(() => {
+      setHighlightedEntryId((current) => current === pendingHighlightEntryId ? null : current)
+    }, 2000)
+
+    return () => window.clearTimeout(timer)
+  }, [entries, loading, pendingHighlightEntryId])
 
   const goToday = () => setCurrentDate(new Date())
   const goPrev = () => setCurrentDate((d) => subDays(d, 1))
@@ -188,6 +220,7 @@ export function HomePage() {
             crossDayHints={crossDayHints}
             prevDayLastTime={prevDayLastTime}
             timePointMode={timePointMode}
+            externalHighlightedEntryId={highlightedEntryId}
             onEditRequest={(entry) => {
               window.dispatchEvent(new CustomEvent("openQuickAddEdit", {
                 detail: {

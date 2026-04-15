@@ -2,6 +2,7 @@ export interface LogEntry {
   id: number
   log_date: string
   log_time: string
+  time_range?: string
   event_type: string
   detail: string
   category: string
@@ -200,12 +201,25 @@ export interface ScheduledTaskInfo {
   default_cron: string
   next_run?: string
   bound_webhook_count: number
+  param_definitions?: ScheduledTaskParamDefinition[]
 }
 
 export interface ScheduledTaskUpdate {
   name: string
   cron: string
   enabled: boolean
+  params?: Record<string, string>
+}
+
+export interface ScheduledTaskParamDefinition {
+  key: string
+  label: string
+  description?: string
+  type: "text" | "textarea" | "boolean"
+  placeholder?: string
+  read_only?: boolean
+  value?: string
+  rows?: number
 }
 
 export interface SystemMonitor {

@@ -87,6 +87,10 @@ func QueryLogEntries(q repository.LogEntryQuery, category string) ([]model.LogEn
 	}
 
 	responses := MatchCategories(entries)
+	responses, err = enrichTimeRanges(entries, responses)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	// 按大类筛选（动态过滤）
 	if category != "" {

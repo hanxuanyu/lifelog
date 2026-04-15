@@ -1,0 +1,29 @@
+name: lifelog-local
+
+services:
+  lifelog:
+    image: ${LIFELOG_LOCAL_IMAGE_REPO:-lifelog-local}:${LIFELOG_IMAGE_TAG:-main}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${LIFELOG_VERSION:-dev-local}
+        COMMIT: ${LIFELOG_COMMIT:-unknown}
+      labels:
+        io.lifelog.local-build: "true"
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+      # - "${MCP_PORT:-8081}:8081"  # MCP 端口默认不开启，按需取消注释
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config:/app/config
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      LIFELOG_SERVER_PORT: ${LIFELOG_SERVER_PORT:-8080}
+      LIFELOG_SERVER_DB_PATH: ${LIFELOG_SERVER_DB_PATH:-./data/lifelog.db}
+      LIFELOG_MCP_ENABLED: ${LIFELOG_MCP_ENABLED:-false}
+      LIFELOG_MCP_PORT: ${LIFELOG_MCP_PORT:-8081}
+      # LIFELOG_AUTH_JWT_SECRET: ${LIFELOG_AUTH_JWT_SECRET:-change-me-to-a-random-string}
+      # LIFELOG_AUTH_JWT_EXPIRE_HOURS: ${LIFELOG_AUTH_JWT_EXPIRE_HOURS:-168}

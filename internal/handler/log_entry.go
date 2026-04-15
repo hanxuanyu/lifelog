@@ -138,6 +138,8 @@ func DeleteLogEntry(c *gin.Context) {
 // @Tags 日志
 // @Produce json
 // @Param date query string false "日期 YYYY-MM-DD"
+// @Param start_date query string false "起始日期 YYYY-MM-DD"
+// @Param end_date query string false "结束日期 YYYY-MM-DD"
 // @Param event_type query string false "事项类型"
 // @Param category query string false "大类名称"
 // @Param keyword query string false "关键词"
@@ -151,6 +153,8 @@ func QueryLogEntries(c *gin.Context) {
 
 	q := repository.LogEntryQuery{
 		Date:      c.Query("date"),
+		StartDate: c.Query("start_date"),
+		EndDate:   c.Query("end_date"),
 		EventType: c.Query("event_type"),
 		Keyword:   c.Query("keyword"),
 		Page:      page,

@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"errors"
+
 	"github.com/hxuanyu/lifelog/internal/model"
 	"gorm.io/gorm"
 )
@@ -123,6 +125,45 @@ func GetDistinctEventTypes() ([]string, error) {
 	var types []string
 	err := DB.Model(&model.LogEntry{}).Distinct("event_type").Order("event_type").Pluck("event_type", &types).Error
 	return types, err
+}
+
+// GetAdjacentEntries 获取某条日志前后相邻的原始日志记录
+func GetAdjacentEntries(entry model.LogEntry) (*model.LogEntry, *model.LogEntry, error) {
+	var prev model.LogEntry
+	prevErr := DB.
+		Where(
+			"log_date < ? OR (log_date = ? AND log_time < ?) OR (log_date = ? AND log_time = ? AND id < ?)",
+			entry.LogDate, entry.LogDate, entry.LogTime, entry.LogDate, entry.LogTime, entry.ID,
+		).
+		Order("log_date DESC, log_time DESC, id DESC").
+		First(&prev).Error
+	if prevErr != nil && !errors.Is(prevErr, gorm.ErrRecordNotFound) {
+		return nil, nil, prevErr
+	}
+
+	var next model.LogEntry
+	nextErr := DB.
+		Where(
+			"log_date > ? OR (log_date = ? AND log_time > ?) OR (log_date = ? AND log_time = ? AND id > ?)",
+			entry.LogDate, entry.LogDate, entry.LogTime, entry.LogDate, entry.LogTime, entry.ID,
+		).
+		Order("log_date ASC, log_time ASC, id ASC").
+		First(&next).Error
+	if nextErr != nil && !errors.Is(nextErr, gorm.ErrRecordNotFound) {
+		return nil, nil, nextErr
+	}
+
+	var prevPtr *model.LogEntry
+	if prevErr == nil {
+		prevPtr = &prev
+	}
+
+	var nextPtr *model.LogEntry
+	if nextErr == nil {
+		nextPtr = &next
+	}
+
+	return prevPtr, nextPtr, nil
 }
 
 func applyFilters(tx *gorm.DB, q LogEntryQuery) *gorm.DB {

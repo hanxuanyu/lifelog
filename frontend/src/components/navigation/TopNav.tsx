@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { BarChart3, Settings, Home, Plus, Sun, Moon } from "lucide-react"
+import { BarChart3, Settings, Home, Plus, Sun, Moon, Search } from "lucide-react"
 import { useTheme } from "@/hooks/use-theme"
 import { navigateWithReplace } from "@/lib/navigation"
 
@@ -87,6 +87,20 @@ export function TopNav({ showOnMobile = false }: { showOnMobile?: boolean }) {
           <Settings className={iconClass} />
         </motion.button>
       )}
+
+      <motion.button
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.225, type: "spring", stiffness: 300, damping: 20 }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => window.dispatchEvent(new CustomEvent("openGlobalSearch"))}
+        className={btnClass}
+        title="搜索"
+        aria-label="搜索"
+      >
+        <Search className={iconClass} />
+      </motion.button>
 
       <motion.button
         initial={{ opacity: 0, y: -10 }}

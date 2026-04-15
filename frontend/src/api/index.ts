@@ -71,6 +71,8 @@ export async function createLog(data: LogEntryRequest) {
 
 export async function getLogs(params: {
   date?: string
+  start_date?: string
+  end_date?: string
   event_type?: string
   category?: string
   keyword?: string
