@@ -7,6 +7,7 @@ cd "$PROJECT_ROOT"
 ENV_FILE="$PROJECT_ROOT/.env"
 COMPOSE_FILE="docker-compose-local.yaml"
 CLEAN_SCRIPT="$PROJECT_ROOT/scripts/docker-local-clean-images.sh"
+BUILD_PROGRESS="${DOCKER_BUILD_PROGRESS:-plain}"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -66,7 +67,8 @@ export LIFELOG_VERSION="${LIFELOG_VERSION:-$GIT_TAG}"
 export LIFELOG_COMMIT="${LIFELOG_COMMIT:-$GIT_COMMIT}"
 
 echo "==> Building local Docker image ${LIFELOG_LOCAL_IMAGE_REPO}:${LIFELOG_IMAGE_TAG}..."
-docker compose -f "$COMPOSE_FILE" build --pull lifelog
+echo "==> Docker build progress mode: ${BUILD_PROGRESS}"
+docker compose -f "$COMPOSE_FILE" build --pull --progress "$BUILD_PROGRESS" lifelog
 
 echo "==> Restarting local Docker stack..."
 docker compose -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans lifelog
