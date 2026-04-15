@@ -65,9 +65,17 @@ export LIFELOG_LOCAL_IMAGE_REPO="${LIFELOG_LOCAL_IMAGE_REPO:-lifelog-local}"
 export LIFELOG_IMAGE_TAG="${LIFELOG_IMAGE_TAG:-main}"
 export LIFELOG_VERSION="${LIFELOG_VERSION:-$GIT_TAG}"
 export LIFELOG_COMMIT="${LIFELOG_COMMIT:-$GIT_COMMIT}"
+export LIFELOG_BUILD_NPM_REGISTRY="${LIFELOG_BUILD_NPM_REGISTRY:-}"
+export LIFELOG_BUILD_GO_PROXY="${LIFELOG_BUILD_GO_PROXY:-}"
 
 echo "==> Building local Docker image ${LIFELOG_LOCAL_IMAGE_REPO}:${LIFELOG_IMAGE_TAG}..."
 echo "==> Docker build progress mode: ${BUILD_PROGRESS}"
+if [ -n "$LIFELOG_BUILD_NPM_REGISTRY" ]; then
+  echo "==> Using custom npm registry: ${LIFELOG_BUILD_NPM_REGISTRY}"
+fi
+if [ -n "$LIFELOG_BUILD_GO_PROXY" ]; then
+  echo "==> Using custom Go proxy: ${LIFELOG_BUILD_GO_PROXY}"
+fi
 docker compose -f "$COMPOSE_FILE" build --pull --progress "$BUILD_PROGRESS" lifelog
 
 echo "==> Restarting local Docker stack..."
