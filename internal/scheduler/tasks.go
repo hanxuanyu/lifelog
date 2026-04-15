@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -11,7 +12,10 @@ import (
 	"github.com/hxuanyu/lifelog/internal/service"
 )
 
-// ========== 日报任务 ==========
+const (
+	noLogReminderThresholdParam = "threshold_hours"
+	noLogReminderThresholdHours = 4.0
+)
 
 type DailyReportTask struct{}
 
@@ -20,17 +24,19 @@ func (t *DailyReportTask) Description() string { return "每日日报生成" }
 func (t *DailyReportTask) DefaultCron() string { return "0 0 22 * * *" }
 func (t *DailyReportTask) EventName() string   { return "task.daily_report" }
 
-func (t *DailyReportTask) Execute() (map[string]string, error) {
+func (t *DailyReportTask) ParameterDefinitions(cfg model.ScheduledTaskConfig) []model.ScheduledTaskParamDefinition {
+	return buildReportPromptParamDefinitions(cfg)
+}
+
+func (t *DailyReportTask) Execute(cfg model.ScheduledTaskConfig) (map[string]string, error) {
 	date := time.Now().Format("2006-01-02")
 	stats, err := service.GetDailyStatistics(date)
 	if err != nil {
 		return nil, fmt.Errorf("获取日报数据失败: %w", err)
 	}
 
-	return buildDailyReportEventData(date, stats), nil
+	return buildDailyReportEventData(date, stats, cfg), nil
 }
-
-// ========== 周报任务 ==========
 
 type WeeklyReportTask struct{}
 
@@ -39,18 +45,19 @@ func (t *WeeklyReportTask) Description() string { return "每周周报生成" }
 func (t *WeeklyReportTask) DefaultCron() string { return "0 0 10 * * 1" }
 func (t *WeeklyReportTask) EventName() string   { return "task.weekly_report" }
 
-func (t *WeeklyReportTask) Execute() (map[string]string, error) {
-	// 周一触发时生成上周报告，所以取 7 天前的日期
+func (t *WeeklyReportTask) ParameterDefinitions(cfg model.ScheduledTaskConfig) []model.ScheduledTaskParamDefinition {
+	return buildReportPromptParamDefinitions(cfg)
+}
+
+func (t *WeeklyReportTask) Execute(cfg model.ScheduledTaskConfig) (map[string]string, error) {
 	ref := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
 	stats, err := service.GetWeeklyStatistics(ref)
 	if err != nil {
 		return nil, fmt.Errorf("获取周报数据失败: %w", err)
 	}
 
-	return buildPeriodReportEventData("weekly_report", "周报", stats), nil
+	return buildPeriodReportEventData("weekly_report", "周报", stats, cfg), nil
 }
-
-// ========== 月报任务 ==========
 
 type MonthlyReportTask struct{}
 
@@ -59,52 +66,64 @@ func (t *MonthlyReportTask) Description() string { return "每月月报生成" }
 func (t *MonthlyReportTask) DefaultCron() string { return "0 0 10 1 * *" }
 func (t *MonthlyReportTask) EventName() string   { return "task.monthly_report" }
 
-func (t *MonthlyReportTask) Execute() (map[string]string, error) {
+func (t *MonthlyReportTask) ParameterDefinitions(cfg model.ScheduledTaskConfig) []model.ScheduledTaskParamDefinition {
+	return buildReportPromptParamDefinitions(cfg)
+}
+
+func (t *MonthlyReportTask) Execute(cfg model.ScheduledTaskConfig) (map[string]string, error) {
 	ref := time.Now().AddDate(0, 0, -1)
 	stats, err := service.GetMonthlyStatistics(ref.Year(), int(ref.Month()))
 	if err != nil {
 		return nil, fmt.Errorf("获取月报数据失败: %w", err)
 	}
 
-	return buildPeriodReportEventData("monthly_report", "月报", stats), nil
+	return buildPeriodReportEventData("monthly_report", "月报", stats, cfg), nil
 }
 
-// ========== 长时间未记录提醒任务 ==========
-
-// NoLogReminderTask 阈值和防抖
+// NoLogReminderTask tracks reminder debounce state.
 type NoLogReminderTask struct {
 	mu                sync.Mutex
-	lastReminderAt    time.Time // 上次触发提醒的时间（用于防抖）
-	lastReminderLogID uint      // 上次提醒时的最新日志 ID
+	lastReminderAt    time.Time
+	lastReminderLogID uint
 }
-
-// 提醒阈值（小时）——超过即触发
-const noLogReminderThresholdHours = 4.0
 
 func (t *NoLogReminderTask) Name() string        { return "no_log_reminder" }
 func (t *NoLogReminderTask) Description() string { return "长时间未记录日志提醒" }
 func (t *NoLogReminderTask) DefaultCron() string { return "0 0 */2 * * *" }
 func (t *NoLogReminderTask) EventName() string   { return "task.no_log_reminder" }
 
-func (t *NoLogReminderTask) Execute() (map[string]string, error) {
+func (t *NoLogReminderTask) ParameterDefinitions(cfg model.ScheduledTaskConfig) []model.ScheduledTaskParamDefinition {
+	threshold := formatPositiveFloat(parsePositiveFloatParam(cfg, noLogReminderThresholdParam, noLogReminderThresholdHours))
+	return []model.ScheduledTaskParamDefinition{
+		{
+			Key:         noLogReminderThresholdParam,
+			Label:       "提醒阈值（小时）",
+			Description: "距离最新一条日志超过该时长后才触发提醒，支持小数，例如 1.5 表示 1 小时 30 分钟。",
+			Type:        "text",
+			Placeholder: formatPositiveFloat(noLogReminderThresholdHours),
+			Value:       threshold,
+		},
+	}
+}
+
+func (t *NoLogReminderTask) Execute(cfg model.ScheduledTaskConfig) (map[string]string, error) {
 	latest, err := repository.GetLatestEntry()
 	if err != nil {
-		// 尚无任何日志 - 不重复提醒
 		return nil, nil
 	}
 
-	lastAt, perr := parseEntryTime(latest)
-	if perr != nil {
-		return nil, fmt.Errorf("解析最近日志时间失败: %w", perr)
+	lastAt, err := parseEntryTime(latest)
+	if err != nil {
+		return nil, fmt.Errorf("解析最近日志时间失败: %w", err)
 	}
 
+	thresholdHours := parsePositiveFloatParam(cfg, noLogReminderThresholdParam, noLogReminderThresholdHours)
 	idle := time.Since(lastAt)
 	idleHours := idle.Hours()
-	if idleHours < noLogReminderThresholdHours {
+	if idleHours < thresholdHours {
 		return nil, nil
 	}
 
-	// 防抖：同一段空闲期（最新日志 ID 相同）且上次提醒距现在不足 2 小时则跳过
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if latest.ID == t.lastReminderLogID && time.Since(t.lastReminderAt) < 2*time.Hour {
@@ -113,8 +132,13 @@ func (t *NoLogReminderTask) Execute() (map[string]string, error) {
 	t.lastReminderAt = time.Now()
 	t.lastReminderLogID = latest.ID
 
-	msg := fmt.Sprintf("您已经 %.1f 小时未记录日志，最后一条：%s %s - %s",
-		idleHours, latest.LogDate, latest.LogTime, latest.EventType)
+	msg := fmt.Sprintf(
+		"您已 %.1f 小时未记录日志，最后一条：%s %s - %s",
+		idleHours,
+		latest.LogDate,
+		latest.LogTime,
+		latest.EventType,
+	)
 
 	return map[string]string{
 		"last_log_time": latest.LogDate + " " + latest.LogTime,
@@ -124,8 +148,6 @@ func (t *NoLogReminderTask) Execute() (map[string]string, error) {
 	}, nil
 }
 
-// ========== 未分类事项提醒任务 ==========
-
 type UncategorizedReminderTask struct{}
 
 func (t *UncategorizedReminderTask) Name() string        { return "uncategorized_reminder" }
@@ -133,7 +155,11 @@ func (t *UncategorizedReminderTask) Description() string { return "未分类事�
 func (t *UncategorizedReminderTask) DefaultCron() string { return "0 30 21 * * *" }
 func (t *UncategorizedReminderTask) EventName() string   { return "task.uncategorized_reminder" }
 
-func (t *UncategorizedReminderTask) Execute() (map[string]string, error) {
+func (t *UncategorizedReminderTask) ParameterDefinitions(model.ScheduledTaskConfig) []model.ScheduledTaskParamDefinition {
+	return nil
+}
+
+func (t *UncategorizedReminderTask) Execute(model.ScheduledTaskConfig) (map[string]string, error) {
 	date := time.Now().Format("2006-01-02")
 	entries, err := repository.GetTimelineEntries(date)
 	if err != nil {
@@ -153,7 +179,7 @@ func (t *UncategorizedReminderTask) Execute() (map[string]string, error) {
 		return nil, nil
 	}
 
-	message := fmt.Sprintf("今天还有 %d 条未分类事项，建议补充分类规则或规范事项名称。", len(uncategorized))
+	message := fmt.Sprintf("今天还有 %d 条未分类事项，建议补充分组规则或规范事项名称。", len(uncategorized))
 	return map[string]string{
 		"report_date":         date,
 		"uncategorized_count": fmt.Sprintf("%d", len(uncategorized)),
@@ -163,23 +189,19 @@ func (t *UncategorizedReminderTask) Execute() (map[string]string, error) {
 	}, nil
 }
 
-// ========== 辅助函数 ==========
-
-// parseEntryTime 将日志条目的 log_date+log_time 解析为本地时间
 func parseEntryTime(e *model.LogEntry) (time.Time, error) {
 	tStr := e.LogTime
-	// 兼容 HH:mm 和 HH:mm:ss
 	if len(tStr) == 5 {
 		tStr += ":00"
 	}
 	return time.ParseInLocation("2006-01-02 15:04:05", e.LogDate+" "+tStr, time.Local)
 }
 
-// formatCategorySummary 格式化分类汇总为一行文本
 func formatCategorySummary(summary []model.CategorySummary) string {
 	if len(summary) == 0 {
 		return "(无数据)"
 	}
+
 	parts := make([]string, 0, len(summary))
 	for _, s := range summary {
 		parts = append(parts, fmt.Sprintf("%s %s (%.1f%%)", s.Category, s.Display, s.Percentage))
@@ -187,16 +209,15 @@ func formatCategorySummary(summary []model.CategorySummary) string {
 	return strings.Join(parts, ", ")
 }
 
-// formatDailyDetail 格式化日报详细内容为多行文本
 func formatDailyDetail(stats *model.DailyStatistics) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("📅 日报 - %s\n", stats.Date))
+	sb.WriteString(fmt.Sprintf("日报 - %s\n", stats.Date))
 	sb.WriteString(fmt.Sprintf("总时长：%s\n\n", formatSeconds(stats.TotalKnown)))
 
 	if len(stats.Summary) > 0 {
 		sb.WriteString("分类汇总：\n")
 		for _, s := range stats.Summary {
-			sb.WriteString(fmt.Sprintf("  • %s: %s (%.1f%%)\n", s.Category, s.Display, s.Percentage))
+			sb.WriteString(fmt.Sprintf("  - %s: %s (%.1f%%)\n", s.Category, s.Display, s.Percentage))
 		}
 	}
 
@@ -204,40 +225,40 @@ func formatDailyDetail(stats *model.DailyStatistics) string {
 		sb.WriteString("\n时间轴：\n")
 		for _, item := range stats.Items {
 			if item.Unknown {
-				sb.WriteString(fmt.Sprintf("  · %s %s (未知时长)\n", item.StartTime, item.EventType))
-			} else {
-				sb.WriteString(fmt.Sprintf("  · %s-%s %s (%s)\n",
-					item.StartTime, item.EndTime, item.EventType, item.Display))
+				sb.WriteString(fmt.Sprintf("  - %s %s (时长待定)\n", item.StartTime, item.EventType))
+				continue
 			}
+			sb.WriteString(fmt.Sprintf("  - %s-%s %s (%s)\n", item.StartTime, item.EndTime, item.EventType, item.Display))
 		}
 	}
+
 	return sb.String()
 }
 
-// formatPeriodDetail 格式化周/月报详细内容
 func formatPeriodDetail(reportLabel string, stats *model.PeriodStatistics) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("📊 %s - %s 至 %s\n", reportLabel, stats.StartDate, stats.EndDate))
+	sb.WriteString(fmt.Sprintf("%s - %s 至 %s\n", reportLabel, stats.StartDate, stats.EndDate))
 	sb.WriteString(fmt.Sprintf("覆盖天数：%d 天\n", stats.DayCount))
 	sb.WriteString(fmt.Sprintf("总时长：%s\n\n", formatSeconds(stats.TotalKnown)))
 
 	if len(stats.Summary) > 0 {
 		sb.WriteString("分类汇总：\n")
 		for _, s := range stats.Summary {
-			sb.WriteString(fmt.Sprintf("  • %s: %s (%.1f%%)\n", s.Category, s.Display, s.Percentage))
+			sb.WriteString(fmt.Sprintf("  - %s: %s (%.1f%%)\n", s.Category, s.Display, s.Percentage))
 		}
 	}
+
 	return sb.String()
 }
 
 func formatUncategorizedDetail(date string, entries []model.LogEntry) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("🏷️ 未分类事项提醒 - %s\n", date))
+	sb.WriteString(fmt.Sprintf("未分类事项提醒 - %s\n", date))
 	sb.WriteString(fmt.Sprintf("共有 %d 条记录尚未匹配分类：\n", len(entries)))
 	for _, entry := range entries {
-		line := fmt.Sprintf("  · %s %s", entry.LogTime[:5], entry.EventType)
+		line := fmt.Sprintf("  - %s %s", entry.LogTime[:5], entry.EventType)
 		if entry.Detail != "" {
-			line += fmt.Sprintf(" — %s", entry.Detail)
+			line += fmt.Sprintf(" - %s", entry.Detail)
 		}
 		sb.WriteString(line + "\n")
 	}
@@ -245,19 +266,36 @@ func formatUncategorizedDetail(date string, entries []model.LogEntry) string {
 	return sb.String()
 }
 
-// formatSeconds 将秒数格式化为 "1h30m" 等可读形式
 func formatSeconds(seconds int) string {
 	h := seconds / 3600
 	m := (seconds % 3600) / 60
 	if h > 0 && m > 0 {
 		return fmt.Sprintf("%dh%dm", h, m)
-	} else if h > 0 {
+	}
+	if h > 0 {
 		return fmt.Sprintf("%dh", h)
 	}
 	return fmt.Sprintf("%dm", m)
 }
 
-// RegisterBuiltinTasks 在调度器启动前注册所有内置任务
+func parsePositiveFloatParam(cfg model.ScheduledTaskConfig, key string, fallback float64) float64 {
+	raw := strings.TrimSpace(cfg.Params[key])
+	if raw == "" {
+		return fallback
+	}
+
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil || value <= 0 {
+		return fallback
+	}
+	return value
+}
+
+func formatPositiveFloat(value float64) string {
+	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
+// RegisterBuiltinTasks registers all builtin tasks before the scheduler starts.
 func RegisterBuiltinTasks() {
 	RegisterBuiltinTask(&DailyReportTask{})
 	RegisterBuiltinTask(&WeeklyReportTask{})

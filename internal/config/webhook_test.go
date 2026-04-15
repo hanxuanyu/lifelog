@@ -39,3 +39,19 @@ func TestNormalizeScheduledTaskCron(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeScheduledTaskParams(t *testing.T) {
+	input := map[string]string{
+		" custom_prompt ": "  focus on sleep  ",
+		"":                "ignored",
+		"blank":           "   ",
+	}
+
+	got := normalizeScheduledTaskParams(input)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 normalized param, got %d", len(got))
+	}
+	if got["custom_prompt"] != "focus on sleep" {
+		t.Fatalf("expected trimmed custom_prompt, got %#v", got)
+	}
+}

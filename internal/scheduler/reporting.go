@@ -12,6 +12,21 @@ import (
 	"github.com/hxuanyu/lifelog/internal/service"
 )
 
+const (
+	reportBuiltinPromptParam  = "builtin_prompt"
+	reportCustomPromptParam   = "custom_prompt"
+	reportOverridePromptParam = "override_builtin_prompt"
+)
+
+const scheduledReportSystemPrompt = `你是一个生活日志报告助手，需要根据结构化统计和原始日志生成可直接推送的中文 Markdown 报告。
+
+要求：
+1. 只基于提供的数据进行总结，不虚构用户未记录的事实。
+2. 开头先给出一句整体概览。
+3. 再用 2 到 4 个简短小节或要点，指出时间投入重点、节奏特征和可观察到的问题。
+4. 语气客观、简洁、可读，适合消息通知、日报、周报或月报推送。
+5. 如果记录较少，要明确指出样本有限。`
+
 type generatedReport struct {
 	Detail   string
 	Source   string
@@ -27,18 +42,54 @@ type reportRequest struct {
 	TotalKnownText string
 	SummaryText    string
 	TemplateDetail string
+	SystemPrompt   string
 }
 
-const scheduledReportSystemPrompt = `你是一个生活日志报告助手，需要根据用户的结构化统计和原始日志生成可直接推送的中文 Markdown 报告。
+func buildReportPromptParamDefinitions(cfg model.ScheduledTaskConfig) []model.ScheduledTaskParamDefinition {
+	return []model.ScheduledTaskParamDefinition{
+		{
+			Key:         reportBuiltinPromptParam,
+			Label:       "内置提示词",
+			Description: "任务默认使用的系统提示词，只读，可在这里查看任务的内置生成策略。",
+			Type:        "textarea",
+			ReadOnly:    true,
+			Value:       strings.TrimSpace(scheduledReportSystemPrompt),
+			Rows:        8,
+		},
+		{
+			Key:         reportOverridePromptParam,
+			Label:       "覆盖内置提示词",
+			Description: "开启后仅使用自定义提示词；关闭时会在内置提示词后追加自定义提示词。",
+			Type:        "boolean",
+			Value:       formatBoolParam(parseBoolParam(cfg, reportOverridePromptParam)),
+		},
+		{
+			Key:         reportCustomPromptParam,
+			Label:       "自定义提示词",
+			Description: "用于定义这类报告的格式、重点或表达偏好。",
+			Type:        "textarea",
+			Placeholder: "例如：重点关注深度工作、睡眠节奏，并给出 2 条下阶段建议。",
+			Value:       strings.TrimSpace(cfg.Params[reportCustomPromptParam]),
+			Rows:        6,
+		},
+	}
+}
 
-要求：
-1. 只基于提供的数据进行总结，不要虚构用户未记录的事情。
-2. 第一段先给出一句总览。
-3. 再用 2 到 4 个简短小节或要点，指出时间投入重点、节奏特征和可观察到的问题。
-4. 语气客观、简洁、可读，适合消息通知或日报/周报推送。
-5. 如果记录较少，要明确指出样本有限。`
+func buildScheduledReportSystemPrompt(cfg model.ScheduledTaskConfig) string {
+	customPrompt := strings.TrimSpace(cfg.Params[reportCustomPromptParam])
+	overrideBuiltin := parseBoolParam(cfg, reportOverridePromptParam)
+	systemPrompt := strings.TrimSpace(scheduledReportSystemPrompt)
 
-func buildDailyReportEventData(date string, stats *model.DailyStatistics) map[string]string {
+	if customPrompt == "" {
+		return systemPrompt
+	}
+	if overrideBuiltin {
+		return customPrompt
+	}
+	return fmt.Sprintf("%s\n\n用户自定义指令：\n%s", systemPrompt, customPrompt)
+}
+
+func buildDailyReportEventData(date string, stats *model.DailyStatistics, cfg model.ScheduledTaskConfig) map[string]string {
 	summaryText := formatCategorySummary(stats.Summary)
 	report := generateScheduledReport(reportRequest{
 		TaskName:       "daily_report",
@@ -48,6 +99,7 @@ func buildDailyReportEventData(date string, stats *model.DailyStatistics) map[st
 		TotalKnownText: formatSeconds(stats.TotalKnown),
 		SummaryText:    summaryText,
 		TemplateDetail: buildFallbackDailyReport(stats),
+		SystemPrompt:   buildScheduledReportSystemPrompt(cfg),
 	})
 
 	return map[string]string{
@@ -62,7 +114,7 @@ func buildDailyReportEventData(date string, stats *model.DailyStatistics) map[st
 	}
 }
 
-func buildPeriodReportEventData(taskName, reportLabel string, stats *model.PeriodStatistics) map[string]string {
+func buildPeriodReportEventData(taskName, reportLabel string, stats *model.PeriodStatistics, cfg model.ScheduledTaskConfig) map[string]string {
 	summaryText := formatCategorySummary(stats.Summary)
 	report := generateScheduledReport(reportRequest{
 		TaskName:       taskName,
@@ -72,6 +124,7 @@ func buildPeriodReportEventData(taskName, reportLabel string, stats *model.Perio
 		TotalKnownText: formatSeconds(stats.TotalKnown),
 		SummaryText:    summaryText,
 		TemplateDetail: buildFallbackPeriodReport(reportLabel, stats),
+		SystemPrompt:   buildScheduledReportSystemPrompt(cfg),
 	})
 
 	return map[string]string{
@@ -101,11 +154,11 @@ func generateScheduledReport(req reportRequest) generatedReport {
 
 	logContext, err := service.BuildLogContext(req.StartDate, req.EndDate, nil)
 	if err != nil {
-		slog.Warn("构建 AI 报告日志上下文失败，回退模板", "task", req.TaskName, "error", err)
+		slog.Warn("failed to build AI report log context, fallback to template", "task", req.TaskName, "error", err)
 		return fallback
 	}
 
-	userPrompt := strings.TrimSpace(fmt.Sprintf(`请生成「%s」。
+	userPrompt := strings.TrimSpace(fmt.Sprintf(`请生成《%s》。
 
 统计信息：
 - 时间范围：%s 至 %s
@@ -118,11 +171,11 @@ func generateScheduledReport(req reportRequest) generatedReport {
 原始日志：
 %s`, req.ReportLabel, req.StartDate, req.EndDate, req.TotalKnownText, req.SummaryText, req.TemplateDetail, logContext))
 
-	content, err := service.ChatCompletion(*provider, scheduledReportSystemPrompt, []model.AIChatMessage{
+	content, err := service.ChatCompletion(*provider, req.SystemPrompt, []model.AIChatMessage{
 		{Role: "user", Content: userPrompt},
 	})
 	if err != nil {
-		slog.Warn("AI 报告生成失败，回退模板", "task", req.TaskName, "provider", provider.Name, "model", provider.Model, "error", err)
+		slog.Warn("AI report generation failed, fallback to template", "task", req.TaskName, "provider", provider.Name, "model", provider.Model, "error", err)
 		return fallback
 	}
 
@@ -218,14 +271,7 @@ func buildFallbackDailyReport(stats *model.DailyStatistics) string {
 			if hint.Direction == "prev" {
 				direction = "承接自前一日"
 			}
-			sb.WriteString(fmt.Sprintf(
-				"- `%s-%s` **%s** · %s · %s\n",
-				hint.StartTime,
-				hint.EndTime,
-				hint.EventType,
-				hint.Category,
-				direction,
-			))
+			sb.WriteString(fmt.Sprintf("- `%s-%s` **%s** · %s · %s\n", hint.StartTime, hint.EndTime, hint.EventType, hint.Category, direction))
 		}
 	}
 
@@ -324,7 +370,7 @@ func buildFallbackPeriodReport(reportLabel string, stats *model.PeriodStatistics
 	if needSampleNotice(len(stats.Items), unknownCount) {
 		sb.WriteString("\n## 说明\n")
 		if stats.DayCount < 3 || len(stats.Items) < 5 {
-			sb.WriteString("- 样本量偏少，摘要更适合作为阶段性回看。\n")
+			sb.WriteString("- 样本量偏少，摘要更适合作为阶段性回顾。\n")
 		}
 		if unknownCount > 0 {
 			sb.WriteString("- 部分片段缺少完整边界，累计时长会略偏保守。\n")
@@ -469,6 +515,18 @@ func countCrossDayItems(items []model.DurationItem) int {
 
 func needSampleNotice(itemCount, unknownCount int) bool {
 	return itemCount < 5 || unknownCount > 0
+}
+
+func parseBoolParam(cfg model.ScheduledTaskConfig, key string) bool {
+	raw := strings.TrimSpace(strings.ToLower(cfg.Params[key]))
+	return raw == "1" || raw == "true" || raw == "yes" || raw == "on"
+}
+
+func formatBoolParam(value bool) string {
+	if value {
+		return "true"
+	}
+	return "false"
 }
 
 func minInt(a, b int) int {

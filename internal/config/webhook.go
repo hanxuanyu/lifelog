@@ -179,6 +179,32 @@ func normalizeScheduledTasks(items []model.ScheduledTaskConfig) []model.Schedule
 		normalized[i] = items[i]
 		normalized[i].Name = strings.TrimSpace(normalized[i].Name)
 		normalized[i].Cron = normalizeScheduledTaskCron(normalized[i].Cron)
+		normalized[i].Params = normalizeScheduledTaskParams(normalized[i].Params)
+	}
+	return normalized
+}
+
+func normalizeScheduledTaskParams(params map[string]string) map[string]string {
+	if len(params) == 0 {
+		return nil
+	}
+
+	normalized := make(map[string]string, len(params))
+	for key, value := range params {
+		trimmedKey := strings.TrimSpace(key)
+		if trimmedKey == "" {
+			continue
+		}
+
+		trimmedValue := strings.TrimSpace(value)
+		if trimmedValue == "" {
+			continue
+		}
+		normalized[trimmedKey] = trimmedValue
+	}
+
+	if len(normalized) == 0 {
+		return nil
 	}
 	return normalized
 }

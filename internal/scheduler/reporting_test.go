@@ -75,3 +75,49 @@ func TestBuildFallbackPeriodReportUsesMarkdownSections(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildScheduledReportSystemPromptAppendsCustomPrompt(t *testing.T) {
+	got := buildScheduledReportSystemPrompt(model.ScheduledTaskConfig{
+		Params: map[string]string{
+			reportCustomPromptParam: "请关注睡眠节奏",
+		},
+	})
+	if !strings.Contains(got, "请关注睡眠节奏") {
+		t.Fatalf("expected custom prompt to be appended, got:\n%s", got)
+	}
+	if !strings.Contains(got, "用户自定义指令") {
+		t.Fatalf("expected custom prompt section header, got:\n%s", got)
+	}
+}
+
+func TestBuildScheduledReportSystemPromptCanOverrideBuiltinPrompt(t *testing.T) {
+	got := buildScheduledReportSystemPrompt(model.ScheduledTaskConfig{
+		Params: map[string]string{
+			reportCustomPromptParam:   "只输出结论",
+			reportOverridePromptParam: "true",
+		},
+	})
+	if got != "只输出结论" {
+		t.Fatalf("expected builtin prompt to be overridden, got:\n%s", got)
+	}
+}
+
+func TestNoLogReminderParameterDefinitionsUseConfiguredThreshold(t *testing.T) {
+	task := &NoLogReminderTask{}
+	defs := task.ParameterDefinitions(model.ScheduledTaskConfig{
+		Name: "no_log_reminder",
+		Params: map[string]string{
+			noLogReminderThresholdParam: "1.5",
+		},
+	})
+
+	if len(defs) != 1 {
+		t.Fatalf("expected 1 parameter definition, got %d", len(defs))
+	}
+	if defs[0].Key != noLogReminderThresholdParam {
+		t.Fatalf("unexpected parameter key: %s", defs[0].Key)
+	}
+	if defs[0].Value != "1.5" {
+		t.Fatalf("expected configured threshold to be reflected, got %q", defs[0].Value)
+	}
+}
