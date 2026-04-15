@@ -25,3 +25,4 @@ web/
 logs/
 .gocache/
 .gomodcache/
+.env
