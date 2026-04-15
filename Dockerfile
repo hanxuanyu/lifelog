@@ -8,10 +8,14 @@ ARG ALPINE_VERSION=3.21
 # spend time emulating Node.js for every target platform.
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION} AS frontend-builder
 
+ARG NPM_REGISTRY=
+
 WORKDIR /app/frontend
 
 COPY frontend/package.json frontend/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
+    if [ -n "$NPM_REGISTRY" ]; then npm config set registry "$NPM_REGISTRY"; fi \
+    && \
     npm ci --no-audit --prefer-offline
 
 COPY frontend/ ./
@@ -25,11 +29,14 @@ ARG VERSION=dev
 ARG COMMIT=unknown
 ARG TARGETOS
 ARG TARGETARCH
+ARG GO_PROXY=
 
 WORKDIR /src
 
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
+    if [ -n "$GO_PROXY" ]; then export GOPROXY="$GO_PROXY"; fi \
+    && \
     go mod download
 
 COPY main.go ./
@@ -39,6 +46,8 @@ COPY --from=frontend-builder /app/web ./web
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
+    if [ -n "$GO_PROXY" ]; then export GOPROXY="$GO_PROXY"; fi \
+    && \
     CGO_ENABLED=0 \
     GOOS=${TARGETOS:-linux} \
     GOARCH=${TARGETARCH:-amd64} \
