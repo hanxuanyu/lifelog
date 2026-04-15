@@ -192,10 +192,28 @@ func runTaskByName(name string) {
 	runTask(task, cfg)
 }
 
+// MultiEventTask is optionally implemented by tasks that publish multiple event types.
+// runTask checks all returned event names instead of just EventName().
+type MultiEventTask interface {
+	EventNames() []string
+}
+
 func runTask(task Task, cfg model.ScheduledTaskConfig) {
 	start := time.Now()
 
-	if !hasEnabledBindings(task.EventName()) {
+	if mt, ok := task.(MultiEventTask); ok {
+		hasAny := false
+		for _, name := range mt.EventNames() {
+			if hasEnabledBindings(name) {
+				hasAny = true
+				break
+			}
+		}
+		if !hasAny {
+			slog.Info("scheduled task skipped because no enabled webhook bindings exist", "task", task.Name())
+			return
+		}
+	} else if !hasEnabledBindings(task.EventName()) {
 		slog.Info("scheduled task skipped because no enabled webhook bindings exist", "task", task.Name(), "event", task.EventName())
 		return
 	}
@@ -234,6 +252,7 @@ type TaskInfo struct {
 	Cron              string                               `json:"cron"`
 	Enabled           bool                                 `json:"enabled"`
 	EventName         string                               `json:"event_name"`
+	EventNames        []string                             `json:"event_names,omitempty"`
 	DefaultCron       string                               `json:"default_cron"`
 	NextRun           time.Time                            `json:"next_run,omitempty"`
 	BoundWebhookCount int                                  `json:"bound_webhook_count"`
@@ -253,14 +272,25 @@ func GetTasks() []TaskInfo {
 		}
 
 		info := TaskInfo{
-			Name:              t.Name(),
-			Description:       t.Description(),
-			Cron:              entry.Config.Cron,
-			Enabled:           entry.Config.Enabled,
-			EventName:         t.EventName(),
-			DefaultCron:       t.DefaultCron(),
-			BoundWebhookCount: countEnabledBindings(t.EventName()),
-			ParamDefinitions:  t.ParameterDefinitions(copyScheduledTaskConfig(entry.Config)),
+			Name:             t.Name(),
+			Description:      t.Description(),
+			Cron:             entry.Config.Cron,
+			Enabled:          entry.Config.Enabled,
+			EventName:        t.EventName(),
+			DefaultCron:      t.DefaultCron(),
+			ParamDefinitions: t.ParameterDefinitions(copyScheduledTaskConfig(entry.Config)),
+		}
+
+		if mt, ok := t.(MultiEventTask); ok {
+			names := mt.EventNames()
+			info.EventNames = names
+			total := 0
+			for _, name := range names {
+				total += countEnabledBindings(name)
+			}
+			info.BoundWebhookCount = total
+		} else {
+			info.BoundWebhookCount = countEnabledBindings(t.EventName())
 		}
 		if cronRunner != nil && entry.EntryID != 0 {
 			e := cronRunner.Entry(entry.EntryID)

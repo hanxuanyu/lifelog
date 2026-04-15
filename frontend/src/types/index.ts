@@ -198,6 +198,7 @@ export interface ScheduledTaskInfo {
   cron: string
   enabled: boolean
   event_name: string
+  event_names?: string[]
   default_cron: string
   next_run?: string
   bound_webhook_count: number

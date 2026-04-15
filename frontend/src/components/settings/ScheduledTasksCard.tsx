@@ -433,8 +433,17 @@ export function ScheduledTasksCard() {
                               <div className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
                                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                                 <span>
-                                  任务已启用但未绑定 Webhook，执行时将跳过。请在上方“事件绑定”中将
-                                  <span className="font-mono"> {task.event_name} </span>
+                                  {"任务已启用但未绑定 Webhook，执行时将跳过。请在上方\u201c事件绑定\u201d中将"}
+                                  {task.event_names && task.event_names.length > 1 ? (
+                                    task.event_names.map((name, i, arr) => (
+                                      <span key={name}>
+                                        <span className="font-mono">{` ${name} `}</span>
+                                        {i + 1 !== arr.length && "或"}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="font-mono">{` ${task.event_name} `}</span>
+                                  )}
                                   绑定到 Webhook。
                                 </span>
                               </div>
@@ -443,7 +452,17 @@ export function ScheduledTasksCard() {
                             <div className="flex items-center justify-between gap-2">
                               <div className="text-xs text-muted-foreground min-w-0">
                                 <span>事件：</span>
-                                <span className="font-mono">{task.event_name}</span>
+                                {task.event_names && task.event_names.length > 1 ? (
+                                  <span className="inline-flex flex-wrap gap-1">
+                                    {task.event_names.map((name) => (
+                                      <Badge key={name} variant="outline" className="text-[10px] font-mono font-normal">
+                                        {name}
+                                      </Badge>
+                                    ))}
+                                  </span>
+                                ) : (
+                                  <span className="font-mono">{task.event_name}</span>
+                                )}
                                 {task.next_run && task.enabled && (
                                   <span className="ml-2">| 下次执行：{formatNextRun(task.next_run)}</span>
                                 )}
