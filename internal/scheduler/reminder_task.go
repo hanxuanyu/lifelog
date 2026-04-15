@@ -99,8 +99,13 @@ func (t *ActivityReminderTask) Execute(cfg model.ScheduledTaskConfig) (map[strin
 			dur = 0
 		}
 
-		// Publish activity end reminder.
-		if hasEndBinding {
+		// Try next activity reminder first; fall back to end reminder.
+		nextPublished := false
+		if hasNextBinding {
+			nextPublished = publishNextActivityReminder(entries, i, mode, today, entry, category, endTime, now)
+		}
+
+		if !nextPublished && hasEndBinding {
 			msg := fmt.Sprintf("活动 [%s] 已结束，持续 %s", entry.EventType, formatSeconds(dur))
 			events.Publish(activityEndReminderEvent, map[string]string{
 				"log_id":     fmt.Sprintf("%d", entry.ID),
@@ -115,11 +120,6 @@ func (t *ActivityReminderTask) Execute(cfg model.ScheduledTaskConfig) (map[strin
 				"timestamp":  now.Format("2006-01-02 15:04:05"),
 			})
 			slog.Info("activity end reminder fired", "log_id", entry.ID, "event_type", entry.EventType)
-		}
-
-		// Check for next activity and publish next activity reminder.
-		if hasNextBinding {
-			publishNextActivityReminder(entries, i, mode, today, entry, category, endTime, now)
 		}
 	}
 
@@ -175,8 +175,8 @@ func resolveEndTime(entries []model.LogEntry, idx int, mode, today string) (time
 }
 
 // publishNextActivityReminder checks for a subsequent activity after the ended one
-// and publishes a next_activity_reminder event if found.
-func publishNextActivityReminder(entries []model.LogEntry, idx int, mode, today string, ended model.LogEntry, endedCategory string, endedTime, now time.Time) {
+// and publishes a next_activity_reminder event if found. Returns true if published.
+func publishNextActivityReminder(entries []model.LogEntry, idx int, mode, today string, ended model.LogEntry, endedCategory string, endedTime, now time.Time) bool {
 	var nextEntry *model.LogEntry
 
 	switch mode {
@@ -194,7 +194,7 @@ func publishNextActivityReminder(entries []model.LogEntry, idx int, mode, today 
 	}
 
 	if nextEntry == nil {
-		return
+		return false
 	}
 
 	nextCategory := service.MatchCategory(nextEntry.EventType)
@@ -226,4 +226,5 @@ func publishNextActivityReminder(entries []model.LogEntry, idx int, mode, today 
 		"timestamp":        now.Format("2006-01-02 15:04:05"),
 	})
 	slog.Info("next activity reminder fired", "ended", ended.EventType, "next", nextEntry.EventType)
+	return true
 }
