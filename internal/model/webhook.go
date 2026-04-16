@@ -26,14 +26,26 @@ type ScheduledTaskConfig struct {
 	Params  map[string]string `json:"params,omitempty" yaml:"params,omitempty" mapstructure:"params"`
 }
 
+// ParamOption 定义下拉选择等参数类型的选项
+type ParamOption struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
 // ScheduledTaskParamDefinition 定义定时任务可展示/编辑的额外参数
 type ScheduledTaskParamDefinition struct {
-	Key         string `json:"key"`
-	Label       string `json:"label"`
-	Description string `json:"description,omitempty"`
-	Type        string `json:"type"`
-	Placeholder string `json:"placeholder,omitempty"`
-	ReadOnly    bool   `json:"read_only,omitempty"`
-	Value       string `json:"value,omitempty"`
-	Rows        int    `json:"rows,omitempty"`
+	Key           string       `json:"key"`
+	Label         string       `json:"label"`
+	Description   string       `json:"description,omitempty"`
+	Type          string       `json:"type"`
+	Placeholder   string       `json:"placeholder,omitempty"`
+	ReadOnly      bool         `json:"read_only,omitempty"`
+	Value         string       `json:"value,omitempty"`
+	Rows          int          `json:"rows,omitempty"`
+	Options       []ParamOption `json:"options,omitempty"`
+	Min           *float64     `json:"min,omitempty"`
+	Max           *float64     `json:"max,omitempty"`
+	Step          *float64     `json:"step,omitempty"`
+	MapKeyLabel   string       `json:"map_key_label,omitempty"`
+	MapValueLabel string       `json:"map_value_label,omitempty"`
 }

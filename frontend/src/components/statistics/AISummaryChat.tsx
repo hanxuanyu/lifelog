@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
 import {
   Bot,
@@ -22,11 +22,13 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -46,6 +48,9 @@ import { cn } from "@/lib/utils"
 import { QUICK_QUESTIONS, DATE_PRESETS } from "./ai-chat-shared"
 import { CopyButton, SessionList } from "./SessionList"
 import { useAIChat } from "@/hooks/use-ai-chat"
+import { getPrompts, createPrompt } from "@/api"
+import type { Prompt } from "@/types"
+import { toast } from "sonner"
 
 export function AISummaryChat() {
   const {
@@ -68,6 +73,43 @@ export function AISummaryChat() {
     handleAbort, handleNewSession, openSession, handleDeleteSession,
     sendMessage, handleKeyDown, handleTextareaInput, loadProviders,
   } = useAIChat()
+
+  const [prompts, setPrompts] = useState<Prompt[]>([])
+  const [promptDialogOpen, setPromptDialogOpen] = useState(false)
+  const [newPromptName, setNewPromptName] = useState("")
+  const [newPromptDesc, setNewPromptDesc] = useState("")
+  const [newPromptContent, setNewPromptContent] = useState("")
+  const [savingPrompt, setSavingPrompt] = useState(false)
+
+  const loadPrompts = useCallback(() => {
+    getPrompts().then((list) => setPrompts(list || [])).catch(() => {})
+  }, [])
+
+  useEffect(() => { loadPrompts() }, [loadPrompts])
+
+  const handleCreatePrompt = async () => {
+    if (!newPromptName.trim() || !newPromptContent.trim()) {
+      toast.error("名称和内容不能为空")
+      return
+    }
+    setSavingPrompt(true)
+    try {
+      await createPrompt({ name: newPromptName.trim(), content: newPromptContent.trim(), description: newPromptDesc.trim() })
+      toast.success("提示词创建成功")
+      setPromptDialogOpen(false)
+      setNewPromptName("")
+      setNewPromptDesc("")
+      setNewPromptContent("")
+      loadPrompts()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "创建失败"
+      toast.error(msg)
+    } finally {
+      setSavingPrompt(false)
+    }
+  }
+
+  const userPrompts = prompts.filter((p) => !p.builtin)
 
   if (loadingProviders) {
     return (
@@ -196,6 +238,28 @@ export function AISummaryChat() {
                     </button>
                   ))}
                 </div>
+                {userPrompts.length > 0 && (
+                  <div className="mt-3 flex flex-wrap justify-center gap-2 px-4">
+                    {userPrompts.map((p) => (
+                      <button
+                        key={p.name}
+                        type="button"
+                        onClick={() => sendMessage(p.content)}
+                        title={p.name}
+                        className="rounded-full border border-primary/20 bg-background px-3 py-1.5 text-xs transition-colors hover:bg-accent"
+                      >
+                        {p.description || p.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPromptDialogOpen(true)}
+                  className="mt-3 inline-flex items-center gap-1 rounded-full border border-dashed px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent"
+                >
+                  <Plus className="h-3 w-3" /> 添加提示词
+                </button>
               </div>
             ) : (
               <div className="space-y-4">
@@ -255,6 +319,17 @@ export function AISummaryChat() {
                     className="rounded-full border bg-background px-2.5 py-1 text-[11px] transition-colors hover:bg-accent"
                   >
                     {question}
+                  </button>
+                ))}
+                {userPrompts.map((p) => (
+                  <button
+                    key={p.name}
+                    type="button"
+                    onClick={() => sendMessage(p.content)}
+                    title={p.name}
+                    className="rounded-full border border-primary/20 bg-background px-2.5 py-1 text-[11px] transition-colors hover:bg-accent"
+                  >
+                    {p.description || p.name}
                   </button>
                 ))}
               </div>
@@ -496,6 +571,35 @@ export function AISummaryChat() {
       </AlertDialog>
 
       <AIProviderDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} onSaved={loadProviders} />
+
+      <Dialog open={promptDialogOpen} onOpenChange={(open) => { setPromptDialogOpen(open); if (!open) { setNewPromptName(""); setNewPromptDesc(""); setNewPromptContent("") } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>添加自定义提示词</DialogTitle>
+            <DialogDescription>创建一个可复用的提示词模板，可在 AI 对话和定时任务中使用。</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">名称</label>
+              <Input value={newPromptName} onChange={(e) => setNewPromptName(e.target.value)} placeholder="如：周报重点分析" className="h-9 text-sm" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">描述</label>
+              <Input value={newPromptDesc} onChange={(e) => setNewPromptDesc(e.target.value)} placeholder="简短描述，显示为按钮文字" className="h-9 text-sm" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">内容</label>
+              <Textarea value={newPromptContent} onChange={(e) => setNewPromptContent(e.target.value)} placeholder="输入提示词内容..." rows={5} className="text-sm" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPromptDialogOpen(false)}>取消</Button>
+            <Button onClick={handleCreatePrompt} disabled={savingPrompt}>
+              {savingPrompt ? <Loader2 className="h-4 w-4 animate-spin" /> : "创建"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

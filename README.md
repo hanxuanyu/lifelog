@@ -20,7 +20,8 @@
 - **单文件部署** — 前端嵌入 Go 二进制，只需一个可执行文件 + `config/` 配置目录
 - **键盘快捷键** — `←` `→` 切换日期，`T` 回到今天，`Alt+Shift+N` 快速记录
 - **深浅模式** — 亮色/暗色主题，自动跟随系统偏好
-- **事件与自动化** — 事件总线 + Webhook 推送，内置日报/周报/月报、未记录提醒、未分类提醒等定时任务
+- **事件与自动化** — 事件总线 + Webhook 推送，内置日报/周报/月报、未记录提醒、未分类提醒、活动提醒等定时任务
+- **AI 对话与提示词管理** — 内置 AI 对话分析日志，支持自定义提示词模板，AI 页面和定时任务共享提示词库
 - **数据导入导出** — ZIP 格式全量备份与恢复
 
 ## 快速开始
@@ -69,7 +70,7 @@ curl -fSL -o docker-compose.yaml \
 docker compose up -d
 ```
 
-首次启动会自动在 `config/` 目录下生成默认配置文件：`config.yaml`、`categories.yaml`、`webhooks.yaml`。`data/`、`logs/`、`config/` 目录会挂载到宿主机。访问 <http://localhost:8080> 即可使用。
+首次启动会自动在 `config/` 目录下生成默认配置文件：`config.yaml`、`categories.yaml`、`webhooks.yaml`、`prompts.yaml`。`data/`、`logs/`、`config/` 目录会挂载到宿主机。访问 <http://localhost:8080> 即可使用。
 
 自定义配置：
 
@@ -83,6 +84,7 @@ environment:
 vim config/config.yaml
 vim config/categories.yaml
 vim config/webhooks.yaml
+vim config/prompts.yaml
 docker compose restart
 ```
 
@@ -154,6 +156,7 @@ make build-all      # 跨平台构建（6 个平台）
 | `config.yaml` | 基础配置：服务端口、数据库路径、认证、时间点模式、AI、MCP | 部分支持 |
 | `categories.yaml` | 分类规则配置 | 是 |
 | `webhooks.yaml` | Webhook、事件绑定与定时任务配置 | 是 |
+| `prompts.yaml` | 自定义提示词模板 | 是 |
 
 `config.yaml` 主要配置项：
 
@@ -222,6 +225,8 @@ Lifelog 内置事件总线（Event Bus），系统操作（创建日志、修改
 | `task.monthly_report` | 月报生成完成 | `start_date`, `end_date`, `summary`, `total_known`, `day_count`, `detail`, `report_source`, `report_provider`, `report_model`, `timestamp` |
 | `task.no_log_reminder` | 长时间未记录提醒 | `last_log_time`, `idle_hours`, `message`, `timestamp` |
 | `task.uncategorized_reminder` | 未分类事项提醒 | `report_date`, `uncategorized_count`, `message`, `detail`, `timestamp` |
+| `task.activity_end_reminder` | 活动结束提醒 | `event_type`, `category`, `start_time`, `end_time`, `duration`, `timestamp` |
+| `task.next_activity_reminder` | 下一活动提醒 | `event_type`, `category`, `start_time`, `timestamp` |
 
 ### Webhook 配置
 
@@ -259,7 +264,8 @@ Webhook 的 URL、Headers、Query Params、Body 中可使用 `{{变量名}}` 占
 | 每周周报 | `task.weekly_report` | `0 0 10 * * 1` | 每周一 10:00:00 生成上周汇总 |
 | 每月月报 | `task.monthly_report` | `0 0 10 1 * *` | 每月 1 日 10:00:00 生成上月汇总 |
 | 未记录提醒 | `task.no_log_reminder` | `0 0 */2 * * *` | 每 2 小时检查，超过 4 小时未记录则提醒 |
-| 未分类提醒 | `task.uncategorized_reminder` | `0 30 21 * * *` | 每天 21:30:00 检查当天未分类事项，提醒完善分类规则 |
+| 未分类提醒 | `task.uncategorized_reminder` | `0 30 21 * * *` | 每天 21:30:00 检查当天未分类事项 |
+| 活动提醒 | `task.activity_end_reminder` / `task.next_activity_reminder` | `*/30 * * * * *` | 每 30 秒检查活动结束和下一活动 |
 
 Cron 表达式格式：`秒 分 时 日 月 周`，可在设置页面的「事件绑定」标签页中修改。
 
@@ -285,6 +291,50 @@ scheduled_tasks:
 ```
 
 > **注意**：任务启用后，还需要在事件绑定中将对应事件（如 `task.daily_report`）绑定到 Webhook，否则任务执行时会自动跳过。
+
+## 提示词管理
+
+Lifelog 提供集中式的提示词管理，AI 对话和定时报告任务共享同一套提示词库。
+
+### 内置提示词
+
+| 名称 | 说明 |
+| ---- | ---- |
+| `scheduled_report` | 定时报告默认提示词，用于日报/周报/月报的 AI 生成 |
+| `ai_chat_default` | AI 对话默认提示词，用于日志分析对话 |
+
+内置提示词不可修改或删除。
+
+### 自定义提示词
+
+在 `prompts.yaml` 中配置，或通过 AI 对话页面的「添加提示词」按钮创建：
+
+```yaml
+prompts:
+  - name: weekly-focus
+    description: 周报重点分析
+    content: |
+      请重点关注深度工作时间占比、睡眠节奏变化，
+      并给出 2 条下阶段改进建议。
+```
+
+自定义提示词可在以下场景使用：
+- **AI 对话页面** — 显示为快捷按钮，点击即以提示词内容发送消息
+- **定时报告任务** — 在任务参数中通过下拉框选择提示词，替代默认的报告生成策略
+
+### 任务参数类型
+
+定时任务支持多种参数类型，前端自动渲染对应的输入组件：
+
+| 类型 | 说明 | 前端组件 |
+| ---- | ---- | -------- |
+| `text` | 单行文本 | 文本输入框 |
+| `textarea` | 多行文本 | 多行文本框 |
+| `boolean` | 开关 | Switch 开关 |
+| `select` | 下拉单选 | Select 下拉框 |
+| `number` | 数字输入 | 数字输入框 |
+| `multi_select` | 多选 | 按钮组 |
+| `map` | 键值对 | 动态键值对编辑器 |
 
 ## MCP 集成
 

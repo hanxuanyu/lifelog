@@ -13,19 +13,11 @@ import (
 )
 
 const (
-	reportBuiltinPromptParam  = "builtin_prompt"
-	reportCustomPromptParam   = "custom_prompt"
-	reportOverridePromptParam = "override_builtin_prompt"
+	reportPromptNameParam   = "prompt_name"
+	reportCustomPromptParam = "custom_prompt"
 )
 
-const scheduledReportSystemPrompt = `你是一个生活日志报告助手，需要根据结构化统计和原始日志生成可直接推送的中文 Markdown 报告。
-
-要求：
-1. 只基于提供的数据进行总结，不虚构用户未记录的事实。
-2. 开头先给出一句整体概览。
-3. 再用 2 到 4 个简短小节或要点，指出时间投入重点、节奏特征和可观察到的问题。
-4. 语气客观、简洁、可读，适合消息通知、日报、周报或月报推送。
-5. 如果记录较少，要明确指出样本有限。`
+const defaultReportPromptName = "scheduled_report"
 
 type generatedReport struct {
 	Detail   string
@@ -46,27 +38,37 @@ type reportRequest struct {
 }
 
 func buildReportPromptParamDefinitions(cfg model.ScheduledTaskConfig) []model.ScheduledTaskParamDefinition {
+	allPrompts := config.GetAllPrompts()
+	options := make([]model.ParamOption, 0, len(allPrompts))
+	for _, p := range allPrompts {
+		label := p.Description
+		if label == "" {
+			label = p.Name
+		}
+		if p.Builtin {
+			label += "（内置）"
+		}
+		options = append(options, model.ParamOption{Label: label, Value: p.Name})
+	}
+
+	promptName := strings.TrimSpace(cfg.Params[reportPromptNameParam])
+	if promptName == "" {
+		promptName = defaultReportPromptName
+	}
+
 	return []model.ScheduledTaskParamDefinition{
 		{
-			Key:         reportBuiltinPromptParam,
-			Label:       "内置提示词",
-			Description: "任务默认使用的系统提示词，只读，可在这里查看任务的内置生成策略。",
-			Type:        "textarea",
-			ReadOnly:    true,
-			Value:       strings.TrimSpace(scheduledReportSystemPrompt),
-			Rows:        8,
-		},
-		{
-			Key:         reportOverridePromptParam,
-			Label:       "覆盖内置提示词",
-			Description: "开启后仅使用自定义提示词；关闭时会在内置提示词后追加自定义提示词。",
-			Type:        "boolean",
-			Value:       formatBoolParam(parseBoolParam(cfg, reportOverridePromptParam)),
+			Key:         reportPromptNameParam,
+			Label:       "提示词",
+			Description: "选择用于生成报告的系统提示词。",
+			Type:        "select",
+			Options:     options,
+			Value:       promptName,
 		},
 		{
 			Key:         reportCustomPromptParam,
-			Label:       "自定义提示词",
-			Description: "用于定义这类报告的格式、重点或表达偏好。",
+			Label:       "自定义补充提示词",
+			Description: "追加在所选提示词之后，用于定义报告的格式、重点或表达偏好。",
 			Type:        "textarea",
 			Placeholder: "例如：重点关注深度工作、睡眠节奏，并给出 2 条下阶段建议。",
 			Value:       strings.TrimSpace(cfg.Params[reportCustomPromptParam]),
@@ -76,14 +78,26 @@ func buildReportPromptParamDefinitions(cfg model.ScheduledTaskConfig) []model.Sc
 }
 
 func buildScheduledReportSystemPrompt(cfg model.ScheduledTaskConfig) string {
-	customPrompt := strings.TrimSpace(cfg.Params[reportCustomPromptParam])
-	overrideBuiltin := parseBoolParam(cfg, reportOverridePromptParam)
-	systemPrompt := strings.TrimSpace(scheduledReportSystemPrompt)
+	promptName := strings.TrimSpace(cfg.Params[reportPromptNameParam])
+	if promptName == "" {
+		promptName = defaultReportPromptName
+	}
 
+	prompt := config.GetPromptByName(promptName)
+	if prompt == nil {
+		prompt = config.GetPromptByName(defaultReportPromptName)
+	}
+
+	systemPrompt := ""
+	if prompt != nil {
+		systemPrompt = strings.TrimSpace(prompt.Content)
+	}
+
+	customPrompt := strings.TrimSpace(cfg.Params[reportCustomPromptParam])
 	if customPrompt == "" {
 		return systemPrompt
 	}
-	if overrideBuiltin {
+	if systemPrompt == "" {
 		return customPrompt
 	}
 	return fmt.Sprintf("%s\n\n用户自定义指令：\n%s", systemPrompt, customPrompt)
