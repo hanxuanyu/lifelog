@@ -19,6 +19,7 @@ const (
 	baseConfigFileName       = "config.yaml"
 	categoriesConfigFileName = "categories.yaml"
 	webhookConfigFileName    = "webhooks.yaml"
+	promptsConfigFileName    = "prompts.yaml"
 )
 
 type serverConfig struct {
@@ -68,6 +69,7 @@ var (
 	baseViper       = viper.New()
 	categoriesViper = viper.New()
 	webhookViper    = viper.New()
+	promptsViper    = viper.New()
 )
 
 // SetConfigDir sets the config directory before Init is called.
@@ -106,11 +108,18 @@ func Init() {
 		os.Exit(1)
 	}
 
+	promptsViper, err = loadConfigViper(promptsConfigFileName)
+	if err != nil {
+		slog.Error("failed to load prompts config", "error", err)
+		os.Exit(1)
+	}
+
 	loadCategories()
 	loadAIProviders()
 	loadWebhooks()
 	loadEventBindings()
 	loadScheduledTasks()
+	loadPrompts()
 
 	watchConfigFile(baseViper, loadAIProviders)
 	watchConfigFile(categoriesViper, loadCategories)
@@ -119,6 +128,7 @@ func Init() {
 		loadEventBindings()
 		loadScheduledTasks()
 	})
+	watchConfigFile(promptsViper, loadPrompts)
 
 	slog.Info("configuration loaded",
 		"dir", configDir,
@@ -143,6 +153,7 @@ func ensureSplitConfigFiles() error {
 		{name: baseConfigFileName, data: defaultBaseConfig()},
 		{name: categoriesConfigFileName, data: defaultCategoriesConfig()},
 		{name: webhookConfigFileName, data: defaultWebhookConfig()},
+		{name: promptsConfigFileName, data: defaultPromptsConfig()},
 	}
 
 	for _, file := range files {

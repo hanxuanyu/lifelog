@@ -27,14 +27,16 @@ type exportData struct {
 
 // exportConfig 导出配置的结构
 type exportConfig struct {
-	TimePointMode string               `json:"time_point_mode"`
-	Server        exportServerConfig   `json:"server"`
-	Auth          exportAuthConfig     `json:"auth"`
-	AI            exportAIConfig       `json:"ai"`
-	Categories    []model.Category     `json:"categories"`
-	Webhooks      []model.Webhook      `json:"webhooks"`
-	EventBindings []model.EventBinding `json:"event_bindings"`
-	MCP           exportMCPConfig      `json:"mcp"`
+	TimePointMode  string                      `json:"time_point_mode"`
+	Server         exportServerConfig          `json:"server"`
+	Auth           exportAuthConfig            `json:"auth"`
+	AI             exportAIConfig              `json:"ai"`
+	Categories     []model.Category            `json:"categories"`
+	Webhooks       []model.Webhook             `json:"webhooks"`
+	EventBindings  []model.EventBinding        `json:"event_bindings"`
+	ScheduledTasks []model.ScheduledTaskConfig `json:"scheduled_tasks"`
+	Prompts        []model.Prompt              `json:"prompts"`
+	MCP            exportMCPConfig             `json:"mcp"`
 }
 
 type exportServerConfig struct {
@@ -58,11 +60,13 @@ type exportMCPConfig struct {
 }
 
 const (
-	importConfigBasic      = "basic"
-	importConfigAuth       = "auth"
-	importConfigAI         = "ai"
-	importConfigCategories = "categories"
-	importConfigWebhooks   = "webhooks"
+	importConfigBasic          = "basic"
+	importConfigAuth           = "auth"
+	importConfigAI             = "ai"
+	importConfigCategories     = "categories"
+	importConfigWebhooks       = "webhooks"
+	importConfigScheduledTasks = "scheduled_tasks"
+	importConfigPrompts        = "prompts"
 )
 
 var allImportConfigTypes = []string{
@@ -71,6 +75,8 @@ var allImportConfigTypes = []string{
 	importConfigAI,
 	importConfigCategories,
 	importConfigWebhooks,
+	importConfigScheduledTasks,
+	importConfigPrompts,
 }
 
 // ExportData 导出全量数据和配置到 zip
@@ -108,9 +114,11 @@ func ExportData(c *gin.Context) {
 		AI: exportAIConfig{
 			Providers: config.GetAIProviders(),
 		},
-		Categories:    config.GetCategories(),
-		Webhooks:      config.GetWebhooks(),
-		EventBindings: config.GetEventBindings(),
+		Categories:     config.GetCategories(),
+		Webhooks:       config.GetWebhooks(),
+		EventBindings:  config.GetEventBindings(),
+		ScheduledTasks: config.GetScheduledTasks(),
+		Prompts:        config.GetCustomPrompts(),
 		MCP: exportMCPConfig{
 			Enabled: config.GetMCPEnabled(),
 			Port:    config.GetMCPPort(),
@@ -378,6 +386,26 @@ func ImportData(c *gin.Context) {
 					}
 					if err := config.SetEventBindings(bindings); err != nil {
 						configErrors = append(configErrors, "导入事件绑定失败: "+err.Error())
+						break
+					}
+					importedTypes = append(importedTypes, configType)
+				case importConfigScheduledTasks:
+					tasks := cfgData.ScheduledTasks
+					if tasks == nil {
+						tasks = []model.ScheduledTaskConfig{}
+					}
+					if err := config.SetScheduledTasks(tasks); err != nil {
+						configErrors = append(configErrors, "导入定时任务失败: "+err.Error())
+						break
+					}
+					importedTypes = append(importedTypes, configType)
+				case importConfigPrompts:
+					prompts := cfgData.Prompts
+					if prompts == nil {
+						prompts = []model.Prompt{}
+					}
+					if err := config.SetCustomPrompts(prompts); err != nil {
+						configErrors = append(configErrors, "导入提示词失败: "+err.Error())
 						break
 					}
 					importedTypes = append(importedTypes, configType)

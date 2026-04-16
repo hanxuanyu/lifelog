@@ -30,6 +30,8 @@ export function DataManagementCard({ onImportComplete }: DataManagementCardProps
     ai: true,
     categories: true,
     webhooks: true,
+    scheduled_tasks: true,
+    prompts: true,
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -47,6 +49,8 @@ export function DataManagementCard({ onImportComplete }: DataManagementCardProps
     ai: "AI 配置",
     categories: "分类规则",
     webhooks: "Webhook 与事件绑定",
+    scheduled_tasks: "定时任务",
+    prompts: "提示词配置",
   }
 
   const handleExport = async () => {
@@ -112,7 +116,7 @@ export function DataManagementCard({ onImportComplete }: DataManagementCardProps
                 <Upload className="h-3.5 w-3.5 mr-1.5" />{importing ? "导入中..." : "导入数据"}
               </Button>
             </div>
-            <p className="text-[10px] text-muted-foreground">导出包含全部日志记录，以及基础配置、认证配置、AI 配置、分类规则和 Webhook 配置的 zip 压缩包</p>
+            <p className="text-[10px] text-muted-foreground">导出包含全部日志记录，以及基础配置、认证配置、AI 配置、分类规则、Webhook 配置、定时任务和提示词的 zip 压缩包</p>
           </CardContent>
         </Card>
       </motion.div>
@@ -175,6 +179,20 @@ export function DataManagementCard({ onImportComplete }: DataManagementCardProps
                           <p className="text-xs text-muted-foreground">Webhook 配置和事件触发绑定</p>
                         </div>
                         <Switch checked={configTypes.webhooks} onCheckedChange={(checked) => toggleConfigType("webhooks", checked)} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">定时任务</p>
+                          <p className="text-xs text-muted-foreground">定时任务的 Cron 表达式、启用状态和参数配置</p>
+                        </div>
+                        <Switch checked={configTypes.scheduled_tasks} onCheckedChange={(checked) => toggleConfigType("scheduled_tasks", checked)} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">提示词配置</p>
+                          <p className="text-xs text-muted-foreground">自定义提示词模板</p>
+                        </div>
+                        <Switch checked={configTypes.prompts} onCheckedChange={(checked) => toggleConfigType("prompts", checked)} />
                       </div>
                     </div>
                   )}

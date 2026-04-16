@@ -112,6 +112,15 @@ func Setup(r *gin.Engine, staticFS fs.FS) {
 			ai.POST("/models", handler.FetchModels)
 			ai.POST("/chat", handler.AIChat)
 		}
+
+		// 提示词
+		prompts := protected.Group("/prompts")
+		{
+			prompts.GET("", handler.GetPrompts)
+			prompts.POST("", handler.CreatePrompt)
+			prompts.PUT("/:name", handler.UpdatePrompt)
+			prompts.DELETE("/:name", handler.DeletePrompt)
+		}
 	}
 
 	// 静态文件服务 - 嵌入前端构建产物

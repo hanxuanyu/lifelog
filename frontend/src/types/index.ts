@@ -128,7 +128,7 @@ export interface UpdateSettingsResponse {
   need_restart: boolean
 }
 
-export type ImportConfigType = "basic" | "auth" | "ai" | "categories" | "webhooks"
+export type ImportConfigType = "basic" | "auth" | "ai" | "categories" | "webhooks" | "scheduled_tasks" | "prompts"
 
 export interface ImportDataResult {
   logs_imported?: number
@@ -212,15 +212,33 @@ export interface ScheduledTaskUpdate {
   params?: Record<string, string>
 }
 
+export interface Prompt {
+  name: string
+  content: string
+  description: string
+  builtin: boolean
+}
+
+export interface ParamOption {
+  label: string
+  value: string
+}
+
 export interface ScheduledTaskParamDefinition {
   key: string
   label: string
   description?: string
-  type: "text" | "textarea" | "boolean"
+  type: "text" | "textarea" | "boolean" | "select" | "number" | "multi_select" | "map"
   placeholder?: string
   read_only?: boolean
   value?: string
   rows?: number
+  options?: ParamOption[]
+  min?: number
+  max?: number
+  step?: number
+  map_key_label?: string
+  map_value_label?: string
 }
 
 export interface SystemMonitor {

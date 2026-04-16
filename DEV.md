@@ -56,7 +56,8 @@ lifelog/
 ├── internal/
 │   ├── config/
 │   │   ├── config.go          # 配置加载、热重载、读写接口
-│   │   └── webhook.go         # Webhook、事件绑定、定时任务配置管理
+│   │   ├── webhook.go         # Webhook、事件绑定、定时任务配置管理
+│   │   └── prompts.go         # 提示词配置管理（内置 + 自定义）
 │   ├── events/
 │   │   ├── bus.go             # 事件总线（发布/订阅）
 │   │   ├── events.go          # 事件定义注册表
@@ -64,7 +65,9 @@ lifelog/
 │   │   └── webhook_subscriber.go # Webhook 订阅者（事件 → Webhook 分发）
 │   ├── scheduler/
 │   │   ├── scheduler.go       # 定时任务调度器（robfig/cron）
-│   │   └── tasks.go           # 内置任务（日报、周报、未记录提醒）
+│   │   ├── tasks.go           # 内置任务（日报、周报、未记录提醒等）
+│   │   ├── reporting.go       # 报告生成逻辑（AI + 模板回退）
+│   │   └── reminder_task.go   # 活动提醒任务
 │   ├── handler/
 │   │   ├── auth.go            # 登录、密码设置
 │   │   ├── log_entry.go       # 日志 CRUD、时间轴
@@ -74,6 +77,7 @@ lifelog/
 │   │   ├── settings.go        # 系统设置
 │   │   ├── webhook.go         # Webhook 管理、事件定义、事件绑定
 │   │   ├── scheduled_task.go  # 定时任务管理
+│   │   ├── prompts.go         # 提示词 CRUD
 │   │   ├── ai.go              # AI 提供商管理与对话
 │   │   ├── version.go         # 版本信息与更新检查
 │   │   └── router.go          # 路由注册、静态文件服务、SPA fallback
@@ -82,7 +86,8 @@ lifelog/
 │   ├── model/
 │   │   ├── log_entry.go       # 日志条目模型（GORM）
 │   │   ├── category.go        # 分类与匹配规则模型
-│   │   ├── webhook.go         # Webhook、事件绑定、定时任务配置模型
+│   │   ├── webhook.go         # Webhook、事件绑定、定时任务配置、参数定义模型
+│   │   ├── prompt.go          # 提示词模型
 │   │   ├── ai.go              # AI 提供商与对话模型
 │   │   └── response.go        # 响应 DTO（统计、分页等）
 │   ├── repository/
@@ -153,7 +158,7 @@ lifelog/
             │   ├── TopEventsCard.tsx       # 事项排行
             │   ├── DailyAveragePills.tsx   # 日均统计
             │   ├── CategoryDetailDialog.tsx # 子分类详情弹窗
-            │   └── AISummaryChat.tsx       # AI 统计摘要对话
+            │   └── AISummaryChat.tsx       # AI 统计摘要对话（含提示词管理）
             ├── settings/
             │   ├── AuthConfigCard.tsx      # 认证配置
             │   ├── PasswordCard.tsx        # 密码设置
@@ -168,7 +173,7 @@ lifelog/
             │   ├── WebhookSettingsCard.tsx # Webhook 管理
             │   ├── WebhookDialog.tsx       # Webhook 编辑/复制弹窗
             │   ├── EventBindingsCard.tsx   # 事件绑定管理
-            │   ├── ScheduledTasksCard.tsx  # 定时任务管理
+            │   ├── ScheduledTasksCard.tsx  # 定时任务管理（支持多种参数类型渲染）
             │   └── VersionInfoCard.tsx     # 版本信息与更新
             └── ui/                    # shadcn/ui 组件
 ```
@@ -307,9 +312,46 @@ events.Publish(task.EventName(), data)
 2. 在 `RegisterBuiltinTasks()` 中注册
 3. 在 `internal/events/events.go` 中添加对应的事件定义
 
+任务参数类型系统：
+
+`ScheduledTaskParamDefinition` 支持以下类型，前端根据 `type` 字段自动渲染对应输入组件：
+
+| 类型 | 存储格式 | 附加字段 |
+| ---- | -------- | -------- |
+| `text` | 字符串 | `placeholder` |
+| `textarea` | 字符串 | `placeholder`, `rows` |
+| `boolean` | `"true"` / `"false"` | — |
+| `select` | 选中项的 value | `options []ParamOption` |
+| `number` | 数字字符串 | `min`, `max`, `step` |
+| `multi_select` | 逗号分隔字符串 | `options []ParamOption` |
+| `map` | JSON 字符串 | `map_key_label`, `map_value_label` |
+
+添加新参数类型时，需同步更新前端 `ScheduledTasksCard.tsx` 中的渲染分支和 `formatParamSummary` 函数。
+
+### 提示词管理
+
+提示词系统采用内置 + 自定义的双层设计，存储在独立的 `prompts.yaml` 配置文件中：
+
+```text
+config/prompts.go（内置提示词定义 + 配置读写）
+    ↓
+config/config.go（promptsViper 初始化 + 热重载）
+    ↓
+handler/prompts.go（CRUD API）
+    ↓
+scheduler/reporting.go（报告任务通过 prompt_name 引用提示词）
+frontend/AISummaryChat.tsx（AI 页面展示提示词按钮）
+```
+
+- 内置提示词在 Go 代码中定义（`builtinPrompts` 变量），始终可用，不可修改删除
+- 自定义提示词存储在 `prompts.yaml`，通过 API 或直接编辑文件管理
+- `GetPromptByName()` 优先搜索内置提示词，再搜索自定义提示词
+- 定时报告任务通过 `prompt_name` 参数（select 类型）引用提示词，执行时动态解析
+- 引用的提示词被删除时自动回退到 `scheduled_report` 内置提示词
+
 ### 前端构建嵌入
 
-前端 `npm run build` 输出到 `web/` 目录，Go 通过 `//go:embed web/*` 将其编译进单一二进制文件。生产部署只需要一个可执行文件 + `config.yaml`。
+前端 `npm run build` 输出到 `web/` 目录，Go 通过 `//go:embed web/*` 将其编译进单一二进制文件。生产部署只需要一个可执行文件 + `config/` 配置目录。
 
 路由使用 SPA fallback：未匹配的路径返回 `index.html`，由前端 react-router 处理。
 
@@ -394,6 +436,10 @@ events.Publish(task.EventName(), data)
 | `POST` | `/api/ai/providers/test` | 测试 AI 提供商连接 | 是 |
 | `POST` | `/api/ai/models` | 获取 AI 模型列表 | 是 |
 | `POST` | `/api/ai/chat` | AI 对话 | 是 |
+| `GET` | `/api/prompts` | 获取所有提示词（内置 + 自定义） | 是 |
+| `POST` | `/api/prompts` | 创建自定义提示词 | 是 |
+| `PUT` | `/api/prompts/:name` | 更新自定义提示词 | 是 |
+| `DELETE` | `/api/prompts/:name` | 删除自定义提示词 | 是 |
 | `GET` | `/api/webhooks` | 获取 Webhook 列表 | 是 |
 | `POST` | `/api/webhooks` | 创建 Webhook | 是 |
 | `PUT` | `/api/webhooks/:name` | 更新 Webhook | 是 |
@@ -475,7 +521,7 @@ INDEX idx_log_entries_log_date ON log_entries(log_date)
 ```text
 lifelog-export-YYYYMMDD-HHMMSS.zip
 ├── logs.json      # 全量日志（含 version、exported_at）
-└── config.json    # 分类配置 + time_point_mode
+└── config.json    # 全量配置（基础、认证、AI、分类、Webhook、事件绑定、定时任务、提示词、MCP）
 ```
 
 ### 导入选项
@@ -484,6 +530,7 @@ lifelog-export-YYYYMMDD-HHMMSS.zip
 | ---- | ---- |
 | `merge_logs=true` | 按 (date, time, event_type) 去重合并 |
 | `merge_logs=false` | 清空现有日志后全量导入 |
-| `import_config=true` | 同时导入分类配置和时间点模式 |
+| `import_config=true` | 同时导入配置 |
+| `import_config_types` | 可选配置类型：`basic`、`auth`、`ai`、`categories`、`webhooks`、`scheduled_tasks`、`prompts` |
 
 文件大小限制：100MB。

@@ -21,6 +21,7 @@ import type {
   ScheduledTaskInfo,
   ScheduledTaskUpdate,
   SystemMonitor,
+  Prompt,
 } from "@/types"
 
 const http = axios.create({
@@ -422,5 +423,26 @@ export async function updateScheduledTasks(tasks: ScheduledTaskUpdate[]) {
 
 export async function runScheduledTask(name: string) {
   const res = await http.post<ApiResponse>(`/scheduled-tasks/${encodeURIComponent(name)}/run`)
+  return res.data
+}
+
+// Prompts
+export async function getPrompts() {
+  const res = await http.get<ApiResponse<Prompt[]>>("/prompts")
+  return res.data.data
+}
+
+export async function createPrompt(prompt: Omit<Prompt, "builtin">) {
+  const res = await http.post<ApiResponse>("/prompts", prompt)
+  return res.data
+}
+
+export async function updatePrompt(name: string, prompt: Omit<Prompt, "builtin">) {
+  const res = await http.put<ApiResponse>(`/prompts/${encodeURIComponent(name)}`, prompt)
+  return res.data
+}
+
+export async function deletePrompt(name: string) {
+  const res = await http.delete<ApiResponse>(`/prompts/${encodeURIComponent(name)}`)
   return res.data
 }

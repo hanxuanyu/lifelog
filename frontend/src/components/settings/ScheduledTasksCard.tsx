@@ -10,6 +10,8 @@ import {
   Check,
   Loader2,
   SlidersHorizontal,
+  Plus,
+  Trash2,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -17,6 +19,13 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -80,7 +89,7 @@ function buildTaskPayload(task: ScheduledTaskInfo) {
   const params = Object.fromEntries(
     getEditableParamDefinitions(task)
       .map((param) => [param.key, normalizeParamValue(param)] as const)
-      .filter(([_, value]) => value !== "" && value !== "false"),
+      .filter(([_, value]) => value !== "" && value !== "false" && value !== "{}"),
   )
 
   return {
@@ -99,6 +108,24 @@ function formatParamSummary(param: ScheduledTaskParamDefinition) {
   const value = normalizeParamValue(param)
   if (param.type === "boolean") {
     return `${param.label}：${isBooleanEnabled(value) ? "开启" : "关闭"}`
+  }
+  if (param.type === "select") {
+    const option = param.options?.find((o) => o.value === value)
+    return option ? `${param.label}：${option.label}` : ""
+  }
+  if (param.type === "multi_select") {
+    const selected = value ? value.split(",").filter(Boolean) : []
+    return selected.length > 0 ? `${param.label}：已选 ${selected.length} 项` : ""
+  }
+  if (param.type === "map") {
+    try {
+      const obj = value ? JSON.parse(value) : {}
+      const count = Object.keys(obj).length
+      return count > 0 ? `${param.label}：${count} 组键值对` : ""
+    } catch { return "" }
+  }
+  if (param.type === "number") {
+    return value ? `${param.label}：${value}` : ""
   }
   if (!value) return ""
   if (param.key === "custom_prompt") {
@@ -718,6 +745,130 @@ export function ScheduledTasksCard() {
                         />
                       </div>
                     )}
+
+                    {param.type === "select" && (
+                      <Select
+                        value={value}
+                        onValueChange={(v) => updateParam(editorTask.name, param.key, v)}
+                        disabled={param.read_only}
+                      >
+                        <SelectTrigger
+                          ref={(node) => { if (shouldAutofocus) firstEditableFieldRef.current = node }}
+                          className="w-full text-xs"
+                          onFocus={(e) => scrollEditorFieldIntoView(e.currentTarget)}
+                        >
+                          <SelectValue placeholder={param.placeholder || "请选择"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(param.options || []).map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+
+                    {param.type === "number" && (
+                      <Input
+                        ref={(node) => { if (shouldAutofocus) firstEditableFieldRef.current = node }}
+                        type="number"
+                        value={value}
+                        readOnly={param.read_only}
+                        placeholder={param.placeholder}
+                        min={param.min}
+                        max={param.max}
+                        step={param.step}
+                        onFocus={(e) => scrollEditorFieldIntoView(e.currentTarget)}
+                        onChange={(e) => {
+                          if (param.read_only) return
+                          updateParam(editorTask.name, param.key, e.target.value)
+                        }}
+                        className={`h-9 text-xs ${param.read_only ? "font-mono bg-muted/40" : ""}`}
+                      />
+                    )}
+
+                    {param.type === "multi_select" && (
+                      <div className="flex flex-wrap gap-1.5 rounded-md border bg-muted/20 p-3">
+                        {(param.options || []).map((opt) => {
+                          const selected = value ? value.split(",").filter(Boolean) : []
+                          const checked = selected.includes(opt.value)
+                          return (
+                            <Button
+                              key={opt.value}
+                              type="button"
+                              variant={checked ? "secondary" : "outline"}
+                              size="sm"
+                              className="rounded-full text-xs font-normal"
+                              disabled={param.read_only}
+                              onClick={() => {
+                                const next = checked ? selected.filter((v) => v !== opt.value) : [...selected, opt.value]
+                                updateParam(editorTask.name, param.key, next.join(","))
+                              }}
+                            >
+                              {checked && <Check className="mr-1 h-3 w-3" />}
+                              {opt.label}
+                            </Button>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {param.type === "map" && (() => {
+                      let entries: [string, string][] = []
+                      try { entries = Object.entries(value ? JSON.parse(value) : {}) } catch { entries = [] }
+                      const updateEntries = (next: [string, string][]) => {
+                        updateParam(editorTask.name, param.key, JSON.stringify(Object.fromEntries(next)))
+                      }
+                      return (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <span className="flex-1">{param.map_key_label || "键"}</span>
+                            <span className="flex-1">{param.map_value_label || "值"}</span>
+                            <span className="w-8" />
+                          </div>
+                          {entries.map(([k, v], i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <Input
+                                value={k}
+                                placeholder={param.map_key_label || "键"}
+                                className="h-8 flex-1 text-xs"
+                                onChange={(e) => {
+                                  const next = [...entries] as [string, string][]
+                                  next[i] = [e.target.value, v]
+                                  updateEntries(next)
+                                }}
+                              />
+                              <Input
+                                value={v}
+                                placeholder={param.map_value_label || "值"}
+                                className="h-8 flex-1 text-xs"
+                                onChange={(e) => {
+                                  const next = [...entries] as [string, string][]
+                                  next[i] = [k, e.target.value]
+                                  updateEntries(next)
+                                }}
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => updateEntries(entries.filter((_, j) => j !== i))}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => updateEntries([...entries, ["", ""]])}
+                          >
+                            <Plus className="h-3.5 w-3.5" /> 添加
+                          </Button>
+                        </div>
+                      )
+                    })()}
                   </div>
                 )
               })}
