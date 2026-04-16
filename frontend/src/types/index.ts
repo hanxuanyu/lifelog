@@ -128,7 +128,7 @@ export interface UpdateSettingsResponse {
   need_restart: boolean
 }
 
-export type ImportConfigType = "basic" | "auth" | "ai" | "categories" | "webhooks"
+export type ImportConfigType = "basic" | "auth" | "ai" | "categories" | "webhooks" | "scheduled_tasks"
 
 export interface ImportDataResult {
   logs_imported?: number
