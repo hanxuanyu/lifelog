@@ -15,6 +15,7 @@ import { TopNav } from "@/components/navigation/TopNav"
 import { MobileActionDock } from "@/components/navigation/MobileActionDock"
 import { MobileTopActions } from "@/components/navigation/MobileTopActions"
 import { MobileBottomNav } from "@/components/navigation/MobileBottomNav"
+import { MobileDateNav } from "@/components/navigation/MobileDateNav"
 import { GlobalShortcutListener } from "@/components/navigation/GlobalShortcutListener"
 import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog"
 import { format } from "date-fns"
@@ -27,6 +28,7 @@ function AppLayout() {
   const isHome = location.pathname === "/"
   const [isStandalone, setIsStandalone] = useState(() => isStandaloneDisplayMode())
   const [timelineEditing, setTimelineEditing] = useState(false)
+  const [railHovering, setRailHovering] = useState(false)
   const [bottomNavCollapsed, setBottomNavCollapsed] = useState(false)
   const { isAutoNavigation, isTopNavigation, isFloatingNavigation } = useNavigationStyle()
 
@@ -121,6 +123,12 @@ function AppLayout() {
   }, [isHome])
 
   useEffect(() => {
+    const handler = (e: Event) => setRailHovering((e as CustomEvent).detail)
+    window.addEventListener("railHovering", handler)
+    return () => window.removeEventListener("railHovering", handler)
+  }, [])
+
+  useEffect(() => {
     document.body.classList.toggle("no-scroll", isHome)
     if (!isHome) window.scrollTo(0, 0)
     return () => document.body.classList.remove("no-scroll")
@@ -160,6 +168,7 @@ function AppLayout() {
   const showTopNavOnMobile = isTopNavigation
   const showFloatingDock = isFloatingNavigation
   const mobileFabHidden = quickAddOpen || (isHome && timelineEditing)
+  const dateNavHidden = mobileFabHidden || railHovering
 
   useEffect(() => {
     setBottomNavCollapsed(false)
@@ -235,6 +244,8 @@ function AppLayout() {
       <TopNav showOnMobile={showTopNavOnMobile} />
       {showAutoMobileNav && <MobileTopActions />}
       <MobileActionDock hidden={!showFloatingDock || mobileFabHidden} />
+      {showAutoMobileNav && <MobileDateNav collapsed={bottomNavCollapsed} mode="auto" hidden={!isHome || dateNavHidden} />}
+      {showFloatingDock && <MobileDateNav collapsed={false} mode="floating" hidden={!isHome || dateNavHidden} />}
       {showAutoMobileNav && <MobileBottomNav collapsed={bottomNavCollapsed} />}
       <GlobalShortcutListener />
       <GlobalSearchDialog open={globalSearchOpen} onOpenChange={setGlobalSearchOpen} />

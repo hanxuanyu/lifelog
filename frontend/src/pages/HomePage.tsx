@@ -112,6 +112,23 @@ export function HomePage() {
     return () => window.removeEventListener("timelineEditing", handler)
   }, [])
 
+  // Dispatch date state for MobileDateNav
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("dateNavState", { detail: { isToday: isToday(currentDate) } }))
+  }, [currentDate])
+
+  // Listen for MobileDateNav prev/next events
+  useEffect(() => {
+    const onPrev = () => setCurrentDate((d) => subDays(d, 1))
+    const onNext = () => setCurrentDate((d) => { if (!isToday(d)) return addDays(d, 1); return d })
+    window.addEventListener("dateNavPrev", onPrev)
+    window.addEventListener("dateNavNext", onNext)
+    return () => {
+      window.removeEventListener("dateNavPrev", onPrev)
+      window.removeEventListener("dateNavNext", onNext)
+    }
+  }, [])
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (dialogOpen) return
