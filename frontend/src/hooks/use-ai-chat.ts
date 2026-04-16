@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { format, subDays } from "date-fns"
-import { streamAIChat, getAIProviders, getCategories, fetchAIModels } from "@/api"
+import { streamAIChat, getAIProviders, getCategories, fetchAIModels, updateAIProvider } from "@/api"
 import type { AIProvider, AIChatMessage, Category } from "@/types"
 import { toast } from "sonner"
 import {
@@ -225,7 +225,7 @@ export function useAIChat() {
     const preferredModel = currentSession?.model || storedSelections[activeProvider.name] || activeProvider.model
     setSelectedModel(preferredModel)
     void loadModelsForProvider(activeProvider, preferredModel)
-  }, [activeProvider, currentSession?.id, currentSession?.model, loadModelsForProvider])
+  }, [activeProviderName, activeProvider, currentSession?.id, currentSession?.model, loadModelsForProvider])
 
   useEffect(() => {
     if (!currentSessionIdRef.current || messagesRef.current.length === 0) return
@@ -250,6 +250,32 @@ export function useAIChat() {
     delete modelCacheRef.current[activeProvider.name]
     await loadModelsForProvider(activeProvider, selectedModel || activeProvider.model)
   }
+
+  const switchProvider = useCallback(async (providerName: string) => {
+    const target = providersRef.current.find((p) => p.name === providerName)
+    if (!target) return
+
+    // Reset selected model to the new provider's default
+    setSelectedModel(target.model)
+
+    // Update current session's provider if one exists
+    if (currentSessionIdRef.current && messagesRef.current.length > 0) {
+      const updated = sessionsRef.current.map((s) =>
+        s.id === currentSessionIdRef.current ? { ...s, provider_name: providerName, model: target.model, updated_at: new Date().toISOString() } : s,
+      )
+      persistSessions(updated)
+    }
+
+    // Set as default provider in config
+    if (!target.default) {
+      try {
+        await updateAIProvider(target.name, { ...target, default: true })
+        setProviders((prev) => prev.map((p) => ({ ...p, default: p.name === providerName })))
+      } catch {
+        toast.error("切换服务商失败")
+      }
+    }
+  }, [persistSessions])
 
   const handleAbort = useCallback(() => {
     abortRef.current?.abort()
@@ -365,6 +391,15 @@ export function useAIChat() {
         pruneEmptyAssistant()
       },
       controller.signal,
+      (reasoning) => {
+        const updated = [...messagesRef.current]
+        const last = updated[updated.length - 1]
+        if (last?.role !== "assistant") return
+        updated[updated.length - 1] = { ...last, reasoning: (last.reasoning || "") + reasoning }
+        replaceMessages(updated)
+        upsertSessionSnapshot(sessionId, updated)
+        scrollToBottom()
+      },
     )
   }, [activeProvider, pruneEmptyAssistant, replaceMessages, scrollToBottom, streaming, upsertSessionSnapshot])
 
@@ -397,7 +432,7 @@ export function useAIChat() {
     modelMenuOpen, setModelMenuOpen,
     activeProvider, activeProviderName, rangeSummary, filterSummary,
     currentSession, scrollRef,
-    handlePromptChange, handleSelectModel, refreshModels,
+    handlePromptChange, handleSelectModel, refreshModels, switchProvider,
     handleAbort, handleNewSession, openSession, handleDeleteSession,
     sendMessage, handleKeyDown, handleTextareaInput, loadProviders,
   }

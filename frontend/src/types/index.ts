@@ -137,6 +137,8 @@ export interface ImportDataResult {
   config_imported?: boolean
   config_imported_types?: ImportConfigType[]
   config_need_restart?: boolean
+  config_need_restart_types?: string[]
+  config_hot_reloaded?: string[]
   config_error?: string
   config_errors?: string[]
 }

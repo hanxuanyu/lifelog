@@ -182,12 +182,19 @@ func forwardStreamEvent(lines []string, writer io.Writer, flusher http.Flusher) 
 		return true, nil
 	}
 
-	content := extractStreamContent(payload)
-	if content == "" {
+	content, reasoning := extractStreamContent(payload)
+	if content == "" && reasoning == "" {
 		return false, nil
 	}
 
-	sseData, _ := json.Marshal(map[string]string{"content": content})
+	ssePayload := make(map[string]string)
+	if content != "" {
+		ssePayload["content"] = content
+	}
+	if reasoning != "" {
+		ssePayload["reasoning"] = reasoning
+	}
+	sseData, _ := json.Marshal(ssePayload)
 	if _, err := fmt.Fprintf(writer, "data: %s\n\n", sseData); err != nil {
 		return false, err
 	}
@@ -198,11 +205,12 @@ func forwardStreamEvent(lines []string, writer io.Writer, flusher http.Flusher) 
 	return false, nil
 }
 
-func extractStreamContent(payload string) string {
+func extractStreamContent(payload string) (content string, reasoning string) {
 	var chunk struct {
 		Choices []struct {
 			Delta struct {
-				Content any `json:"content"`
+				Content          any `json:"content"`
+				ReasoningContent any `json:"reasoning_content"`
 			} `json:"delta"`
 			Message struct {
 				Content any `json:"content"`
@@ -210,15 +218,17 @@ func extractStreamContent(payload string) string {
 		} `json:"choices"`
 	}
 	if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
-		return ""
+		return "", ""
 	}
 	if len(chunk.Choices) == 0 {
-		return ""
+		return "", ""
 	}
-	if content := extractMessageContent(chunk.Choices[0].Delta.Content, false); content != "" {
-		return content
+	content = extractMessageContent(chunk.Choices[0].Delta.Content, false)
+	if content == "" {
+		content = extractMessageContent(chunk.Choices[0].Message.Content, false)
 	}
-	return extractMessageContent(chunk.Choices[0].Message.Content, false)
+	reasoning = extractMessageContent(chunk.Choices[0].Delta.ReasoningContent, false)
+	return content, reasoning
 }
 
 // ChatCompletion 调用 AI 提供商的 OpenAI 兼容接口进行非流式对话

@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
 import {
   Bot,
+  Brain,
   CalendarIcon,
   Check,
   ChevronDown,
+  ChevronRight,
   Filter,
   History,
   Loader2,
@@ -24,6 +26,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -69,7 +78,7 @@ export function AISummaryChat() {
     modelMenuOpen, setModelMenuOpen,
     activeProvider, filterSummary,
     scrollRef,
-    handlePromptChange, handleSelectModel, refreshModels,
+    handlePromptChange, handleSelectModel, refreshModels, switchProvider,
     handleAbort, handleNewSession, openSession, handleDeleteSession,
     sendMessage, handleKeyDown, handleTextareaInput, loadProviders,
   } = useAIChat()
@@ -142,9 +151,21 @@ export function AISummaryChat() {
         <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="flex flex-wrap items-center gap-2 border-b px-3 py-3 sm:px-4">
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <Badge variant="outline" className="h-8 rounded-lg px-3 font-normal">
-                {activeProvider?.name || "未选择服务商"}
-              </Badge>
+              <Select
+                value={activeProvider?.name || ""}
+                onValueChange={(value) => switchProvider(value)}
+              >
+                <SelectTrigger className="h-8 min-w-0 max-w-[140px] text-xs font-normal sm:max-w-[180px]">
+                  <SelectValue placeholder="未选择服务商" />
+                </SelectTrigger>
+                <SelectContent>
+                  {providers.map((p) => (
+                    <SelectItem key={p.name} value={p.name} className="text-xs">
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Popover open={modelMenuOpen} onOpenChange={setModelMenuOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8 min-w-0 gap-1.5">
@@ -278,22 +299,51 @@ export function AISummaryChat() {
                         </div>
                       ) : (
                         <div className="group max-w-full">
-                          {!message.content && streaming ? (
+                          {message.reasoning && (() => {
+                            const isThinking = isStreamingAssistant && !message.content
+                            if (isThinking) {
+                              return (
+                                <div className="text-sm leading-7">
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                                    <Brain className="h-3.5 w-3.5 shrink-0" />
+                                    <span>思考中...</span>
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  </div>
+                                  <div className="whitespace-pre-wrap text-muted-foreground/80">
+                                    {message.reasoning}
+                                    <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-muted-foreground/60 align-middle" />
+                                  </div>
+                                </div>
+                              )
+                            }
+                            return (
+                              <details className="mb-2">
+                                <summary className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground select-none py-1 hover:text-foreground transition-colors">
+                                  <Brain className="h-3.5 w-3.5 shrink-0" />
+                                  <span>已深度思考（点击展开）</span>
+                                </summary>
+                                <div className="mt-1 rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                                  {message.reasoning}
+                                </div>
+                              </details>
+                            )
+                          })()}
+                          {!message.content && !message.reasoning && streaming ? (
                             <div className="inline-flex gap-1 py-2">
                               <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:0ms]" />
                               <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:150ms]" />
                               <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:300ms]" />
                             </div>
-                          ) : isStreamingAssistant ? (
+                          ) : isStreamingAssistant && message.content ? (
                             <div className="whitespace-pre-wrap text-sm leading-7">
                               {message.content}
                               <span className="ml-1 inline-block h-4 w-[2px] animate-pulse bg-primary/60 align-middle" />
                             </div>
-                          ) : (
+                          ) : message.content ? (
                             <div className="text-sm leading-relaxed">
                               <MarkdownRenderer content={message.content} preserveLineBreaks />
                             </div>
-                          )}
+                          ) : null}
                           {message.content && !isStreamingAssistant && (
                             <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100">
                               <CopyButton text={message.content} />
