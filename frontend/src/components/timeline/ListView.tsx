@@ -364,6 +364,7 @@ export function ListView({
                 entry={entry} index={index} color={getCategoryColor(entry.category)}
                 durItem={getDurationForEntry(index)} highlightIndex={highlightIndex}
                 expandedEntryId={expandedEntryId} swipedEntryId={swipedEntryId}
+                isToday={isToday} currentTime={currentTime}
                 getEntryMode={getEntryMode} onCardClick={handleCardClick}
                 onCardContextMenu={handleCardContextMenu}
                 onCardTouchStart={handleCardTouchStart} onCardTouchMove={handleCardTouchMove}
