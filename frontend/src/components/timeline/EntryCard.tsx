@@ -53,11 +53,17 @@ export function EntryCard({
 
   const isFuturePlan = useMemo(() => {
     if (!isToday) return false
+    // Cross-day entries that started yesterday are not plans
+    if (durItem?.cross_day) return false
+    const today = new Date()
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+    if (entry.log_date < todayStr) return false
+    if (entry.log_date > todayStr) return true
     const entryTime = durItem?.start_time
       ? formatTime(durItem.start_time)
       : formatTime(entry.log_time)
     return timeToMinutes(entryTime) > timeToMinutes(currentTime)
-  }, [isToday, currentTime, durItem?.start_time, entry.log_time])
+  }, [isToday, currentTime, durItem?.start_time, durItem?.cross_day, entry.log_time, entry.log_date])
 
   return (
     <motion.div
