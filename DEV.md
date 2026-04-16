@@ -168,7 +168,7 @@ lifelog/
             │   ├── ShortcutCard.tsx        # 快捷键设置
             │   ├── DataManagementCard.tsx  # 数据导入导出
             │   ├── MCPServiceCard.tsx      # MCP 服务配置
-            │   ├── AIProviderSettings.tsx  # AI 提供商设置
+            │   ├── AIProviderSettings.tsx  # AI 提供商设置 + 提示词管理
             │   ├── AIProviderDialog.tsx    # AI 提供商编辑弹窗
             │   ├── WebhookSettingsCard.tsx # Webhook 管理
             │   ├── WebhookDialog.tsx       # Webhook 编辑/复制弹窗

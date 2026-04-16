@@ -402,6 +402,36 @@ func RunTaskNow(name string) error {
 	return nil
 }
 
+// ReloadFromConfig reloads all task configs from the config file and reschedules.
+func ReloadFromConfig() {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if cronRunner == nil {
+		return
+	}
+
+	for _, entry := range registeredMap {
+		unscheduleEntry(entry)
+
+		saved := config.GetScheduledTaskByName(entry.Task.Name())
+		if saved != nil {
+			entry.Config = copyScheduledTaskConfig(*saved)
+			if entry.Config.Cron == "" {
+				entry.Config.Cron = entry.Task.DefaultCron()
+			}
+		}
+
+		if entry.Config.Enabled {
+			if err := scheduleEntry(entry); err != nil {
+				slog.Error("failed to reschedule task after reload", "task", entry.Task.Name(), "error", err)
+			}
+		}
+	}
+
+	slog.Info("scheduler reloaded from config")
+}
+
 func copyScheduledTaskConfig(cfg model.ScheduledTaskConfig) model.ScheduledTaskConfig {
 	cfg.Params = copyStringMap(cfg.Params)
 	return cfg

@@ -249,6 +249,7 @@ export function streamAIChat(
   onDone: () => void,
   onError: (err: string) => void,
   signal?: AbortSignal,
+  onReasoning?: (reasoning: string) => void,
 ) {
   const token = localStorage.getItem("token")
   fetch("/api/ai/chat", {
@@ -303,6 +304,9 @@ export function streamAIChat(
             if (parsed.content) {
               onChunk(parsed.content)
             }
+            if (parsed.reasoning && onReasoning) {
+              onReasoning(parsed.reasoning)
+            }
           } catch {
             // ignore parse errors
           }
@@ -323,6 +327,9 @@ export function streamAIChat(
           }
           if (parsed.content) {
             onChunk(parsed.content)
+          }
+          if (parsed.reasoning && onReasoning) {
+            onReasoning(parsed.reasoning)
           }
         } catch {
           // ignore parse errors

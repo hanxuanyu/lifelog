@@ -87,7 +87,14 @@ export function DataManagementCard({ onImportComplete }: DataManagementCardProps
       } else if (d?.config_imported) {
         parts.push("配置已导入")
       }
-      if (d?.config_need_restart) parts.push("部分配置需要重启服务后生效")
+      if (d?.config_hot_reloaded?.length) {
+        parts.push(`已实时生效：${d.config_hot_reloaded.join("、")}`)
+      }
+      if (d?.config_need_restart && d?.config_need_restart_types?.length) {
+        parts.push(`需要重启后生效：${d.config_need_restart_types.join("、")}`)
+      } else if (d?.config_need_restart) {
+        parts.push("部分配置需要重启服务后生效")
+      }
       if (d?.config_errors?.length) parts.push(`配置错误: ${d.config_errors.join("；")}`)
       else if (d?.config_error) parts.push(`配置错误: ${d.config_error}`)
       toast.success("导入完成", { description: parts.join("，") })

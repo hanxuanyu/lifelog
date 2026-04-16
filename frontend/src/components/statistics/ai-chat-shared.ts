@@ -27,6 +27,7 @@ export const DATE_PRESETS: DatePreset[] = [
 export interface ChatMsg {
   role: "user" | "assistant"
   content: string
+  reasoning?: string
 }
 
 export interface ChatSession {

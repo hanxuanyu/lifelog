@@ -16,6 +16,7 @@ import (
 	"github.com/hxuanyu/lifelog/internal/events"
 	"github.com/hxuanyu/lifelog/internal/model"
 	"github.com/hxuanyu/lifelog/internal/repository"
+	"github.com/hxuanyu/lifelog/internal/scheduler"
 )
 
 // exportData 导出数据的结构
@@ -324,8 +325,9 @@ func ImportData(c *gin.Context) {
 			result["config_errors"] = []string{"zip 中未找到 config.json，无法导入配置"}
 		} else {
 			importedTypes := make([]string, 0, len(selectedConfigTypes))
+			hotReloadedTypes := make([]string, 0)
+			restartRequiredTypes := make([]string, 0)
 			configErrors := make([]string, 0)
-			needRestart := false
 
 			for _, configType := range selectedConfigTypes {
 				switch configType {
@@ -343,14 +345,15 @@ func ImportData(c *gin.Context) {
 						break
 					}
 					importedTypes = append(importedTypes, configType)
-					needRestart = true
+					restartRequiredTypes = append(restartRequiredTypes, "服务端口", "数据库路径", "MCP 配置")
+					hotReloadedTypes = append(hotReloadedTypes, "时间点模式")
 				case importConfigAuth:
 					if err := config.SetAuthBackupConfig(&cfgData.Auth.PasswordHash, &cfgData.Auth.JWTSecret, &cfgData.Auth.JWTExpireHours); err != nil {
 						configErrors = append(configErrors, "导入认证配置失败: "+err.Error())
 						break
 					}
 					importedTypes = append(importedTypes, configType)
-					needRestart = true
+					restartRequiredTypes = append(restartRequiredTypes, "认证配置")
 				case importConfigAI:
 					providers := cfgData.AI.Providers
 					if providers == nil {
@@ -361,6 +364,7 @@ func ImportData(c *gin.Context) {
 						break
 					}
 					importedTypes = append(importedTypes, configType)
+					hotReloadedTypes = append(hotReloadedTypes, "AI 配置")
 				case importConfigCategories:
 					categories := cfgData.Categories
 					if categories == nil {
@@ -371,6 +375,7 @@ func ImportData(c *gin.Context) {
 						break
 					}
 					importedTypes = append(importedTypes, configType)
+					hotReloadedTypes = append(hotReloadedTypes, "分类规则")
 				case importConfigWebhooks:
 					webhooks := cfgData.Webhooks
 					if webhooks == nil {
@@ -389,6 +394,7 @@ func ImportData(c *gin.Context) {
 						break
 					}
 					importedTypes = append(importedTypes, configType)
+					hotReloadedTypes = append(hotReloadedTypes, "Webhook", "事件绑定")
 				case importConfigScheduledTasks:
 					tasks := cfgData.ScheduledTasks
 					if tasks == nil {
@@ -398,7 +404,9 @@ func ImportData(c *gin.Context) {
 						configErrors = append(configErrors, "导入定时任务失败: "+err.Error())
 						break
 					}
+					scheduler.ReloadFromConfig()
 					importedTypes = append(importedTypes, configType)
+					hotReloadedTypes = append(hotReloadedTypes, "定时任务")
 				case importConfigPrompts:
 					prompts := cfgData.Prompts
 					if prompts == nil {
@@ -409,6 +417,7 @@ func ImportData(c *gin.Context) {
 						break
 					}
 					importedTypes = append(importedTypes, configType)
+					hotReloadedTypes = append(hotReloadedTypes, "提示词")
 				}
 			}
 
@@ -416,12 +425,16 @@ func ImportData(c *gin.Context) {
 				result["config_imported"] = true
 				result["config_imported_types"] = importedTypes
 			}
+			if len(hotReloadedTypes) > 0 {
+				result["config_hot_reloaded"] = hotReloadedTypes
+			}
+			if len(restartRequiredTypes) > 0 {
+				result["config_need_restart"] = true
+				result["config_need_restart_types"] = restartRequiredTypes
+			}
 			if len(configErrors) > 0 {
 				result["config_errors"] = configErrors
 				result["config_error"] = strings.Join(configErrors, "；")
-			}
-			if needRestart {
-				result["config_need_restart"] = true
 			}
 		}
 	}
