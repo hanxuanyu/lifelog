@@ -302,4 +302,5 @@ func RegisterBuiltinTasks() {
 	RegisterBuiltinTask(&MonthlyReportTask{})
 	RegisterBuiltinTask(&NoLogReminderTask{})
 	RegisterBuiltinTask(&UncategorizedReminderTask{})
+	RegisterBuiltinTask(&ActivityReminderTask{})
 }

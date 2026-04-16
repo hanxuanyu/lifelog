@@ -14,6 +14,10 @@ export function useRailInteraction({
 }: UseRailInteractionOptions) {
   const [hoverTime, setHoverTime] = useState<string | null>(null)
   const [isTouching, setIsTouching] = useState(false)
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("railHovering", { detail: isTouching }))
+  }, [isTouching])
   const isTouchingRef = useRef(false)
   const hoverTimeRef = useRef<string | null>(null)
 

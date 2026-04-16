@@ -57,7 +57,7 @@ export function MobileBottomNav({ collapsed = false }: { collapsed?: boolean }) 
 
   const navWidth = collapsed ? "5.25rem" : "10.5rem"
   const buttonClass = (active: boolean) =>
-    `flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-1.5 transition-colors duration-150 ${
+    `flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-1 transition-colors duration-150 ${
       active ? "text-primary" : "text-muted-foreground hover:text-foreground"
     }`
 
@@ -78,7 +78,7 @@ export function MobileBottomNav({ collapsed = false }: { collapsed?: boolean }) 
             width: navWidth,
             y: collapsed ? 14 : 0,
             opacity: collapsed ? 0.88 : 1,
-            padding: collapsed ? "0.2rem 0.25rem" : "0.25rem 0.375rem",
+            padding: collapsed ? "0.15rem 0.25rem" : "0.2rem 0.375rem",
           }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           style={{
@@ -128,17 +128,17 @@ export function MobileBottomNav({ collapsed = false }: { collapsed?: boolean }) 
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 10 }}
             onClick={() => window.dispatchEvent(new CustomEvent("openQuickAdd"))}
-            className="pointer-events-auto fixed right-4 z-50 flex h-[3.125rem] w-[3.125rem] items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-[bottom,box-shadow] duration-300 ease-out"
+            className="pointer-events-auto fixed right-4 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-[bottom,box-shadow] duration-300 ease-out"
             whileTap={{ scale: 0.92 }}
             transition={{ type: "spring", stiffness: 360, damping: 26 }}
             style={{
-              bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.85rem + var(--mobile-toast-lift, 0px))",
+              bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.85rem + 0.25rem + var(--mobile-toast-lift, 0px))",
               boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
             }}
             title="快速记录"
             aria-label="快速记录"
           >
-            <Plus className="h-5 w-5" />
+            <Plus className="h-4.5 w-4.5" />
           </motion.button>
         )}
       </AnimatePresence>
