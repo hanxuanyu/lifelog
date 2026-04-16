@@ -1,10 +1,10 @@
 import { useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Pencil, Trash2, Maximize2 } from "lucide-react"
+import { Pencil, Trash2, Maximize2, CalendarClock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { LogEntry, DurationItem } from "@/types"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
-import { formatTime, getContrastText, SWIPE_ACTION_WIDTH } from "./shared"
+import { formatTime, timeToMinutes, getContrastText, SWIPE_ACTION_WIDTH } from "./shared"
 
 interface EntryCardProps {
   entry: LogEntry
@@ -14,6 +14,8 @@ interface EntryCardProps {
   highlightIndex: number | null
   expandedEntryId: number | null
   swipedEntryId: number | null
+  isToday: boolean
+  currentTime: string
   getEntryMode: (entry: LogEntry) => string
   onCardClick: (entry: LogEntry) => void
   onCardContextMenu: (e: React.MouseEvent, entry: LogEntry) => void
@@ -33,7 +35,7 @@ interface EntryCardProps {
 
 export function EntryCard({
   entry, index, color, durItem, highlightIndex, expandedEntryId, swipedEntryId,
-  getEntryMode, onCardClick, onCardContextMenu, onCardTouchStart, onCardTouchMove,
+  isToday, currentTime, getEntryMode, onCardClick, onCardContextMenu, onCardTouchStart, onCardTouchMove,
   onCardTouchEnd, onHighlightEnter, onHighlightLeave, onEditRequest, onDeleteRequest,
   onDetailView, onAssignCategory, setCardRef, setSwipedEntryId, highlighted,
 }: EntryCardProps) {
@@ -48,6 +50,14 @@ export function EntryCard({
       .replace(/\n+/g, " ")                   // newlines to spaces
       .trim()
   }, [entry.detail])
+
+  const isFuturePlan = useMemo(() => {
+    if (!isToday) return false
+    const entryTime = durItem?.start_time
+      ? formatTime(durItem.start_time)
+      : formatTime(entry.log_time)
+    return timeToMinutes(entryTime) > timeToMinutes(currentTime)
+  }, [isToday, currentTime, durItem?.start_time, entry.log_time])
 
   return (
     <motion.div
@@ -102,6 +112,12 @@ export function EntryCard({
                 )}
                 {durItem?.unknown && (
                   <span className="text-[10px] text-muted-foreground/60 italic">{durItem.display}</span>
+                )}
+                {isFuturePlan && (
+                  <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                    <CalendarClock className="h-3 w-3" />
+                    计划
+                  </span>
                 )}
               </div>
               {entry.detail && (
