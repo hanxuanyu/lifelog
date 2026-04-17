@@ -13,7 +13,7 @@ func TestExtractStreamContentPreservesWhitespaceChunks(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		got := extractStreamContent(tc.payload)
+		got, _ := extractStreamContent(tc.payload)
 		if got != tc.want {
 			t.Fatalf("%s: extractStreamContent() = %q, want %q", tc.name, got, tc.want)
 		}

@@ -39,7 +39,8 @@ type mcpConfig struct {
 }
 
 type aiProvidersConfig struct {
-	Providers []model.AIProvider `mapstructure:"providers" yaml:"providers"`
+	Providers    []model.AIProvider `mapstructure:"providers" yaml:"providers"`
+	DefaultModel string             `mapstructure:"default_model" yaml:"default_model"`
 }
 
 type baseFileConfig struct {
@@ -61,10 +62,11 @@ type webhookFileConfig struct {
 }
 
 var (
-	mu          sync.RWMutex
-	categories  []model.Category
-	aiProviders []model.AIProvider
-	configDir   = "./config"
+	mu             sync.RWMutex
+	categories     []model.Category
+	aiProviders    []model.AIProvider
+	defaultAIModel string
+	configDir      = "./config"
 
 	baseViper       = viper.New()
 	categoriesViper = viper.New()
@@ -198,6 +200,7 @@ func applyBaseDefaults(cfg *viper.Viper) {
 	cfg.SetDefault("auth.jwt_expire_hours", defaults.Auth.JWTExpireHours)
 	cfg.SetDefault("time_point_mode", defaults.TimePointMode)
 	cfg.SetDefault("ai.providers", defaults.AI.Providers)
+	cfg.SetDefault("ai.default_model", defaults.AI.DefaultModel)
 	cfg.SetDefault("mcp.enabled", defaults.MCP.Enabled)
 	cfg.SetDefault("mcp.port", defaults.MCP.Port)
 }
@@ -235,7 +238,8 @@ func defaultBaseConfig() baseFileConfig {
 		},
 		TimePointMode: "end",
 		AI: aiProvidersConfig{
-			Providers: []model.AIProvider{},
+			Providers:    []model.AIProvider{},
+			DefaultModel: "",
 		},
 		MCP: mcpConfig{
 			Enabled: false,
@@ -492,8 +496,9 @@ func loadAIProviders() {
 		return
 	}
 
-	aiProviders = providers
-	slog.Info("ai config loaded", "count", len(aiProviders))
+	aiProviders = normalizeDefaultProviders(providers)
+	defaultAIModel = strings.TrimSpace(baseViper.GetString("ai.default_model"))
+	slog.Info("ai config loaded", "count", len(aiProviders), "default_model", defaultAIModel)
 }
 
 // GetAIProviders returns all configured AI providers.
@@ -508,7 +513,7 @@ func GetAIProviders() []model.AIProvider {
 
 // SetAIProviders persists AI providers into config.yaml.
 func SetAIProviders(providers []model.AIProvider) error {
-	baseViper.Set("ai.providers", providers)
+	baseViper.Set("ai.providers", normalizeDefaultProviders(providers))
 	if err := baseViper.WriteConfig(); err != nil {
 		return err
 	}
@@ -516,7 +521,52 @@ func SetAIProviders(providers []model.AIProvider) error {
 	return nil
 }
 
-// GetDefaultAIProvider returns the default provider or the first configured provider.
+// GetDefaultAIModel returns the configured default model override.
+func GetDefaultAIModel() string {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	return defaultAIModel
+}
+
+// SetAIDefaultModel persists the default model override into config.yaml.
+func SetAIDefaultModel(modelName string) error {
+	baseViper.Set("ai.default_model", strings.TrimSpace(modelName))
+	if err := baseViper.WriteConfig(); err != nil {
+		return err
+	}
+	loadAIProviders()
+	return nil
+}
+
+// GetAIConfig returns the AI config exposed by the API.
+func GetAIConfig() map[string]interface{} {
+	return map[string]interface{}{
+		"default_model": GetDefaultAIModel(),
+	}
+}
+
+// GetAIProviderByName returns the configured provider by name without model overrides.
+func GetAIProviderByName(name string) *model.AIProvider {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil
+	}
+
+	for _, p := range aiProviders {
+		if p.Name == name {
+			cp := p
+			return &cp
+		}
+	}
+	return nil
+}
+
+// GetDefaultAIProvider returns the default provider or the first configured provider,
+// applying the configured default model override when present.
 func GetDefaultAIProvider() *model.AIProvider {
 	mu.RLock()
 	defer mu.RUnlock()
@@ -524,14 +574,42 @@ func GetDefaultAIProvider() *model.AIProvider {
 	for _, p := range aiProviders {
 		if p.Default {
 			cp := p
+			if defaultAIModel != "" {
+				cp.Model = defaultAIModel
+			}
 			return &cp
 		}
 	}
 	if len(aiProviders) > 0 {
 		cp := aiProviders[0]
+		if defaultAIModel != "" {
+			cp.Model = defaultAIModel
+		}
 		return &cp
 	}
 	return nil
+}
+
+func normalizeDefaultProviders(providers []model.AIProvider) []model.AIProvider {
+	if len(providers) == 0 {
+		return providers
+	}
+
+	result := make([]model.AIProvider, len(providers))
+	copy(result, providers)
+
+	defaultIndex := -1
+	for i := range result {
+		if result[i].Default {
+			if defaultIndex == -1 {
+				defaultIndex = i
+				continue
+			}
+			result[i].Default = false
+		}
+	}
+
+	return result
 }
 
 // GetMCPEnabled returns whether the MCP server is enabled.

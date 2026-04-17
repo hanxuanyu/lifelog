@@ -59,6 +59,7 @@ func GetSettings(c *gin.Context) {
 		"time_point_mode": config.GetTimePointMode(),
 		"server":          config.GetServerConfig(),
 		"auth":            config.GetAuthConfig(),
+		"ai":              config.GetAIConfig(),
 		"mcp":             config.GetMCPConfig(),
 	}
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "ok", Data: settings})
@@ -77,6 +78,7 @@ func UpdateSettings(c *gin.Context) {
 		ServerPort     *int    `json:"server_port"`
 		ServerDBPath   *string `json:"server_db_path"`
 		JWTExpireHours *int    `json:"jwt_expire_hours"`
+		AIDefaultModel *string `json:"ai_default_model"`
 		MCPEnabled     *bool   `json:"mcp_enabled"`
 		MCPPort        *int    `json:"mcp_port"`
 	}
@@ -87,7 +89,6 @@ func UpdateSettings(c *gin.Context) {
 
 	needRestart := false
 
-	// 时间点模式（热重载）
 	if req.TimePointMode != nil {
 		if err := config.SetTimePointMode(*req.TimePointMode); err != nil {
 			slog.Error("设置时间模式失败", "error", err, "mode", *req.TimePointMode)
@@ -97,7 +98,6 @@ func UpdateSettings(c *gin.Context) {
 		slog.Info("时间模式已更新", "mode", *req.TimePointMode)
 	}
 
-	// 服务器配置（需重启）
 	if req.ServerPort != nil || req.ServerDBPath != nil {
 		port := 0
 		dbPath := ""
@@ -115,7 +115,6 @@ func UpdateSettings(c *gin.Context) {
 		}
 	}
 
-	// JWT 过期时间（需重启）
 	if req.JWTExpireHours != nil {
 		needRestart = true
 		if err := config.SetAuthConfig(*req.JWTExpireHours); err != nil {
@@ -124,7 +123,15 @@ func UpdateSettings(c *gin.Context) {
 		}
 	}
 
-	// MCP 配置（需重启）
+	if req.AIDefaultModel != nil {
+		if err := config.SetAIDefaultModel(*req.AIDefaultModel); err != nil {
+			slog.Error("设置 AI 默认模型失败", "error", err, "model", *req.AIDefaultModel)
+			c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: "保存失败: " + err.Error()})
+			return
+		}
+		slog.Info("AI 默认模型已更新", "model", *req.AIDefaultModel)
+	}
+
 	if req.MCPEnabled != nil || req.MCPPort != nil {
 		needRestart = true
 		if err := config.SetMCPConfig(req.MCPEnabled, req.MCPPort); err != nil {

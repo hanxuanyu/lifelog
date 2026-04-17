@@ -217,4 +217,16 @@ var Registry = []EventDefinition{
 			{Key: "timestamp", Description: "时间戳"},
 		},
 	},
+	{
+		Name:        "task.smart_reminder",
+		Description: "智能提醒触发",
+		Variables: []EventVariable{
+			{Key: "checkpoint_name", Description: "检查点名称"},
+			{Key: "checkpoint_description", Description: "检查点描述"},
+			{Key: "expected_time", Description: "预期时间"},
+			{Key: "category", Description: "所属分类"},
+			{Key: "message", Description: "提醒消息"},
+			{Key: "timestamp", Description: "时间戳"},
+		},
+	},
 }
