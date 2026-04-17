@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VERSION: ${LIFELOG_VERSION:-dev-local}
+        VERSION: main
         COMMIT: ${LIFELOG_COMMIT:-unknown}
         NPM_REGISTRY: ${LIFELOG_BUILD_NPM_REGISTRY:-}
         GO_PROXY: ${LIFELOG_BUILD_GO_PROXY:-}
