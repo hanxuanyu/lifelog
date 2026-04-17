@@ -2,12 +2,12 @@ name: lifelog-local
 
 services:
   lifelog:
-    image: ${LIFELOG_LOCAL_IMAGE_REPO:-lifelog-local}:${LIFELOG_IMAGE_TAG:-dev}
+    image: ${LIFELOG_LOCAL_IMAGE_REPO:-lifelog-local}:${LIFELOG_IMAGE_TAG:-main}
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        VERSION: dev
+        VERSION: main
         COMMIT: ${LIFELOG_COMMIT:-unknown}
         NPM_REGISTRY: ${LIFELOG_BUILD_NPM_REGISTRY:-}
         GO_PROXY: ${LIFELOG_BUILD_GO_PROXY:-}
