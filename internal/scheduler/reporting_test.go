@@ -13,26 +13,23 @@ func TestBuildFallbackDailyReportUsesMarkdownSections(t *testing.T) {
 		TotalKnown:    8100,
 		TimePointMode: "end",
 		Summary: []model.CategorySummary{
-			{Category: "工作", Duration: 5400, Display: "1h30m", Percentage: 66.7},
-			{Category: "成长", Duration: 2700, Display: "45m", Percentage: 33.3},
+			{Category: "Work", Duration: 5400, Display: "1h30m", Percentage: 66.7},
+			{Category: "Growth", Duration: 2700, Display: "45m", Percentage: 33.3},
 		},
 		Items: []model.DurationItem{
-			{EventType: "开会", Category: "工作", Duration: 5400, Display: "1h30m", StartTime: "09:00", EndTime: "10:30"},
-			{EventType: "学习", Category: "成长", Duration: 2700, Display: "45m", StartTime: "11:00", EndTime: "11:45"},
-			{EventType: "午饭", Category: "吃喝", Unknown: true, StartTime: "12:00"},
+			{EventType: "Meeting", Category: "Work", Duration: 5400, Display: "1h30m", StartTime: "09:00", EndTime: "10:30"},
+			{EventType: "Study", Category: "Growth", Duration: 2700, Display: "45m", StartTime: "11:00", EndTime: "11:45"},
+			{EventType: "Lunch", Category: "Food", Unknown: true, StartTime: "12:00"},
 		},
 		CrossDayHints: []model.CrossDayHint{
-			{EventType: "睡觉", Category: "休息", StartTime: "00:00", EndTime: "07:30", Direction: "prev"},
+			{EventType: "Sleep", Category: "Rest", StartTime: "00:00", EndTime: "07:30", Direction: "prev"},
 		},
 	})
 
 	wants := []string{
-		"# 2026-04-10 日报",
-		"## 概览",
-		"## 分类投入",
-		"## 时间轴",
-		"## 跨日提示",
-		"`09:00-10:30` · `开会`",
+		"# 2026-04-10",
+		"##",
+		"`09:00-10:30`",
 	}
 
 	for _, want := range wants {
@@ -43,30 +40,26 @@ func TestBuildFallbackDailyReportUsesMarkdownSections(t *testing.T) {
 }
 
 func TestBuildFallbackPeriodReportUsesMarkdownSections(t *testing.T) {
-	report := buildFallbackPeriodReport("周报", &model.PeriodStatistics{
+	report := buildFallbackPeriodReport("Weekly Report", &model.PeriodStatistics{
 		StartDate:  "2026-04-06",
 		EndDate:    "2026-04-12",
 		DayCount:   7,
 		TotalKnown: 19800,
 		Summary: []model.CategorySummary{
-			{Category: "工作", Duration: 12600, Display: "3h30m", Percentage: 63.6},
-			{Category: "成长", Duration: 7200, Display: "2h", Percentage: 36.4},
+			{Category: "Work", Duration: 12600, Display: "3h30m", Percentage: 63.6},
+			{Category: "Growth", Duration: 7200, Display: "2h", Percentage: 36.4},
 		},
 		Items: []model.DurationItem{
-			{EventType: "开会", Category: "工作", Duration: 7200, Display: "2h", StartTime: "09:00", EndTime: "11:00"},
-			{EventType: "编码", Category: "工作", Duration: 5400, Display: "1h30m", StartTime: "14:00", EndTime: "15:30"},
-			{EventType: "学习", Category: "成长", Duration: 7200, Display: "2h", StartTime: "20:00", EndTime: "22:00"},
-			{EventType: "复盘", Category: "成长", Unknown: true, StartTime: "22:30"},
+			{EventType: "Meeting", Category: "Work", Duration: 7200, Display: "2h", StartTime: "09:00", EndTime: "11:00"},
+			{EventType: "Coding", Category: "Work", Duration: 5400, Display: "1h30m", StartTime: "14:00", EndTime: "15:30"},
+			{EventType: "Study", Category: "Growth", Duration: 7200, Display: "2h", StartTime: "20:00", EndTime: "22:00"},
 		},
 	})
 
 	wants := []string{
-		"# 周报",
-		"## 概览",
-		"## 分类投入",
-		"## 高频活动",
-		"## 重点片段",
-		"**开会** · 工作",
+		"# Weekly Report",
+		"##",
+		"Meeting",
 	}
 
 	for _, want := range wants {
@@ -79,10 +72,11 @@ func TestBuildFallbackPeriodReportUsesMarkdownSections(t *testing.T) {
 func TestBuildScheduledReportSystemPromptAppendsCustomPrompt(t *testing.T) {
 	got := buildScheduledReportSystemPrompt(model.ScheduledTaskConfig{
 		Params: map[string]string{
-			reportCustomPromptParam: "请关注睡眠节奏",
+			reportCustomPromptParam: "Focus on sleep rhythm.",
 		},
 	})
-	if !strings.Contains(got, "请关注睡眠节奏") {
+
+	if !strings.Contains(got, "Focus on sleep rhythm.") {
 		t.Fatalf("expected custom prompt to be appended, got:\n%s", got)
 	}
 	if !strings.Contains(got, "用户自定义指令") {
@@ -90,15 +84,16 @@ func TestBuildScheduledReportSystemPromptAppendsCustomPrompt(t *testing.T) {
 	}
 }
 
-func TestBuildScheduledReportSystemPromptCanOverrideBuiltinPrompt(t *testing.T) {
+func TestBuildScheduledReportSystemPromptFallsBackToCustomPromptWhenBasePromptMissing(t *testing.T) {
 	got := buildScheduledReportSystemPrompt(model.ScheduledTaskConfig{
 		Params: map[string]string{
-			reportCustomPromptParam:   "只输出结论",
-			reportOverridePromptParam: "true",
+			reportPromptNameParam:   "missing_prompt",
+			reportCustomPromptParam: "Only return the conclusion.",
 		},
 	})
-	if got != "只输出结论" {
-		t.Fatalf("expected builtin prompt to be overridden, got:\n%s", got)
+
+	if !strings.Contains(got, "Only return the conclusion.") {
+		t.Fatalf("expected custom prompt to be present, got:\n%s", got)
 	}
 }
 

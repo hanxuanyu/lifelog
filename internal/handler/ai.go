@@ -14,15 +14,7 @@ import (
 	"github.com/hxuanyu/lifelog/internal/service"
 )
 
-// GetAIProviders 获取AI服务提供商列表
-// @Summary 获取AI服务提供商列表
-// @Tags AI
-// @Produce json
-// @Success 200 {object} model.Response{data=[]model.AIProvider}
-// @Router /api/ai/providers [get]
-func GetAIProviders(c *gin.Context) {
-	providers := config.GetAIProviders()
-	// 掩码 API Key
+func maskProviderAPIKeys(providers []model.AIProvider) []model.AIProvider {
 	masked := make([]model.AIProvider, len(providers))
 	for i, p := range providers {
 		masked[i] = p
@@ -32,11 +24,34 @@ func GetAIProviders(c *gin.Context) {
 			masked[i].APIKey = "****"
 		}
 	}
-	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "ok", Data: masked})
+	return masked
 }
 
-// AddAIProvider 添加AI服务提供商
-// @Summary 添加AI服务提供商
+func unmaskProviderAPIKey(req model.AIProvider) model.AIProvider {
+	if strings.Contains(req.APIKey, "****") && req.Name != "" {
+		if stored := config.GetAIProviderByName(req.Name); stored != nil {
+			req.APIKey = stored.APIKey
+		}
+	}
+	return req
+}
+
+// GetAIProviders 获取 AI 服务提供商列表
+// @Summary 获取 AI 服务提供商列表
+// @Tags AI
+// @Produce json
+// @Success 200 {object} model.Response{data=[]model.AIProvider}
+// @Router /api/ai/providers [get]
+func GetAIProviders(c *gin.Context) {
+	c.JSON(http.StatusOK, model.Response{
+		Code:    200,
+		Message: "ok",
+		Data:    maskProviderAPIKeys(config.GetAIProviders()),
+	})
+}
+
+// AddAIProvider 添加 AI 服务提供商
+// @Summary 添加 AI 服务提供商
 // @Tags AI
 // @Accept json
 // @Produce json
@@ -50,6 +65,10 @@ func AddAIProvider(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "参数错误: " + err.Error()})
 		return
 	}
+	req.Name = strings.TrimSpace(req.Name)
+	req.Endpoint = strings.TrimSpace(req.Endpoint)
+	req.Model = strings.TrimSpace(req.Model)
+
 	if req.Name == "" || req.Endpoint == "" || req.Model == "" {
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "名称、接口地址和模型不能为空"})
 		return
@@ -68,19 +87,21 @@ func AddAIProvider(c *gin.Context) {
 			providers[i].Default = false
 		}
 	}
+
 	providers = append(providers, req)
 	if err := config.SetAIProviders(providers); err != nil {
-		slog.Error("保存AI提供商失败", "error", err, "name", req.Name)
+		slog.Error("保存 AI 提供商失败", "error", err, "name", req.Name)
 		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: "保存失败: " + err.Error()})
 		return
 	}
-	slog.Info("AI提供商已添加", "name", req.Name, "endpoint", req.Endpoint, "model", req.Model)
+
+	slog.Info("AI 提供商已添加", "name", req.Name, "endpoint", req.Endpoint, "model", req.Model)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "添加成功"})
 	go events.Publish("ai.provider.created", map[string]string{"provider_name": req.Name, "timestamp": time.Now().Format(time.RFC3339)})
 }
 
-// UpdateAIProvider 更新AI服务提供商
-// @Summary 更新AI服务提供商
+// UpdateAIProvider 更新 AI 服务提供商
+// @Summary 更新 AI 服务提供商
 // @Tags AI
 // @Accept json
 // @Produce json
@@ -97,41 +118,51 @@ func UpdateAIProvider(c *gin.Context) {
 		return
 	}
 
+	req = unmaskProviderAPIKey(req)
+	req.Name = name
+	req.Endpoint = strings.TrimSpace(req.Endpoint)
+	req.Model = strings.TrimSpace(req.Model)
+	if req.Endpoint == "" || req.Model == "" {
+		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "接口地址和模型不能为空"})
+		return
+	}
+
 	providers := config.GetAIProviders()
 	found := false
-	for i, p := range providers {
-		if p.Name == name {
-			found = true
-			if req.Default {
-				for j := range providers {
-					providers[j].Default = false
-				}
-			}
-			// 如果 API Key 包含掩码标记，保留原始 Key
-			if strings.Contains(req.APIKey, "****") {
-				req.APIKey = p.APIKey
-			}
-			req.Name = name // 名称不可变
-			providers[i] = req
-			break
+	if req.Default {
+		for i := range providers {
+			providers[i].Default = false
 		}
 	}
+
+	for i, p := range providers {
+		if p.Name != name {
+			continue
+		}
+		found = true
+		req.Name = p.Name
+		providers[i] = req
+		break
+	}
+
 	if !found {
 		c.JSON(http.StatusNotFound, model.Response{Code: 404, Message: "提供商不存在"})
 		return
 	}
+
 	if err := config.SetAIProviders(providers); err != nil {
-		slog.Error("更新AI提供商失败", "error", err, "name", name)
+		slog.Error("更新 AI 提供商失败", "error", err, "name", name)
 		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: "保存失败: " + err.Error()})
 		return
 	}
-	slog.Info("AI提供商已更新", "name", name)
+
+	slog.Info("AI 提供商已更新", "name", name)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "更新成功"})
 	go events.Publish("ai.provider.updated", map[string]string{"provider_name": name, "timestamp": time.Now().Format(time.RFC3339)})
 }
 
-// DeleteAIProvider 删除AI服务提供商
-// @Summary 删除AI服务提供商
+// DeleteAIProvider 删除 AI 服务提供商
+// @Summary 删除 AI 服务提供商
 // @Tags AI
 // @Produce json
 // @Param name path string true "提供商名称"
@@ -141,31 +172,69 @@ func UpdateAIProvider(c *gin.Context) {
 func DeleteAIProvider(c *gin.Context) {
 	name := c.Param("name")
 	providers := config.GetAIProviders()
-	newProviders := make([]model.AIProvider, 0, len(providers))
+	next := make([]model.AIProvider, 0, len(providers))
 	found := false
+	deletedDefault := false
+
 	for _, p := range providers {
 		if p.Name == name {
 			found = true
+			deletedDefault = p.Default
 			continue
 		}
-		newProviders = append(newProviders, p)
+		next = append(next, p)
 	}
+
 	if !found {
 		c.JSON(http.StatusNotFound, model.Response{Code: 404, Message: "提供商不存在"})
 		return
 	}
-	if err := config.SetAIProviders(newProviders); err != nil {
-		slog.Error("删除AI提供商失败", "error", err, "name", name)
+
+	if deletedDefault && len(next) > 0 {
+		hasDefault := false
+		for _, p := range next {
+			if p.Default {
+				hasDefault = true
+				break
+			}
+		}
+		if !hasDefault {
+			next[0].Default = true
+		}
+	}
+
+	if err := config.SetAIProviders(next); err != nil {
+		slog.Error("删除 AI 提供商失败", "error", err, "name", name)
 		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: "保存失败: " + err.Error()})
 		return
 	}
-	slog.Info("AI提供商已删除", "name", name)
+
+	if deletedDefault {
+		if len(next) == 0 {
+			if err := config.SetAIDefaultModel(""); err != nil {
+				slog.Warn("清空 AI 默认模型失败", "error", err)
+			}
+		} else {
+			nextDefaultModel := strings.TrimSpace(next[0].Model)
+			for _, provider := range next {
+				if provider.Default {
+					nextDefaultModel = strings.TrimSpace(provider.Model)
+					break
+				}
+			}
+			if err := config.SetAIDefaultModel(nextDefaultModel); err != nil {
+				slog.Warn("重置 AI 默认模型失败", "error", err, "model", nextDefaultModel)
+			}
+		}
+	}
+
+	slog.Info("AI 提供商已删除", "name", name)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "删除成功"})
 	go events.Publish("ai.provider.deleted", map[string]string{"provider_name": name, "timestamp": time.Now().Format(time.RFC3339)})
 }
 
-// TestAIProvider 测试AI服务提供商连接
-// @Summary 测试AI服务提供商连接
+// TestAIProvider 测试 AI 服务提供商连接
+// @Summary 测试 AI 服务提供商连接
 // @Tags AI
 // @Accept json
 // @Produce json
@@ -178,26 +247,23 @@ func TestAIProvider(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "参数错误: " + err.Error()})
 		return
 	}
-	// 如果 API Key 包含掩码标记，从配置中查找真实 Key
-	if strings.Contains(req.APIKey, "****") && req.Name != "" {
-		for _, p := range config.GetAIProviders() {
-			if p.Name == req.Name {
-				req.APIKey = p.APIKey
-				break
-			}
-		}
-	}
+
+	req = unmaskProviderAPIKey(req)
+	req.Endpoint = strings.TrimSpace(req.Endpoint)
+	req.Model = strings.TrimSpace(req.Model)
+
 	if err := service.TestProvider(req); err != nil {
-		slog.Warn("AI提供商连接测试失败", "name", req.Name, "endpoint", req.Endpoint, "error", err)
+		slog.Warn("AI 提供商连接测试失败", "name", req.Name, "endpoint", req.Endpoint, "error", err)
 		c.JSON(http.StatusOK, model.Response{Code: 500, Message: "连接失败: " + err.Error()})
 		return
 	}
-	slog.Info("AI提供商连接测试成功", "name", req.Name)
+
+	slog.Info("AI 提供商连接测试成功", "name", req.Name)
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "连接成功"})
 }
 
-// FetchModels 获取AI提供商的可用模型列表
-// @Summary 获取AI提供商的可用模型列表
+// FetchModels 获取 AI 提供商的可用模型列表
+// @Summary 获取 AI 提供商的可用模型列表
 // @Tags AI
 // @Accept json
 // @Produce json
@@ -210,21 +276,20 @@ func FetchModels(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "参数错误: " + err.Error()})
 		return
 	}
-	// 如果 API Key 包含掩码标记，从配置中查找真实 Key
+
 	if strings.Contains(req.APIKey, "****") && req.Name != "" {
-		for _, p := range config.GetAIProviders() {
-			if p.Name == req.Name {
-				req.APIKey = p.APIKey
-				break
-			}
+		if stored := config.GetAIProviderByName(req.Name); stored != nil {
+			req.APIKey = stored.APIKey
 		}
 	}
+
 	models, err := service.FetchModels(req.Endpoint, req.APIKey)
 	if err != nil {
 		slog.Warn("获取模型列表失败", "endpoint", req.Endpoint, "error", err)
 		c.JSON(http.StatusOK, model.Response{Code: 500, Message: "获取模型列表失败: " + err.Error()})
 		return
 	}
+
 	slog.Debug("获取模型列表成功", "endpoint", req.Endpoint, "count", len(models))
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "ok", Data: models})
 }
@@ -245,33 +310,28 @@ func AIChat(c *gin.Context) {
 		return
 	}
 
-	// 获取提供商
 	var provider *model.AIProvider
 	if req.ProviderName != "" {
-		for _, p := range config.GetAIProviders() {
-			if p.Name == req.ProviderName {
-				cp := p
-				provider = &cp
-				break
-			}
-		}
-	}
-	if provider == nil {
+		provider = config.GetAIProviderByName(req.ProviderName)
+	} else {
 		provider = config.GetDefaultAIProvider()
 	}
 	if provider == nil {
-		slog.Warn("AI对话失败: 未配置提供商")
-		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "未配置AI服务提供商"})
+		slog.Warn("AI 对话失败: 未配置提供商")
+		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "未配置 AI 服务提供商"})
 		return
 	}
 
-	if strings.TrimSpace(req.Model) != "" {
-		provider.Model = strings.TrimSpace(req.Model)
+	if modelName := strings.TrimSpace(req.Model); modelName != "" {
+		provider.Model = modelName
+	} else if req.ProviderName == "" {
+		if defaultModel := config.GetDefaultAIModel(); defaultModel != "" {
+			provider.Model = defaultModel
+		}
 	}
 
-	slog.Info("AI对话请求", "provider", provider.Name, "model", provider.Model, "start", req.StartDate, "end", req.EndDate)
+	slog.Info("AI 对话请求", "provider", provider.Name, "model", provider.Model, "start", req.StartDate, "end", req.EndDate)
 
-	// 构建日志上下文
 	logContext, err := service.BuildLogContext(req.StartDate, req.EndDate, req.Categories)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: err.Error()})
@@ -283,17 +343,14 @@ func AIChat(c *gin.Context) {
 
 %s`, logContext)
 
-	// 如果用户提供了自定义提示词，追加到系统提示中
 	if req.SystemPrompt != "" {
 		systemPrompt = fmt.Sprintf("%s\n\n用户自定义指令：\n%s", systemPrompt, req.SystemPrompt)
 	}
 
-	// 构建消息列表
 	messages := make([]model.AIChatMessage, len(req.History))
 	copy(messages, req.History)
 	messages = append(messages, model.AIChatMessage{Role: "user", Content: req.Message})
 
-	// SSE 流式响应
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
@@ -301,9 +358,8 @@ func AIChat(c *gin.Context) {
 
 	writer := c.Writer
 	flusher, _ := writer.(http.Flusher)
-
 	if err := service.StreamChat(*provider, systemPrompt, messages, writer, flusher); err != nil {
-		errData := fmt.Sprintf(`data: {"error": "%s"}`, err.Error())
+		errData := fmt.Sprintf(`data: {"error": %q}`, err.Error())
 		fmt.Fprintf(writer, "%s\n\n", errData)
 		if flusher != nil {
 			flusher.Flush()

@@ -109,6 +109,9 @@ export interface Settings {
   auth: {
     jwt_expire_hours: number
   }
+  ai: {
+    default_model: string
+  }
   mcp: {
     enabled: boolean
     port: number
@@ -120,6 +123,7 @@ export interface UpdateSettingsRequest {
   server_port?: number
   server_db_path?: string
   jwt_expire_hours?: number
+  ai_default_model?: string
   mcp_enabled?: boolean
   mcp_port?: number
 }
@@ -206,6 +210,18 @@ export interface ScheduledTaskInfo {
   bound_webhook_count: number
   requires_webhook: boolean
   param_definitions?: ScheduledTaskParamDefinition[]
+  last_execution?: ScheduledTaskExecutionResult
+}
+
+export interface ScheduledTaskExecutionResult {
+  status: "running" | "success" | "failed" | "skipped" | "noop"
+  trigger?: "manual" | "cron" | string
+  message?: string
+  error?: string
+  started_at: string
+  finished_at?: string
+  duration_ms?: number
+  data?: Record<string, string>
 }
 
 export interface ScheduledTaskUpdate {

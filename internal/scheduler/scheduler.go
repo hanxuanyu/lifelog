@@ -34,6 +34,7 @@ var (
 	cronRunner    *cron.Cron
 	registeredMap = make(map[string]*TaskEntry)
 	builtinTasks  []Task
+	taskResults   = make(map[string]TaskExecutionResult)
 )
 
 // RegisterBuiltinTask registers a builtin task before Start is called.
@@ -60,6 +61,7 @@ func Start() {
 	}
 
 	registeredMap = make(map[string]*TaskEntry, len(builtinTasks))
+	taskResults = make(map[string]TaskExecutionResult, len(builtinTasks))
 	for _, t := range builtinTasks {
 		cfg := model.ScheduledTaskConfig{
 			Name:    t.Name(),
@@ -135,7 +137,7 @@ func scheduleEntry(entry *TaskEntry) error {
 	}
 
 	id, err := cronRunner.AddFunc(entry.Config.Cron, func() {
-		runTaskByName(entry.Task.Name())
+		runTaskByName(entry.Task.Name(), "cron")
 	})
 	if err != nil {
 		return err
@@ -177,7 +179,7 @@ func countEnabledBindings(eventName string) int {
 	return count
 }
 
-func runTaskByName(name string) {
+func runTaskByName(name string, trigger string) {
 	mu.RLock()
 	entry, ok := registeredMap[name]
 	if !ok {
@@ -189,7 +191,7 @@ func runTaskByName(name string) {
 	cfg := copyScheduledTaskConfig(entry.Config)
 	mu.RUnlock()
 
-	runTask(task, cfg)
+	runTask(task, cfg, trigger)
 }
 
 // MultiEventTask is optionally implemented by tasks that publish multiple event types.
@@ -213,8 +215,30 @@ func taskRequiresWebhook(task Task) bool {
 	return true
 }
 
-func runTask(task Task, cfg model.ScheduledTaskConfig) {
+func runTask(task Task, cfg model.ScheduledTaskConfig, trigger string) {
 	start := time.Now()
+	setTaskExecutionResult(task.Name(), TaskExecutionResult{
+		Status:    "running",
+		Trigger:   trigger,
+		Message:   "任务执行中",
+		StartedAt: start,
+	})
+
+	finalize := func(status, message string, data map[string]string, runErr error) {
+		result := TaskExecutionResult{
+			Status:     status,
+			Trigger:    trigger,
+			Message:    message,
+			StartedAt:  start,
+			FinishedAt: time.Now(),
+			DurationMs: time.Since(start).Milliseconds(),
+			Data:       copyStringMap(data),
+		}
+		if runErr != nil {
+			result.Error = runErr.Error()
+		}
+		setTaskExecutionResult(task.Name(), result)
+	}
 
 	if taskRequiresWebhook(task) {
 		if mt, ok := task.(MultiEventTask); ok {
@@ -227,10 +251,12 @@ func runTask(task Task, cfg model.ScheduledTaskConfig) {
 			}
 			if !hasAny {
 				slog.Info("scheduled task skipped because no enabled webhook bindings exist", "task", task.Name())
+				finalize("skipped", "未找到已启用的 Webhook 绑定，任务已跳过", nil, nil)
 				return
 			}
 		} else if !hasEnabledBindings(task.EventName()) {
 			slog.Info("scheduled task skipped because no enabled webhook bindings exist", "task", task.Name(), "event", task.EventName())
+			finalize("skipped", "未找到已启用的 Webhook 绑定，任务已跳过", nil, nil)
 			return
 		}
 	}
@@ -240,17 +266,20 @@ func runTask(task Task, cfg model.ScheduledTaskConfig) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("scheduled task panic", "task", task.Name(), "error", r)
+			finalize("failed", "任务执行发生 panic", nil, fmt.Errorf("%v", r))
 		}
 	}()
 
 	data, err := task.Execute(cfg)
 	if err != nil {
 		slog.Error("scheduled task failed", "task", task.Name(), "error", err, "duration", time.Since(start))
+		finalize("failed", "任务执行失败", nil, err)
 		return
 	}
 
 	if data == nil {
 		slog.Info("scheduled task produced no event data", "task", task.Name(), "duration", time.Since(start))
+		finalize("noop", "任务执行完成，但本次没有可发布结果", nil, nil)
 		return
 	}
 
@@ -260,6 +289,19 @@ func runTask(task Task, cfg model.ScheduledTaskConfig) {
 
 	events.Publish(task.EventName(), data)
 	slog.Info("scheduled task finished", "task", task.Name(), "event", task.EventName(), "duration", time.Since(start))
+	finalize("success", "任务执行成功", data, nil)
+}
+
+// TaskExecutionResult is the latest in-memory execution result for a task.
+type TaskExecutionResult struct {
+	Status     string            `json:"status"`
+	Trigger    string            `json:"trigger,omitempty"`
+	Message    string            `json:"message,omitempty"`
+	Error      string            `json:"error,omitempty"`
+	StartedAt  time.Time         `json:"started_at"`
+	FinishedAt time.Time         `json:"finished_at,omitempty"`
+	DurationMs int64             `json:"duration_ms,omitempty"`
+	Data       map[string]string `json:"data,omitempty"`
 }
 
 // TaskInfo is the API payload for builtin tasks.
@@ -275,6 +317,7 @@ type TaskInfo struct {
 	BoundWebhookCount int                                  `json:"bound_webhook_count"`
 	RequiresWebhook   bool                                 `json:"requires_webhook"`
 	ParamDefinitions  []model.ScheduledTaskParamDefinition `json:"param_definitions,omitempty"`
+	LastExecution     *TaskExecutionResult                 `json:"last_execution,omitempty"`
 }
 
 // GetTasks returns all registered builtin tasks.
@@ -298,6 +341,7 @@ func GetTasks() []TaskInfo {
 			DefaultCron:      t.DefaultCron(),
 			RequiresWebhook:  taskRequiresWebhook(t),
 			ParamDefinitions: t.ParameterDefinitions(copyScheduledTaskConfig(entry.Config)),
+			LastExecution:    getTaskExecutionResultLocked(t.Name()),
 		}
 
 		if mt, ok := t.(MultiEventTask); ok {
@@ -417,7 +461,7 @@ func RunTaskNow(name string) error {
 		return fmt.Errorf("unknown task: %s", name)
 	}
 
-	go runTaskByName(name)
+	go runTaskByName(name, "manual")
 	return nil
 }
 
@@ -465,5 +509,25 @@ func copyStringMap(input map[string]string) map[string]string {
 	for key, value := range input {
 		result[key] = value
 	}
+	return result
+}
+
+func setTaskExecutionResult(name string, result TaskExecutionResult) {
+	mu.Lock()
+	defer mu.Unlock()
+	taskResults[name] = copyTaskExecutionResult(result)
+}
+
+func getTaskExecutionResultLocked(name string) *TaskExecutionResult {
+	result, ok := taskResults[name]
+	if !ok {
+		return nil
+	}
+	cp := copyTaskExecutionResult(result)
+	return &cp
+}
+
+func copyTaskExecutionResult(result TaskExecutionResult) TaskExecutionResult {
+	result.Data = copyStringMap(result.Data)
 	return result
 }

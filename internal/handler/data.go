@@ -52,7 +52,8 @@ type exportAuthConfig struct {
 }
 
 type exportAIConfig struct {
-	Providers []model.AIProvider `json:"providers"`
+	Providers    []model.AIProvider `json:"providers"`
+	DefaultModel string             `json:"default_model"`
 }
 
 type exportMCPConfig struct {
@@ -113,7 +114,8 @@ func ExportData(c *gin.Context) {
 			JWTExpireHours: config.GetJWTExpireHours(),
 		},
 		AI: exportAIConfig{
-			Providers: config.GetAIProviders(),
+			Providers:    config.GetAIProviders(),
+			DefaultModel: config.GetDefaultAIModel(),
 		},
 		Categories:     config.GetCategories(),
 		Webhooks:       config.GetWebhooks(),
@@ -342,6 +344,10 @@ func ImportData(c *gin.Context) {
 					}
 					if err := config.SetMCPConfig(&cfgData.MCP.Enabled, &cfgData.MCP.Port); err != nil {
 						configErrors = append(configErrors, "导入 MCP 配置失败: "+err.Error())
+						break
+					}
+					if err := config.SetAIDefaultModel(cfgData.AI.DefaultModel); err != nil {
+						configErrors = append(configErrors, "瀵煎叆 AI 榛樿妯″瀷澶辫触: "+err.Error())
 						break
 					}
 					importedTypes = append(importedTypes, configType)
