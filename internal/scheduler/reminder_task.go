@@ -84,6 +84,15 @@ func (t *ActivityReminderTask) Execute(cfg model.ScheduledTaskConfig) (map[strin
 			continue
 		}
 
+		// In "end" mode, the entry itself marks the end of an activity.
+		// If the entry was created recently (within the polling window of its end time),
+		// it means the user just manually logged the end — no need to remind.
+		if mode == "end" && !entry.CreatedAt.IsZero() {
+			if entry.CreatedAt.Sub(endTime).Abs() <= window {
+				continue
+			}
+		}
+
 		// Check if already notified.
 		t.mu.Lock()
 		if _, notified := t.notifiedMap[entry.ID]; notified {
