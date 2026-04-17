@@ -198,24 +198,41 @@ type MultiEventTask interface {
 	EventNames() []string
 }
 
+// WebhookIndependentTask is optionally implemented by tasks that do not require
+// webhook bindings to execute. By default, tasks are skipped if no enabled webhook
+// binding exists for their event. Implement this interface and return true to
+// bypass that check.
+type WebhookIndependentTask interface {
+	WebhookIndependent() bool
+}
+
+func taskRequiresWebhook(task Task) bool {
+	if wi, ok := task.(WebhookIndependentTask); ok {
+		return !wi.WebhookIndependent()
+	}
+	return true
+}
+
 func runTask(task Task, cfg model.ScheduledTaskConfig) {
 	start := time.Now()
 
-	if mt, ok := task.(MultiEventTask); ok {
-		hasAny := false
-		for _, name := range mt.EventNames() {
-			if hasEnabledBindings(name) {
-				hasAny = true
-				break
+	if taskRequiresWebhook(task) {
+		if mt, ok := task.(MultiEventTask); ok {
+			hasAny := false
+			for _, name := range mt.EventNames() {
+				if hasEnabledBindings(name) {
+					hasAny = true
+					break
+				}
 			}
-		}
-		if !hasAny {
-			slog.Info("scheduled task skipped because no enabled webhook bindings exist", "task", task.Name())
+			if !hasAny {
+				slog.Info("scheduled task skipped because no enabled webhook bindings exist", "task", task.Name())
+				return
+			}
+		} else if !hasEnabledBindings(task.EventName()) {
+			slog.Info("scheduled task skipped because no enabled webhook bindings exist", "task", task.Name(), "event", task.EventName())
 			return
 		}
-	} else if !hasEnabledBindings(task.EventName()) {
-		slog.Info("scheduled task skipped because no enabled webhook bindings exist", "task", task.Name(), "event", task.EventName())
-		return
 	}
 
 	slog.Info("running scheduled task", "task", task.Name())
@@ -256,6 +273,7 @@ type TaskInfo struct {
 	DefaultCron       string                               `json:"default_cron"`
 	NextRun           time.Time                            `json:"next_run,omitempty"`
 	BoundWebhookCount int                                  `json:"bound_webhook_count"`
+	RequiresWebhook   bool                                 `json:"requires_webhook"`
 	ParamDefinitions  []model.ScheduledTaskParamDefinition `json:"param_definitions,omitempty"`
 }
 
@@ -278,6 +296,7 @@ func GetTasks() []TaskInfo {
 			Enabled:          entry.Config.Enabled,
 			EventName:        t.EventName(),
 			DefaultCron:      t.DefaultCron(),
+			RequiresWebhook:  taskRequiresWebhook(t),
 			ParamDefinitions: t.ParameterDefinitions(copyScheduledTaskConfig(entry.Config)),
 		}
 

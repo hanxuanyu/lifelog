@@ -27,10 +27,23 @@ var builtinPrompts = []model.Prompt{
 		Builtin: true,
 	},
 	{
-		Name: "ai_chat_default",
+		Name:    "ai_chat_default",
 		Description: "AI 对话默认提示词",
 		Content: `你是一个生活日志分析助手。用户会提供一段时间内的活动日志数据，请根据用户的问题对这些数据进行分析和总结。
 请用中文回答，使用 Markdown 格式输出。`,
+		Builtin: true,
+	},
+	{
+		Name:        "smart_reminder_analyze",
+		Description: "智能提醒检查点分析提示词",
+		Content: `你是一个生活日志模式分析助手。用户会提供一段时间内的活动日志数据，请分析用户的日常行为模式，识别出规律性的活动（如用餐、睡觉、通勤等），并为每个规律性活动生成一个"检查点"。
+
+要求：
+1. 只基于提供的数据进行分析，不虚构用户未记录的模式。
+2. 每个检查点包含：name（英文标识）、description（中文描述）、expected_time（建议检查时间，HH:MM 格式，应晚于用户通常完成该活动的时间 15~30 分钟）、time_window_minutes（检查时间窗口，分钟）、event_patterns（匹配的事项关键词数组）、category（所属分类）、message（提醒消息模板）。
+3. 只输出 JSON 数组，不要包含其他文字。
+4. 至少需要在 3 天以上观察到的规律才生成检查点。
+5. message 中应包含用户通常执行该活动的时间范围。`,
 		Builtin: true,
 	},
 }

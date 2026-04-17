@@ -204,6 +204,7 @@ export interface ScheduledTaskInfo {
   default_cron: string
   next_run?: string
   bound_webhook_count: number
+  requires_webhook: boolean
   param_definitions?: ScheduledTaskParamDefinition[]
 }
 

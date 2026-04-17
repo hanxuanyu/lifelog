@@ -412,7 +412,7 @@ export function ScheduledTasksCard() {
                   return normalizeParamValue(param) !== (saved ? normalizeParamValue(saved) : "")
                 })
                 const hasParams = (hydratedTask.param_definitions || []).length > 0
-                const unbound = task.enabled && task.bound_webhook_count === 0
+                const unbound = task.enabled && task.requires_webhook && task.bound_webhook_count === 0
                 const paramSummaries = editableParams
                   .map(formatParamSummary)
                   .filter(Boolean)
