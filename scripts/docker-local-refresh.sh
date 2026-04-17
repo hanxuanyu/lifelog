@@ -25,10 +25,14 @@ resolve_pull_target() {
   local upstream remote ref
 
   if upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"; then
+    upstream="${upstream#refs/remotes/}"
+    upstream="${upstream#remotes/}"
     remote="${upstream%%/*}"
     ref="${upstream#*/}"
-    echo "${remote}:${ref}"
-    return 0
+    if [ -n "$remote" ] && [ -n "$ref" ] && [ "$remote" != "$upstream" ]; then
+      echo "${remote}:${ref}"
+      return 0
+    fi
   fi
 
   if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
