@@ -47,8 +47,8 @@ func main() {
 	go wsHub.Run()
 	events.SubscribeAll(&ws.WSSubscriber{Hub: wsHub})
 
-	// 启动 token 黑名单清理
-	service.StartBlacklistCleanup()
+	// 启动 token 清理任务
+	service.StartTokenCleanup()
 
 	// 注册内置定时任务并启动调度器
 	scheduler.RegisterBuiltinTasks()

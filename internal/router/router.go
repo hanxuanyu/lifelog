@@ -132,6 +132,15 @@ func Setup(r *gin.Engine, staticFS fs.FS, hub *ws.Hub) {
 			devices.GET("", handler.GetOnlineDevices(hub))
 			devices.DELETE("/:id", handler.DisconnectDevice(hub))
 		}
+
+		// 令牌管理
+		tokens := protected.Group("/tokens")
+		{
+			tokens.GET("", handler.GetTokens)
+			tokens.POST("", handler.CreateAPIToken)
+			tokens.DELETE("/:id", handler.RevokeTokenHandler(hub))
+			tokens.DELETE("", handler.RevokeAllTokens(hub))
+		}
 	}
 
 	// 静态文件服务 - 嵌入前端构建产物

@@ -69,7 +69,6 @@ func (h *Hub) Broadcast(msg []byte) {
 		select {
 		case client.Send <- msg:
 		default:
-			// channel full, skip this client
 		}
 	}
 }
@@ -106,6 +105,28 @@ func (h *Hub) GetClientByID(id string) *Client {
 	return h.clients[id]
 }
 
-func (h *Hub) Register(client *Client) {
+// ReconnectOrRegister 处理新连接或同 token 重连
+func (h *Hub) ReconnectOrRegister(id string, conn *websocket.Conn, ip, ua, token string) {
+	h.mu.Lock()
+	if existing, ok := h.clients[id]; ok {
+		delete(h.clients, id)
+		close(existing.Send)
+		go existing.Conn.Close()
+	}
+	h.mu.Unlock()
+
+	client := &Client{
+		ID:          id,
+		Token:       token,
+		Conn:        conn,
+		Send:        make(chan []byte, 256),
+		Hub:         h,
+		IP:          ip,
+		UserAgent:   ua,
+		ConnectedAt: time.Now(),
+	}
+
 	h.register <- client
+	go client.WritePump()
+	go client.ReadPump()
 }

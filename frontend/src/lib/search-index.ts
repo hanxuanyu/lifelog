@@ -35,6 +35,14 @@ export const SETTINGS_SEARCH_ITEMS: SettingsSearchItem[] = [
     section: "online-devices",
   },
   {
+    id: "token-management",
+    title: "令牌管理",
+    description: "管理登录令牌和 API 令牌，支持创建和吊销。",
+    keywords: ["令牌", "token", "API", "吊销", "登录", "密钥"],
+    tab: "app-info",
+    section: "token-management",
+  },
+  {
     id: "password-settings",
     title: "密码设置",
     description: "修改登录密码。",

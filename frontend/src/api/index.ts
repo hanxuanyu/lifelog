@@ -471,3 +471,46 @@ export async function disconnectDevice(id: string) {
   const res = await http.delete<ApiResponse>(`/devices/${id}`)
   return res.data
 }
+
+// Token Management
+export interface TokenInfo {
+  id: string
+  type: "login" | "api"
+  name: string
+  status: "active" | "revoked"
+  ip: string
+  user_agent: string
+  expires_at: string | null
+  last_used_at: string | null
+  created_at: string
+}
+
+export interface CreateAPITokenRequest {
+  name: string
+  expires_in_hours?: number
+}
+
+export interface CreateAPITokenResponse {
+  token: string
+  info: TokenInfo
+}
+
+export async function getTokens() {
+  const res = await http.get<ApiResponse<TokenInfo[]>>("/tokens")
+  return res.data.data
+}
+
+export async function createAPIToken(req: CreateAPITokenRequest) {
+  const res = await http.post<ApiResponse<CreateAPITokenResponse>>("/tokens", req)
+  return res.data.data
+}
+
+export async function revokeToken(id: string) {
+  const res = await http.delete<ApiResponse>(`/tokens/${id}`)
+  return res.data
+}
+
+export async function revokeAllTokens() {
+  const res = await http.delete<ApiResponse>("/tokens")
+  return res.data
+}

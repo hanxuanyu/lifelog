@@ -44,7 +44,7 @@ func authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if err := service.ValidateToken(token); err != nil {
+		if _, err := service.ValidateToken(token); err != nil {
 			slog.Warn("MCP 认证失败: token无效", "ip", r.RemoteAddr, "error", err)
 			http.Error(w, "认证失败: "+err.Error(), http.StatusUnauthorized)
 			return

@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -19,17 +18,16 @@ func HandleWebSocket(hub *ws.Hub) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Query("token")
 
+		var tokenID string
 		if service.IsPasswordSet() {
 			if token == "" {
 				c.JSON(http.StatusUnauthorized, gin.H{"message": "未提供认证信息"})
 				return
 			}
-			if err := service.ValidateToken(token); err != nil {
-				c.JSON(http.StatusUnauthorized, gin.H{"message": "认证失败"})
-				return
-			}
-			if service.IsTokenBlacklisted(token) {
-				c.JSON(http.StatusUnauthorized, gin.H{"message": "token已失效"})
+			var err error
+			tokenID, err = service.ValidateToken(token)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"message": "认证失败: " + err.Error()})
 				return
 			}
 		}
@@ -39,19 +37,15 @@ func HandleWebSocket(hub *ws.Hub) gin.HandlerFunc {
 			return
 		}
 
-		client := &ws.Client{
-			ID:          uuid.New().String(),
-			Token:       token,
-			Conn:        conn,
-			Send:        make(chan []byte, 256),
-			Hub:         hub,
-			IP:          c.ClientIP(),
-			UserAgent:   c.Request.UserAgent(),
-			ConnectedAt: time.Now(),
+		clientID := tokenID
+		if clientID == "" {
+			clientID = uuid.New().String()
 		}
 
-		hub.Register(client)
-		go client.WritePump()
-		go client.ReadPump()
+		hub.ReconnectOrRegister(clientID, conn, c.ClientIP(), c.Request.UserAgent(), token)
+
+		if tokenID != "" {
+			go service.UpdateLastUsed(tokenID)
+		}
 	}
 }

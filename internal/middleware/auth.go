@@ -39,7 +39,8 @@ func AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		if err := service.ValidateToken(token); err != nil {
+		tokenID, err := service.ValidateToken(token)
+		if err != nil {
 			slog.Warn("认证失败: token无效", "path", c.Request.URL.Path, "ip", c.ClientIP(), "error", err)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, model.Response{
 				Code:    401,
@@ -48,13 +49,9 @@ func AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		if service.IsTokenBlacklisted(token) {
-			slog.Warn("认证失败: token已被注销", "path", c.Request.URL.Path, "ip", c.ClientIP())
-			c.AbortWithStatusJSON(http.StatusUnauthorized, model.Response{
-				Code:    401,
-				Message: "token已失效，请重新登录",
-			})
-			return
+		if tokenID != "" {
+			c.Set("token_id", tokenID)
+			go service.UpdateLastUsed(tokenID)
 		}
 
 		c.Next()
