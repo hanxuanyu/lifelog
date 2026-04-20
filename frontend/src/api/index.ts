@@ -453,3 +453,21 @@ export async function deletePrompt(name: string) {
   const res = await http.delete<ApiResponse>(`/prompts/${encodeURIComponent(name)}`)
   return res.data
 }
+
+// Online Devices
+export interface OnlineDevice {
+  id: string
+  ip: string
+  user_agent: string
+  connected_at: string
+}
+
+export async function getOnlineDevices() {
+  const res = await http.get<ApiResponse<OnlineDevice[]>>("/devices")
+  return res.data.data
+}
+
+export async function disconnectDevice(id: string) {
+  const res = await http.delete<ApiResponse>(`/devices/${id}`)
+  return res.data
+}

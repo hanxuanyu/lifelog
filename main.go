@@ -15,6 +15,8 @@ import (
 	"github.com/hxuanyu/lifelog/internal/repository"
 	"github.com/hxuanyu/lifelog/internal/router"
 	"github.com/hxuanyu/lifelog/internal/scheduler"
+	"github.com/hxuanyu/lifelog/internal/service"
+	"github.com/hxuanyu/lifelog/internal/ws"
 )
 
 //go:embed web/*
@@ -40,6 +42,14 @@ func main() {
 	// 初始化事件总线：将 webhook 执行器注册为全局订阅者
 	events.SubscribeAll(&events.WebhookSubscriber{})
 
+	// 初始化 WebSocket Hub 并注册为事件订阅者
+	wsHub := ws.NewHub()
+	go wsHub.Run()
+	events.SubscribeAll(&ws.WSSubscriber{Hub: wsHub})
+
+	// 启动 token 黑名单清理
+	service.StartBlacklistCleanup()
+
 	// 注册内置定时任务并启动调度器
 	scheduler.RegisterBuiltinTasks()
 	scheduler.Start()
@@ -47,7 +57,7 @@ func main() {
 
 	r := gin.Default()
 	staticFS, _ := fs.Sub(webFS, "web")
-	router.Setup(r, staticFS)
+	router.Setup(r, staticFS, wsHub)
 
 	// 启动 MCP 服务
 	if config.GetMCPEnabled() {

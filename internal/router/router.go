@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hxuanyu/lifelog/internal/handler"
 	"github.com/hxuanyu/lifelog/internal/middleware"
+	"github.com/hxuanyu/lifelog/internal/ws"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
@@ -15,9 +16,9 @@ import (
 )
 
 // Setup 注册所有路由
-func Setup(r *gin.Engine, staticFS fs.FS) {
-	// Gzip 压缩中间件；SSE 流式接口需要跳过压缩，否则可能被缓冲后一次性返回
-	r.Use(gzip.Gzip(gzip.DefaultCompression, gzip.WithExcludedPaths([]string{"/api/ai/chat"})))
+func Setup(r *gin.Engine, staticFS fs.FS, hub *ws.Hub) {
+	// Gzip 压缩中间件；SSE 流式接口和 WebSocket 需要跳过压缩
+	r.Use(gzip.Gzip(gzip.DefaultCompression, gzip.WithExcludedPaths([]string{"/api/ai/chat", "/api/ws"})))
 	// Swagger 文档
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
@@ -33,6 +34,9 @@ func Setup(r *gin.Engine, staticFS fs.FS) {
 		auth.POST("/login", handler.Login)
 		auth.PUT("/password", handler.SetPassword)
 	}
+
+	// WebSocket（自行处理认证）
+	api.GET("/ws", handler.HandleWebSocket(hub))
 
 	// 以下路由需要认证
 	protected := api.Group("")
@@ -120,6 +124,13 @@ func Setup(r *gin.Engine, staticFS fs.FS) {
 			prompts.POST("", handler.CreatePrompt)
 			prompts.PUT("/:name", handler.UpdatePrompt)
 			prompts.DELETE("/:name", handler.DeletePrompt)
+		}
+
+		// 在线设备
+		devices := protected.Group("/devices")
+		{
+			devices.GET("", handler.GetOnlineDevices(hub))
+			devices.DELETE("/:id", handler.DisconnectDevice(hub))
 		}
 	}
 

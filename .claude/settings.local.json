@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(xargs grep *)",
+      "Bash(find /c/workspace/project/go/lifelog/frontend/src -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) -exec grep -l \"resize\\\\|viewport\\\\|keyboard\" {} \\\\;)"
     ]
   }
 }

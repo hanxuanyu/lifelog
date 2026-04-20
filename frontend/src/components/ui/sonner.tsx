@@ -18,9 +18,18 @@ const Toaster = ({ ...props }: ToasterProps) => {
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const resizeObserver = new ResizeObserver(() => {
-      window.requestAnimationFrame(updateLift)
-    })
+    let rafPending = false
+
+    const scheduleUpdate = () => {
+      if (rafPending) return
+      rafPending = true
+      window.requestAnimationFrame(() => {
+        rafPending = false
+        updateLift()
+      })
+    }
+
+    const resizeObserver = new ResizeObserver(scheduleUpdate)
 
     const observeVisibleToasts = () => {
       resizeObserver.disconnect()
@@ -62,6 +71,28 @@ const Toaster = ({ ...props }: ToasterProps) => {
       setMobileToastLift(maxBottom - minTop + 12)
     }
 
+    // MutationObserver to detect toast DOM additions/removals
+    const mutationObserver = new MutationObserver(() => {
+      observeVisibleToasts()
+      scheduleUpdate()
+    })
+    const toaster = document.querySelector("[data-sonner-toaster]")
+    if (toaster) {
+      mutationObserver.observe(toaster, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-visible"] })
+    }
+
+    // visualViewport listener for soft keyboard / address bar changes
+    const vv = window.visualViewport
+    if (vv) {
+      vv.addEventListener("resize", scheduleUpdate)
+    }
+
+    // Safety interval: force reset when no visible toasts
+    const safetyInterval = window.setInterval(() => {
+      const count = document.querySelectorAll("[data-sonner-toast][data-visible='true']").length
+      if (count === 0) setMobileToastLift(0)
+    }, 500)
+
     observeVisibleToasts()
     const frameId = window.requestAnimationFrame(updateLift)
     window.addEventListener("resize", updateLift, { passive: true })
@@ -70,6 +101,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
       window.cancelAnimationFrame(frameId)
       window.removeEventListener("resize", updateLift)
       resizeObserver.disconnect()
+      mutationObserver.disconnect()
+      if (vv) vv.removeEventListener("resize", scheduleUpdate)
+      window.clearInterval(safetyInterval)
       setMobileToastLift(0)
     }
   }, [toasts])

@@ -7,6 +7,8 @@ import { getSettings } from "@/api"
 import { HomePage } from "@/pages/HomePage"
 import { LoginPage } from "@/pages/LoginPage"
 import { useNavigationStyle } from "@/hooks/use-navigation-style"
+import { connectWebSocket, disconnectWebSocket } from "@/hooks/use-websocket"
+import { useRealtimeSync } from "@/hooks/use-realtime-sync"
 import { QuickAddDialog } from "@/components/QuickAddDialog"
 import { CategoryAssignDialog } from "@/components/CategoryAssignDialog"
 import { showCategoryAssignToast } from "@/lib/category-toast"
@@ -31,6 +33,8 @@ function AppLayout() {
   const [railHovering, setRailHovering] = useState(false)
   const [bottomNavCollapsed, setBottomNavCollapsed] = useState(false)
   const { isAutoNavigation, isTopNavigation, isFloatingNavigation } = useNavigationStyle()
+
+  useRealtimeSync()
 
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
@@ -308,6 +312,13 @@ export default function App() {
         setAuthenticated(false)
       })
   }, [])
+
+  useEffect(() => {
+    if (authenticated) {
+      connectWebSocket()
+      return () => disconnectWebSocket()
+    }
+  }, [authenticated])
 
   if (authenticated === null) {
     return (
