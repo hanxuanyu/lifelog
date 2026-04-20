@@ -18,3 +18,14 @@ func GetSystemMonitor(c *gin.Context) {
 	monitor := service.GetSystemMonitor()
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "ok", Data: monitor})
 }
+
+// HealthCheck 健康检查
+// @Summary 服务健康检查
+// @Tags 系统
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} model.Response
+// @Router /api/health [get]
+func HealthCheck(c *gin.Context) {
+	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "ok", Data: gin.H{"status": "healthy"}})
+}

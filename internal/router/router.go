@@ -42,6 +42,8 @@ func Setup(r *gin.Engine, staticFS fs.FS, hub *ws.Hub) {
 	protected := api.Group("")
 	protected.Use(middleware.AuthRequired())
 	{
+		// 健康检查
+		protected.GET("/health", handler.HealthCheck)
 		// 日志
 		logs := protected.Group("/logs")
 		{
