@@ -21,6 +21,7 @@ import { CategoriesCard } from "@/components/settings/CategoriesCard"
 import { WebhookSettingsCard } from "@/components/settings/WebhookSettingsCard"
 import { EventBindingsCard } from "@/components/settings/EventBindingsCard"
 import { ScheduledTasksCard } from "@/components/settings/ScheduledTasksCard"
+import { OnlineDevicesCard } from "@/components/settings/OnlineDevicesCard"
 import { useNavigationStyle } from "@/hooks/use-navigation-style"
 import { useTransientPageScrollbar } from "@/hooks/use-transient-page-scrollbar"
 import { isSettingsSearchTab, type SettingsSearchTab } from "@/lib/search-index"
@@ -196,6 +197,9 @@ export function SettingsPage() {
                 </div>
                 <div id="server-monitor" className={getSectionClassName("server-monitor")}>
                   <ServerMonitorCard />
+                </div>
+                <div id="online-devices" className={getSectionClassName("online-devices")}>
+                  <OnlineDevicesCard />
                 </div>
                 <div id="password-settings" className={getSectionClassName("password-settings")}>
                   <PasswordCard />

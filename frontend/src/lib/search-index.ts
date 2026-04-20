@@ -27,6 +27,14 @@ export const SETTINGS_SEARCH_ITEMS: SettingsSearchItem[] = [
     section: "server-monitor",
   },
   {
+    id: "online-devices",
+    title: "在线设备",
+    description: "查看当前在线的客户端设备，支持远程登出。",
+    keywords: ["设备", "在线", "客户端", "登出", "WebSocket", "连接"],
+    tab: "app-info",
+    section: "online-devices",
+  },
+  {
     id: "password-settings",
     title: "密码设置",
     description: "修改登录密码。",

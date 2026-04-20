@@ -48,6 +48,15 @@ func AuthRequired() gin.HandlerFunc {
 			return
 		}
 
+		if service.IsTokenBlacklisted(token) {
+			slog.Warn("认证失败: token已被注销", "path", c.Request.URL.Path, "ip", c.ClientIP())
+			c.AbortWithStatusJSON(http.StatusUnauthorized, model.Response{
+				Code:    401,
+				Message: "token已失效，请重新登录",
+			})
+			return
+		}
+
 		c.Next()
 	}
 }
