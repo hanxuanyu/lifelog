@@ -32,9 +32,7 @@ func DisconnectDevice(hub *ws.Hub) gin.HandlerFunc {
 			return
 		}
 
-		if client.Token != "" {
-			service.BlacklistToken(client.Token)
-		}
+		service.RevokeToken(id)
 		hub.DisconnectByID(id)
 
 		c.JSON(http.StatusOK, model.Response{

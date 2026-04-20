@@ -28,7 +28,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	token, err := service.Login(req.Password)
+	token, err := service.Login(req.Password, c.ClientIP(), c.Request.UserAgent())
 	if err != nil {
 		slog.Warn("登录失败", "error", err, "ip", c.ClientIP())
 		c.JSON(http.StatusUnauthorized, model.Response{Code: 401, Message: err.Error()})
@@ -60,7 +60,7 @@ func SetPassword(c *gin.Context) {
 		return
 	}
 
-	token, err := service.SetPasswordAndLogin(req.OldPassword, req.NewPassword)
+	token, err := service.SetPasswordAndLogin(req.OldPassword, req.NewPassword, c.ClientIP(), c.Request.UserAgent())
 	if err != nil {
 		slog.Warn("密码修改失败", "error", err, "ip", c.ClientIP())
 		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: err.Error()})

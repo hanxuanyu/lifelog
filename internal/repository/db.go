@@ -30,7 +30,7 @@ func InitDB(dbPath string) {
 		os.Exit(1)
 	}
 
-	if err := DB.AutoMigrate(&model.LogEntry{}); err != nil {
+	if err := DB.AutoMigrate(&model.LogEntry{}, &model.Token{}); err != nil {
 		slog.Error("数据库迁移失败", "error", err)
 		os.Exit(1)
 	}

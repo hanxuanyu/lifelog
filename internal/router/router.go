@@ -42,6 +42,8 @@ func Setup(r *gin.Engine, staticFS fs.FS, hub *ws.Hub) {
 	protected := api.Group("")
 	protected.Use(middleware.AuthRequired())
 	{
+		// 健康检查
+		protected.GET("/health", handler.HealthCheck)
 		// 日志
 		logs := protected.Group("/logs")
 		{
@@ -131,6 +133,15 @@ func Setup(r *gin.Engine, staticFS fs.FS, hub *ws.Hub) {
 		{
 			devices.GET("", handler.GetOnlineDevices(hub))
 			devices.DELETE("/:id", handler.DisconnectDevice(hub))
+		}
+
+		// 令牌管理
+		tokens := protected.Group("/tokens")
+		{
+			tokens.GET("", handler.GetTokens)
+			tokens.POST("", handler.CreateAPIToken)
+			tokens.DELETE("/:id", handler.RevokeTokenHandler(hub))
+			tokens.DELETE("", handler.RevokeAllTokens(hub))
 		}
 	}
 
