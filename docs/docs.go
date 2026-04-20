@@ -65,7 +65,7 @@ const docTemplate = `{
                 "tags": [
                     "AI"
                 ],
-                "summary": "获取AI提供商的可用模型列表",
+                "summary": "获取 AI 提供商的可用模型列表",
                 "parameters": [
                     {
                         "description": "提供商接口信息",
@@ -110,7 +110,7 @@ const docTemplate = `{
                 "tags": [
                     "AI"
                 ],
-                "summary": "获取AI服务提供商列表",
+                "summary": "获取 AI 服务提供商列表",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -145,7 +145,7 @@ const docTemplate = `{
                 "tags": [
                     "AI"
                 ],
-                "summary": "添加AI服务提供商",
+                "summary": "添加 AI 服务提供商",
                 "parameters": [
                     {
                         "description": "提供商信息",
@@ -184,7 +184,7 @@ const docTemplate = `{
                 "tags": [
                     "AI"
                 ],
-                "summary": "测试AI服务提供商连接",
+                "summary": "测试 AI 服务提供商连接",
                 "parameters": [
                     {
                         "description": "提供商信息",
@@ -217,7 +217,7 @@ const docTemplate = `{
                 "tags": [
                     "AI"
                 ],
-                "summary": "更新AI服务提供商",
+                "summary": "更新 AI 服务提供商",
                 "parameters": [
                     {
                         "type": "string",
@@ -264,7 +264,7 @@ const docTemplate = `{
                 "tags": [
                     "AI"
                 ],
-                "summary": "删除AI服务提供商",
+                "summary": "删除 AI 服务提供商",
                 "parameters": [
                     {
                         "type": "string",
@@ -520,8 +520,129 @@ const docTemplate = `{
                         "description": "是否导入配置",
                         "name": "import_config",
                         "in": "formData"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "导入的配置类型，可选：basic/auth/ai/categories/webhooks",
+                        "name": "import_config_types",
+                        "in": "formData"
                     }
                 ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/event-bindings": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "事件"
+                ],
+                "summary": "获取事件绑定列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.EventBinding"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "事件"
+                ],
+                "summary": "更新事件绑定",
+                "parameters": [
+                    {
+                        "description": "事件绑定列表",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.EventBinding"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/events": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "事件"
+                ],
+                "summary": "获取事件定义列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/health": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统"
+                ],
+                "summary": "服务健康检查",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -546,6 +667,18 @@ const docTemplate = `{
                         "type": "string",
                         "description": "日期 YYYY-MM-DD",
                         "name": "date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "起始日期 YYYY-MM-DD",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "结束日期 YYYY-MM-DD",
+                        "name": "end_date",
                         "in": "query"
                     },
                     {
@@ -869,6 +1002,87 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/scheduled-tasks": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "定时任务"
+                ],
+                "summary": "获取定时任务列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "定时任务"
+                ],
+                "summary": "更新定时任务",
+                "parameters": [
+                    {
+                        "description": "任务配置列表",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.ScheduledTaskConfig"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/scheduled-tasks/{name}/run": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "定时任务"
+                ],
+                "summary": "手动执行定时任务",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "任务名称",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/settings": {
             "get": {
                 "produces": [
@@ -1082,12 +1296,246 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/system/monitor": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统"
+                ],
+                "summary": "获取服务器资源监控",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.SystemMonitor"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/version": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "summary": "获取版本信息",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/webhooks": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Webhook"
+                ],
+                "summary": "获取 webhook 列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.Webhook"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Webhook"
+                ],
+                "summary": "创建 webhook",
+                "parameters": [
+                    {
+                        "description": "Webhook 配置",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.Webhook"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/webhooks/test-dry": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Webhook"
+                ],
+                "summary": "测试未保存的 webhook",
+                "parameters": [
+                    {
+                        "description": "Webhook 配置 + 可选事件名",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/webhooks/{name}": {
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Webhook"
+                ],
+                "summary": "更新 webhook",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Webhook 名称",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Webhook 配置",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.Webhook"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Webhook"
+                ],
+                "summary": "删除 webhook",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Webhook 名称",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/webhooks/{name}/test": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Webhook"
+                ],
+                "summary": "测试 webhook",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Webhook 名称",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "可选指定事件 {\\",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1136,6 +1584,9 @@ const docTemplate = `{
                     }
                 },
                 "message": {
+                    "type": "string"
+                },
+                "model": {
                     "type": "string"
                 },
                 "provider_name": {
@@ -1258,6 +1709,10 @@ const docTemplate = `{
                         "$ref": "#/definitions/model.DurationItem"
                     }
                 },
+                "prev_day_last_time": {
+                    "description": "前一天最后一条日志的时间",
+                    "type": "string"
+                },
                 "summary": {
                     "type": "array",
                     "items": {
@@ -1286,6 +1741,26 @@ const docTemplate = `{
                     }
                 },
                 "total_known": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.DirInfo": {
+            "type": "object",
+            "properties": {
+                "exists": {
+                    "type": "boolean"
+                },
+                "file_count": {
+                    "type": "integer"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "size_bytes": {
                     "type": "integer"
                 }
             }
@@ -1326,6 +1801,20 @@ const docTemplate = `{
                 "unknown": {
                     "description": "首条/末条未知时长",
                     "type": "boolean"
+                }
+            }
+        },
+        "model.EventBinding": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "event": {
+                    "type": "string"
+                },
+                "webhook_name": {
+                    "type": "string"
                 }
             }
         },
@@ -1391,6 +1880,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "time_point_mode": {
+                    "type": "string"
+                },
+                "time_range": {
                     "type": "string"
                 }
             }
@@ -1485,6 +1977,90 @@ const docTemplate = `{
                 }
             }
         },
+        "model.ScheduledTaskConfig": {
+            "type": "object",
+            "properties": {
+                "cron": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "params": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "model.SystemMonitor": {
+            "type": "object",
+            "properties": {
+                "cpu_cores": {
+                    "type": "integer"
+                },
+                "cpu_usage": {
+                    "description": "OS 级别",
+                    "type": "number"
+                },
+                "directories": {
+                    "description": "目录信息",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.DirInfo"
+                    }
+                },
+                "disk_percent": {
+                    "type": "number"
+                },
+                "disk_total": {
+                    "type": "integer"
+                },
+                "disk_used": {
+                    "description": "磁盘",
+                    "type": "integer"
+                },
+                "go_gc_count": {
+                    "type": "integer"
+                },
+                "go_gc_pause_ms": {
+                    "type": "number"
+                },
+                "go_mem_alloc": {
+                    "description": "进程级别（Go runtime）",
+                    "type": "integer"
+                },
+                "go_mem_gc_sys": {
+                    "type": "integer"
+                },
+                "go_mem_sys": {
+                    "type": "integer"
+                },
+                "go_version": {
+                    "type": "string"
+                },
+                "goroutines": {
+                    "type": "integer"
+                },
+                "os_mem_percent": {
+                    "type": "number"
+                },
+                "os_mem_total": {
+                    "type": "integer"
+                },
+                "os_mem_used": {
+                    "type": "integer"
+                },
+                "uptime_seconds": {
+                    "description": "运行时间",
+                    "type": "integer"
+                }
+            }
+        },
         "model.TrendStatistics": {
             "type": "object",
             "properties": {
@@ -1498,6 +2074,38 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "start_date": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Webhook": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "string"
+                },
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "method": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "query_params": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "timeout_seconds": {
+                    "type": "integer"
+                },
+                "url": {
                     "type": "string"
                 }
             }
