@@ -95,12 +95,12 @@ export function EntryCard({
       if (durItem.cross_day) {
         const mode = durItem.time_point_mode || getEntryMode(entry)
         if (mode === "end") {
-          return currentMinutes <= endMinutes
+          return currentMinutes < endMinutes
         }
         return currentMinutes >= startMinutes
       }
 
-      return currentMinutes >= startMinutes && currentMinutes <= endMinutes
+      return currentMinutes >= startMinutes && currentMinutes < endMinutes
     }
 
     if (durItem?.unknown) {
