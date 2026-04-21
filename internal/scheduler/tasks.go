@@ -15,6 +15,11 @@ import (
 const (
 	noLogReminderThresholdParam = "threshold_hours"
 	noLogReminderThresholdHours = 4.0
+
+	noLogReminderQuietStartParam   = "quiet_start"
+	noLogReminderQuietEndParam     = "quiet_end"
+	noLogReminderQuietStartDefault = "23:00"
+	noLogReminderQuietEndDefault   = "07:00"
 )
 
 type DailyReportTask struct{}
@@ -94,6 +99,16 @@ func (t *NoLogReminderTask) EventName() string   { return "task.no_log_reminder"
 
 func (t *NoLogReminderTask) ParameterDefinitions(cfg model.ScheduledTaskConfig) []model.ScheduledTaskParamDefinition {
 	threshold := formatPositiveFloat(parsePositiveFloatParam(cfg, noLogReminderThresholdParam, noLogReminderThresholdHours))
+
+	quietStart := strings.TrimSpace(cfg.Params[noLogReminderQuietStartParam])
+	if quietStart == "" {
+		quietStart = noLogReminderQuietStartDefault
+	}
+	quietEnd := strings.TrimSpace(cfg.Params[noLogReminderQuietEndParam])
+	if quietEnd == "" {
+		quietEnd = noLogReminderQuietEndDefault
+	}
+
 	return []model.ScheduledTaskParamDefinition{
 		{
 			Key:         noLogReminderThresholdParam,
@@ -103,10 +118,33 @@ func (t *NoLogReminderTask) ParameterDefinitions(cfg model.ScheduledTaskConfig) 
 			Placeholder: formatPositiveFloat(noLogReminderThresholdHours),
 			Value:       threshold,
 		},
+		{
+			Key:         noLogReminderQuietStartParam,
+			Label:       "免打扰开始时间",
+			Description: "免打扰时段的开始时间，格式 HH:MM。在此时段内不会发送提醒。设为与结束时间相同可禁用。",
+			Type:        "text",
+			Placeholder: noLogReminderQuietStartDefault,
+			Value:       quietStart,
+		},
+		{
+			Key:         noLogReminderQuietEndParam,
+			Label:       "免打扰结束时间",
+			Description: "免打扰时段的结束时间，格式 HH:MM。支持跨午夜，例如开始 23:00 结束 07:00。",
+			Type:        "text",
+			Placeholder: noLogReminderQuietEndDefault,
+			Value:       quietEnd,
+		},
 	}
 }
 
 func (t *NoLogReminderTask) Execute(cfg model.ScheduledTaskConfig) (map[string]string, error) {
+	now := time.Now()
+	startH, startM := parseTimeParam(cfg, noLogReminderQuietStartParam, noLogReminderQuietStartDefault)
+	endH, endM := parseTimeParam(cfg, noLogReminderQuietEndParam, noLogReminderQuietEndDefault)
+	if isInQuietHours(now, startH, startM, endH, endM) {
+		return nil, nil
+	}
+
 	latest, err := repository.GetLatestEntry()
 	if err != nil {
 		return nil, nil
@@ -276,6 +314,49 @@ func formatSeconds(seconds int) string {
 		return fmt.Sprintf("%dh", h)
 	}
 	return fmt.Sprintf("%dm", m)
+}
+
+func parseHHMM(s string) (int, int, error) {
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("invalid time format: %s", s)
+	}
+	h, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil || h < 0 || h > 23 {
+		return 0, 0, fmt.Errorf("invalid hour: %s", parts[0])
+	}
+	m, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil || m < 0 || m > 59 {
+		return 0, 0, fmt.Errorf("invalid minute: %s", parts[1])
+	}
+	return h, m, nil
+}
+
+func parseTimeParam(cfg model.ScheduledTaskConfig, key, fallback string) (int, int) {
+	raw := strings.TrimSpace(cfg.Params[key])
+	if raw == "" {
+		raw = fallback
+	}
+	h, m, err := parseHHMM(raw)
+	if err != nil {
+		h, m, _ = parseHHMM(fallback)
+	}
+	return h, m
+}
+
+func isInQuietHours(now time.Time, startH, startM, endH, endM int) bool {
+	nowMin := now.Hour()*60 + now.Minute()
+	startMin := startH*60 + startM
+	endMin := endH*60 + endM
+
+	if startMin == endMin {
+		return false
+	}
+
+	if startMin < endMin {
+		return nowMin >= startMin && nowMin < endMin
+	}
+	return nowMin >= startMin || nowMin < endMin
 }
 
 func parsePositiveFloatParam(cfg model.ScheduledTaskConfig, key string, fallback float64) float64 {

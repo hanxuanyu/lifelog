@@ -96,10 +96,10 @@ function getSettingsTabLabel(tab: SettingsSearchTab) {
       return "设置首页"
     case "basic":
       return "基础配置"
-    case "webhooks":
-      return "Webhook"
-    case "events":
-      return "事件绑定"
+    case "tokens":
+      return "令牌管理"
+    case "automation":
+      return "自动化"
     case "categories":
       return "分类管理"
   }

@@ -22,6 +22,8 @@ definitions:
         type: array
       message:
         type: string
+      model:
+        type: string
       provider_name:
         type: string
       start_date:
@@ -106,6 +108,9 @@ definitions:
         items:
           $ref: '#/definitions/model.DurationItem'
         type: array
+      prev_day_last_time:
+        description: 前一天最后一条日志的时间
+        type: string
       summary:
         items:
           $ref: '#/definitions/model.CategorySummary'
@@ -125,6 +130,19 @@ definitions:
           $ref: '#/definitions/model.CategorySummary'
         type: array
       total_known:
+        type: integer
+    type: object
+  model.DirInfo:
+    properties:
+      exists:
+        type: boolean
+      file_count:
+        type: integer
+      label:
+        type: string
+      path:
+        type: string
+      size_bytes:
         type: integer
     type: object
   model.DurationItem:
@@ -154,6 +172,15 @@ definitions:
       unknown:
         description: 首条/末条未知时长
         type: boolean
+    type: object
+  model.EventBinding:
+    properties:
+      enabled:
+        type: boolean
+      event:
+        type: string
+      webhook_name:
+        type: string
     type: object
   model.FetchModelsRequest:
     properties:
@@ -197,6 +224,8 @@ definitions:
       log_time:
         type: string
       time_point_mode:
+        type: string
+      time_range:
         type: string
     type: object
   model.LoginRequest:
@@ -258,6 +287,63 @@ definitions:
       message:
         type: string
     type: object
+  model.ScheduledTaskConfig:
+    properties:
+      cron:
+        type: string
+      enabled:
+        type: boolean
+      name:
+        type: string
+      params:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
+  model.SystemMonitor:
+    properties:
+      cpu_cores:
+        type: integer
+      cpu_usage:
+        description: OS 级别
+        type: number
+      directories:
+        description: 目录信息
+        items:
+          $ref: '#/definitions/model.DirInfo'
+        type: array
+      disk_percent:
+        type: number
+      disk_total:
+        type: integer
+      disk_used:
+        description: 磁盘
+        type: integer
+      go_gc_count:
+        type: integer
+      go_gc_pause_ms:
+        type: number
+      go_mem_alloc:
+        description: 进程级别（Go runtime）
+        type: integer
+      go_mem_gc_sys:
+        type: integer
+      go_mem_sys:
+        type: integer
+      go_version:
+        type: string
+      goroutines:
+        type: integer
+      os_mem_percent:
+        type: number
+      os_mem_total:
+        type: integer
+      os_mem_used:
+        type: integer
+      uptime_seconds:
+        description: 运行时间
+        type: integer
+    type: object
   model.TrendStatistics:
     properties:
       days:
@@ -267,6 +353,27 @@ definitions:
       end_date:
         type: string
       start_date:
+        type: string
+    type: object
+  model.Webhook:
+    properties:
+      body:
+        type: string
+      headers:
+        additionalProperties:
+          type: string
+        type: object
+      method:
+        type: string
+      name:
+        type: string
+      query_params:
+        additionalProperties:
+          type: string
+        type: object
+      timeout_seconds:
+        type: integer
+      url:
         type: string
     type: object
 host: localhost:8080
@@ -326,7 +433,7 @@ paths:
                     type: string
                   type: array
               type: object
-      summary: 获取AI提供商的可用模型列表
+      summary: 获取 AI 提供商的可用模型列表
       tags:
       - AI
   /api/ai/providers:
@@ -345,7 +452,7 @@ paths:
                     $ref: '#/definitions/model.AIProvider'
                   type: array
               type: object
-      summary: 获取AI服务提供商列表
+      summary: 获取 AI 服务提供商列表
       tags:
       - AI
     post:
@@ -369,7 +476,7 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/model.Response'
-      summary: 添加AI服务提供商
+      summary: 添加 AI 服务提供商
       tags:
       - AI
   /api/ai/providers/{name}:
@@ -391,7 +498,7 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/model.Response'
-      summary: 删除AI服务提供商
+      summary: 删除 AI 服务提供商
       tags:
       - AI
     put:
@@ -424,7 +531,7 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/model.Response'
-      summary: 更新AI服务提供商
+      summary: 更新 AI 服务提供商
       tags:
       - AI
   /api/ai/providers/test:
@@ -445,7 +552,7 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/model.Response'
-      summary: 测试AI服务提供商连接
+      summary: 测试 AI 服务提供商连接
       tags:
       - AI
   /api/auth/login:
@@ -588,6 +695,13 @@ paths:
         in: formData
         name: import_config
         type: boolean
+      - collectionFormat: csv
+        description: 导入的配置类型，可选：basic/auth/ai/categories/webhooks
+        in: formData
+        items:
+          type: string
+        name: import_config_types
+        type: array
       produces:
       - application/json
       responses:
@@ -598,12 +712,87 @@ paths:
       summary: 导入数据
       tags:
       - 数据管理
+  /api/event-bindings:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.EventBinding'
+                  type: array
+              type: object
+      summary: 获取事件绑定列表
+      tags:
+      - 事件
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 事件绑定列表
+        in: body
+        name: body
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/model.EventBinding'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 更新事件绑定
+      tags:
+      - 事件
+  /api/events:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 获取事件定义列表
+      tags:
+      - 事件
+  /api/health:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      security:
+      - BearerAuth: []
+      summary: 服务健康检查
+      tags:
+      - 系统
   /api/logs:
     get:
       parameters:
       - description: 日期 YYYY-MM-DD
         in: query
         name: date
+        type: string
+      - description: 起始日期 YYYY-MM-DD
+        in: query
+        name: start_date
+        type: string
+      - description: 结束日期 YYYY-MM-DD
+        in: query
+        name: end_date
         type: string
       - description: 事项类型
         in: query
@@ -801,6 +990,58 @@ paths:
       summary: 获取某天时间轴
       tags:
       - 日志
+  /api/scheduled-tasks:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 获取定时任务列表
+      tags:
+      - 定时任务
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 任务配置列表
+        in: body
+        name: body
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/model.ScheduledTaskConfig'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 更新定时任务
+      tags:
+      - 定时任务
+  /api/scheduled-tasks/{name}/run:
+    post:
+      parameters:
+      - description: 任务名称
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 手动执行定时任务
+      tags:
+      - 定时任务
   /api/settings:
     get:
       produces:
@@ -928,6 +1169,23 @@ paths:
       summary: 获取某天所在周的统计数据
       tags:
       - 统计
+  /api/system/monitor:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.SystemMonitor'
+              type: object
+      summary: 获取服务器资源监控
+      tags:
+      - 系统
   /api/version:
     get:
       produces:
@@ -938,6 +1196,134 @@ paths:
           schema:
             $ref: '#/definitions/model.Response'
       summary: 获取版本信息
+  /api/webhooks:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Webhook'
+                  type: array
+              type: object
+      summary: 获取 webhook 列表
+      tags:
+      - Webhook
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Webhook 配置
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.Webhook'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 创建 webhook
+      tags:
+      - Webhook
+  /api/webhooks/{name}:
+    delete:
+      parameters:
+      - description: Webhook 名称
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 删除 webhook
+      tags:
+      - Webhook
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Webhook 名称
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Webhook 配置
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.Webhook'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 更新 webhook
+      tags:
+      - Webhook
+  /api/webhooks/{name}/test:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Webhook 名称
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: 可选指定事件 {\
+        in: body
+        name: body
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 测试 webhook
+      tags:
+      - Webhook
+  /api/webhooks/test-dry:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Webhook 配置 + 可选事件名
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: 测试未保存的 webhook
+      tags:
+      - Webhook
 securityDefinitions:
   BearerAuth:
     in: header
