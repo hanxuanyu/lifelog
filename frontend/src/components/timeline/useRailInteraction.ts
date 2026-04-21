@@ -4,12 +4,16 @@ import { minutesToTime } from "./shared"
 interface UseRailInteractionOptions {
   railRef: React.RefObject<HTMLDivElement | null>
   railHeight: number
+  activeTop: number
+  activeBottom: number
   onRailCreate?: (time: string) => void
 }
 
 export function useRailInteraction({
   railRef,
   railHeight,
+  activeTop,
+  activeBottom,
   onRailCreate,
 }: UseRailInteractionOptions) {
   const [hoverTime, setHoverTime] = useState<string | null>(null)
@@ -31,7 +35,9 @@ export function useRailInteraction({
     if (!rail) return
     const rect = rail.getBoundingClientRect()
     const y = e.clientY - rect.top
-    const pct = Math.max(0, Math.min(1, y / railHeight))
+    const activeHeight = Math.max(1, activeBottom - activeTop)
+    const clampedY = Math.max(activeTop, Math.min(activeBottom, y))
+    const pct = Math.max(0, Math.min(1, (clampedY - activeTop) / activeHeight))
     const totalMins = Math.round(pct * 1440)
     setHoverTime(minutesToTime(totalMins))
   }
@@ -48,11 +54,12 @@ export function useRailInteraction({
     if (!rail) return null
     const rect = rail.getBoundingClientRect()
     const y = e.touches[0].clientY - rect.top
-    const h = rail.clientHeight
-    if (h <= 0) return null
-    const pct = Math.max(0, Math.min(1, y / h))
+    const activeHeight = Math.max(1, activeBottom - activeTop)
+    if (railHeight <= 0) return null
+    const clampedY = Math.max(activeTop, Math.min(activeBottom, y))
+    const pct = Math.max(0, Math.min(1, (clampedY - activeTop) / activeHeight))
     return minutesToTime(Math.round(pct * 1440))
-  }, [railRef])
+  }, [activeBottom, activeTop, railHeight, railRef])
 
   useEffect(() => {
     const rail = railRef.current
