@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Save, Info, Settings2, Webhook, Zap, Tags } from "lucide-react"
+import { Save, Info, Settings2, KeyRound, Workflow, Tags } from "lucide-react"
 import { useLocation } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -180,11 +180,11 @@ export function SettingsPage() {
               <TabsTrigger value="basic" className="gap-1.5">
                 <Settings2 className="h-4 w-4" /><span className="hidden sm:inline">基础配置</span>
               </TabsTrigger>
-              <TabsTrigger value="webhooks" className="gap-1.5">
-                <Webhook className="h-4 w-4" /><span className="hidden sm:inline">Webhook</span>
+              <TabsTrigger value="tokens" className="gap-1.5">
+                <KeyRound className="h-4 w-4" /><span className="hidden sm:inline">令牌管理</span>
               </TabsTrigger>
-              <TabsTrigger value="events" className="gap-1.5">
-                <Zap className="h-4 w-4" /><span className="hidden sm:inline">事件绑定</span>
+              <TabsTrigger value="automation" className="gap-1.5">
+                <Workflow className="h-4 w-4" /><span className="hidden sm:inline">自动化</span>
               </TabsTrigger>
               <TabsTrigger value="categories" className="gap-1.5">
                 <Tags className="h-4 w-4" /><span className="hidden sm:inline">分类管理</span>
@@ -201,9 +201,6 @@ export function SettingsPage() {
                 </div>
                 <div id="online-devices" className={getSectionClassName("online-devices")}>
                   <OnlineDevicesCard />
-                </div>
-                <div id="token-management" className={getSectionClassName("token-management")}>
-                  <TokenManagementCard />
                 </div>
                 <div id="password-settings" className={getSectionClassName("password-settings")}>
                   <PasswordCard />
@@ -249,14 +246,17 @@ export function SettingsPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="webhooks">
-              <div id="webhook-settings" className={getSectionClassName("webhook-settings")}>
-                <WebhookSettingsCard />
+            <TabsContent value="tokens">
+              <div id="token-management" className={getSectionClassName("token-management")}>
+                <TokenManagementCard />
               </div>
             </TabsContent>
 
-            <TabsContent value="events">
+            <TabsContent value="automation">
               <div className="space-y-4">
+                <div id="webhook-settings" className={getSectionClassName("webhook-settings")}>
+                  <WebhookSettingsCard />
+                </div>
                 <div id="event-bindings" className={getSectionClassName("event-bindings")}>
                   <EventBindingsCard />
                 </div>

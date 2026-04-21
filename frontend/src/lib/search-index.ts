@@ -1,4 +1,4 @@
-export type SettingsSearchTab = "app-info" | "basic" | "webhooks" | "events" | "categories"
+export type SettingsSearchTab = "app-info" | "basic" | "tokens" | "automation" | "categories"
 
 export interface SettingsSearchItem {
   id: string
@@ -39,7 +39,7 @@ export const SETTINGS_SEARCH_ITEMS: SettingsSearchItem[] = [
     title: "令牌管理",
     description: "管理登录令牌和 API 令牌，支持创建和吊销。",
     keywords: ["令牌", "token", "API", "吊销", "登录", "密钥"],
-    tab: "app-info",
+    tab: "tokens",
     section: "token-management",
   },
   {
@@ -119,7 +119,7 @@ export const SETTINGS_SEARCH_ITEMS: SettingsSearchItem[] = [
     title: "Webhook 设置",
     description: "管理 Webhook 地址、方法和请求内容。",
     keywords: ["Webhook", "回调", "HTTP", "请求", "通知"],
-    tab: "webhooks",
+    tab: "automation",
     section: "webhook-settings",
   },
   {
@@ -127,7 +127,7 @@ export const SETTINGS_SEARCH_ITEMS: SettingsSearchItem[] = [
     title: "事件绑定",
     description: "为事件绑定对应的 Webhook。",
     keywords: ["事件", "绑定", "Webhook", "触发", "event"],
-    tab: "events",
+    tab: "automation",
     section: "event-bindings",
   },
   {
@@ -135,7 +135,7 @@ export const SETTINGS_SEARCH_ITEMS: SettingsSearchItem[] = [
     title: "定时任务",
     description: "管理定时上报和计划任务。",
     keywords: ["定时", "任务", "计划", "cron", "调度"],
-    tab: "events",
+    tab: "automation",
     section: "scheduled-tasks",
   },
   {
@@ -149,7 +149,7 @@ export const SETTINGS_SEARCH_ITEMS: SettingsSearchItem[] = [
 ]
 
 export function isSettingsSearchTab(value: string): value is SettingsSearchTab {
-  return value === "app-info" || value === "basic" || value === "webhooks" || value === "events" || value === "categories"
+  return value === "app-info" || value === "basic" || value === "tokens" || value === "automation" || value === "categories"
 }
 
 function normalizeSearchText(value: string) {
