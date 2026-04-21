@@ -34,9 +34,36 @@ export function RailSvg({
 }: RailSvgProps) {
   if (railHeight <= 0) return null
   const cx = RAIL_LINE_X
+  const railTopY = timeToRailY("00:00")
+  const railBottomY = timeToRailY("23:59")
+  const minorHourMarkers = Array.from({ length: 24 }, (_, index) => index).filter((hour) => !HOUR_MARKERS.includes(hour))
 
   return (
     <svg className="absolute inset-0 pointer-events-none" width={RAIL_WIDTH} height={railHeight}>
+      {/* Main rail line */}
+      <g aria-hidden="true">
+        <line x1={cx} y1={railTopY} x2={cx} y2={railBottomY} stroke="currentColor" strokeWidth={6} strokeLinecap="round" className="text-muted-foreground/8" />
+        <line x1={cx} y1={railTopY} x2={cx} y2={railBottomY} stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" className="text-border/90" />
+      </g>
+
+      {/* Minor hour markers */}
+      {minorHourMarkers.map((hour) => {
+        const y = RAIL_PADDING + ((hour * 60) / 1440) * usableHeight
+        return (
+          <line
+            key={`minor-${hour}`}
+            x1={cx - 2.5}
+            y1={y}
+            x2={cx + 2.5}
+            y2={y}
+            stroke="currentColor"
+            strokeWidth={1}
+            strokeLinecap="round"
+            className="text-muted-foreground/20"
+          />
+        )
+      })}
+
       {/* Duration segments */}
       {durationItems.map((item, i) => {
         if (item.unknown || !item.start_time || !item.end_time) return null
@@ -91,8 +118,8 @@ export function RailSvg({
         const y = RAIL_PADDING + (mins / 1440) * usableHeight
         return (
           <g key={h}>
-            <line x1={cx - 4} y1={y} x2={cx + 4} y2={y} stroke="currentColor" strokeWidth={1} className="text-muted-foreground/30" />
-            <text x={cx - 7} y={y + 4} textAnchor="end" className="fill-muted-foreground/50" fontSize={10} fontFamily="monospace">
+            <line x1={cx - 6} y1={y} x2={cx + 6} y2={y} stroke="currentColor" strokeWidth={1.25} strokeLinecap="round" className="text-muted-foreground/45" />
+            <text x={cx - 10} y={y + 3.5} textAnchor="end" className="fill-muted-foreground/70" fontSize={10} fontFamily="monospace" fontWeight="600">
               {String(h === 24 ? 0 : h).padStart(2, "0")}
             </text>
           </g>
