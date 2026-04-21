@@ -19,6 +19,8 @@ import {
   GAP,
   RAIL_PADDING,
   RAIL_LINE_X,
+  MOBILE_RAIL_BOTTOM_CLEARANCE,
+  DESKTOP_RAIL_BOTTOM_CLEARANCE,
 } from "./shared"
 import { useCardGestures } from "./useCardGestures"
 import { useRailInteraction } from "./useRailInteraction"
@@ -64,6 +66,9 @@ export function ListView({
   const [cardPositions, setCardPositions] = useState<{ top: number; bottom: number }[]>([])
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const [ghostCardPositions, setGhostCardPositions] = useState<Map<string, { top: number; bottom: number }>>(new Map())
+  const [isMobileViewport, setIsMobileViewport] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 640
+  )
 
   // Refs
   const highlightSourceRef = useRef<"rail" | "card" | null>(null)
@@ -84,8 +89,26 @@ export function ListView({
       onContextMenu: (entry, x, y) => setContextMenu({ entry, x, y }),
     })
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const media = window.matchMedia("(max-width: 639px)")
+    const updateViewport = () => setIsMobileViewport(media.matches)
+    updateViewport()
+    media.addEventListener?.("change", updateViewport)
+    return () => media.removeEventListener?.("change", updateViewport)
+  }, [])
+
+  const railBottomClearance = isMobileViewport ? MOBILE_RAIL_BOTTOM_CLEARANCE : DESKTOP_RAIL_BOTTOM_CLEARANCE
+  const railActiveBottom = Math.max(RAIL_PADDING, railHeight - RAIL_PADDING - railBottomClearance)
+
   const { hoverTime, setHoverTime, isTouching, handleRailHover, handleRailClick } =
-    useRailInteraction({ railRef, railHeight, onRailCreate })
+    useRailInteraction({
+      railRef,
+      railHeight,
+      activeTop: RAIL_PADDING,
+      activeBottom: railActiveBottom,
+      onRailCreate,
+    })
 
   // One-time swipe hint: auto-peek first card on mobile
   useEffect(() => {
@@ -102,7 +125,7 @@ export function ListView({
   }, [entries, setSwipedEntryId])
 
   // Computed
-  const usableHeight = Math.max(0, railHeight - RAIL_PADDING * 2)
+  const usableHeight = Math.max(0, railHeight - RAIL_PADDING * 2 - railBottomClearance)
   const timeToRailY = useCallback(
     (timeStr: string): number => RAIL_PADDING + (timeToMinutes(timeStr) / 1440) * usableHeight,
     [usableHeight]
