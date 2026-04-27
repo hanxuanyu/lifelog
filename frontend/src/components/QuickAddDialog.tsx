@@ -271,12 +271,15 @@ function QuickAddDialogInner({
     setSubmitting(true)
     try {
       if (editEntry) {
-        await updateLog(editEntry.id, {
+        const updatedEntry = await updateLog(editEntry.id, {
           log_time: timeValue,
           event_type: eventValue.trim(),
           detail: detailValue.trim() || undefined,
         })
         toast.success("更新成功")
+        if (eventValue.trim() !== editEntry.event && updatedEntry.category === "未分类") {
+          onUncategorized?.(eventValue.trim())
+        }
         window.dispatchEvent(new CustomEvent("entryUpdated", { detail: editEntry.id }))
       } else {
         const entry = await createLog({
