@@ -13,8 +13,6 @@ function setMobileToastLift(value: number) {
 const Toaster = ({ ...props }: ToasterProps) => {
   const { isDark } = useTheme()
   const { toasts } = useSonner()
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 640
-
   useEffect(() => {
     if (typeof window === "undefined") return
 
@@ -112,7 +110,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={isDark ? "dark" : "light"}
       className="toaster group"
-      position={isMobile ? "bottom-center" : "bottom-left"}
+      position="bottom-right"
       closeButton
       icons={{
         success: (
