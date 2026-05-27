@@ -5,6 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { getTokens, createAPIToken, revokeToken, revokeAllTokens } from "@/api"
 import type { TokenInfo } from "@/api"
 import { toast } from "sonner"
@@ -59,6 +63,8 @@ export function TokenManagementCard() {
   const [createdToken, setCreatedToken] = useState("")
   const [copied, setCopied] = useState(false)
   const [revoking, setRevoking] = useState<string | null>(null)
+  const [revokeAllOpen, setRevokeAllOpen] = useState(false)
+  const [revokingAll, setRevokingAll] = useState(false)
 
   const currentTokenID = getCurrentTokenID()
 
@@ -89,13 +95,16 @@ export function TokenManagementCard() {
   }
 
   const handleRevokeAll = async () => {
-    if (!confirm("确定要吊销所有其他令牌吗？其他设备将被强制登出。")) return
+    setRevokingAll(true)
     try {
       await revokeAllTokens()
       toast.success("已吊销所有其他令牌")
       setTokens((prev) => prev.filter((t) => t.id === currentTokenID))
+      setRevokeAllOpen(false)
     } catch {
       toast.error("操作失败")
+    } finally {
+      setRevokingAll(false)
     }
   }
 
@@ -218,7 +227,7 @@ export function TokenManagementCard() {
                   创建 API 令牌
                 </Button>
                 {tokens.length > 1 && (
-                  <Button variant="outline" size="sm" className="text-xs text-destructive hover:text-destructive" onClick={handleRevokeAll}>
+                  <Button variant="outline" size="sm" className="text-xs text-destructive hover:text-destructive" onClick={() => setRevokeAllOpen(true)}>
                     吊销所有其他
                   </Button>
                 )}
@@ -267,6 +276,30 @@ export function TokenManagementCard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={revokeAllOpen} onOpenChange={setRevokeAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>吊销所有其他令牌</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要吊销所有其他令牌吗？其他设备将被强制登出，当前设备会保持登录。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={revokingAll}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault()
+                handleRevokeAll()
+              }}
+              disabled={revokingAll}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {revokingAll ? "吊销中..." : "确认吊销"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
