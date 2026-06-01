@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Lifelog app icon">
+  <defs>
+    <filter id="soft-shadow" x="-15%" y="-12%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#111113" flood-opacity="0.18"/>
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#111113" flood-opacity="0.12"/>
+    </filter>
+    <linearGradient id="cover" x1="512" y1="168" x2="512" y2="856" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EFE9DE"/>
+    </linearGradient>
+    <linearGradient id="spine" x1="512" y1="226" x2="512" y2="814" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F7F5EF"/>
+      <stop offset="1" stop-color="#D8D2C5"/>
+    </linearGradient>
+    <linearGradient id="bookmark" x1="347" y1="224" x2="347" y2="390" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F97316"/>
+      <stop offset="1" stop-color="#EA580C"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="224" fill="#F4F1EA"/>
+  <rect x="78" y="78" width="868" height="868" rx="186" fill="#FBFAF7"/>
+  <circle cx="236" cy="202" r="116" fill="#FFFFFF" opacity="0.56"/>
+
+  <g filter="url(#soft-shadow)">
+    <path
+      d="M188 275c0-37 30-67 67-67h164c38 0 72 13 93 37 21-24 55-37 93-37h164c37 0 67 30 67 67v408c0 37-30 67-67 67H614c-44 0-78 12-102 38-24-26-58-38-102-38H255c-37 0-67-30-67-67V275Z"
+      fill="#2F3338"
+    />
+    <path
+      d="M218 283c0-27 22-49 49-49h151c37 0 66 15 82 40v456c-25-18-55-27-91-27H267c-27 0-49-22-49-49V283Z"
+      fill="url(#cover)"
+    />
+    <path
+      d="M524 274c16-25 45-40 82-40h151c27 0 49 22 49 49v371c0 27-22 49-49 49H615c-36 0-66 9-91 27V274Z"
+      fill="url(#cover)"
+    />
+    <path
+      d="M500 268c0-14 11-25 25-25s25 11 25 25v461c0 22-18 40-38 52-20-12-38-30-38-52V268h26Z"
+      fill="url(#spine)"
+    />
+  </g>
+
+  <path d="M294 238h107v166l-54-40-53 40V238Z" fill="#2F3338"/>
+  <path d="M318 238h58v116l-29-22-29 22V238Z" fill="url(#bookmark)"/>
+
+  <rect x="294" y="471" width="142" height="28" rx="14" fill="#2F3338"/>
+  <rect x="294" y="550" width="182" height="28" rx="14" fill="#2F3338" opacity="0.92"/>
+  <rect x="294" y="629" width="112" height="28" rx="14" fill="#2F3338" opacity="0.78"/>
+
+  <rect x="610" y="333" width="228" height="28" rx="14" fill="#2F3338" opacity="0.16"/>
+  <rect x="610" y="501" width="228" height="28" rx="14" fill="#2F3338" opacity="0.16"/>
+  <rect x="610" y="669" width="228" height="28" rx="14" fill="#2F3338" opacity="0.16"/>
+
+  <circle cx="632" cy="347" r="26" fill="#3B82F6"/>
+  <circle cx="632" cy="515" r="26" fill="#10B981"/>
+  <circle cx="632" cy="683" r="26" fill="#F97316"/>
+
+  <path
+    d="M512 263v496"
+    fill="none"
+    stroke="#2F3338"
+    stroke-width="20"
+    stroke-linecap="round"
+    opacity="0.14"
+  />
+</svg>
