@@ -1,8 +1,6 @@
 package repository
 
 import (
-	"errors"
-
 	"github.com/hxuanyu/lifelog/internal/model"
 	"gorm.io/gorm"
 )
@@ -89,11 +87,14 @@ func GetEntriesByDateRange(startDate, endDate string) ([]model.LogEntry, error) 
 // GetLastEntryBefore 获取指定日期之前最近的一条日志（用于跨天衔接）
 func GetLastEntryBefore(date string) (*model.LogEntry, error) {
 	var entry model.LogEntry
-	err := DB.Where("log_date < ?", date).
+	found, err := findFirst(DB.Where("log_date < ?", date).
 		Order("log_date DESC, log_time DESC").
-		First(&entry).Error
+		Limit(1), &entry)
 	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, nil
 	}
 	return &entry, nil
 }
@@ -101,11 +102,14 @@ func GetLastEntryBefore(date string) (*model.LogEntry, error) {
 // GetFirstEntryAfter 获取指定日期之后最近的一条日志（用于跨天衔接）
 func GetFirstEntryAfter(date string) (*model.LogEntry, error) {
 	var entry model.LogEntry
-	err := DB.Where("log_date > ?", date).
+	found, err := findFirst(DB.Where("log_date > ?", date).
 		Order("log_date ASC, log_time ASC").
-		First(&entry).Error
+		Limit(1), &entry)
 	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, nil
 	}
 	return &entry, nil
 }
@@ -130,40 +134,48 @@ func GetDistinctEventTypes() ([]string, error) {
 // GetAdjacentEntries 获取某条日志前后相邻的原始日志记录
 func GetAdjacentEntries(entry model.LogEntry) (*model.LogEntry, *model.LogEntry, error) {
 	var prev model.LogEntry
-	prevErr := DB.
+	prevFound, prevErr := findFirst(DB.
 		Where(
 			"log_date < ? OR (log_date = ? AND log_time < ?) OR (log_date = ? AND log_time = ? AND id < ?)",
 			entry.LogDate, entry.LogDate, entry.LogTime, entry.LogDate, entry.LogTime, entry.ID,
 		).
 		Order("log_date DESC, log_time DESC, id DESC").
-		First(&prev).Error
-	if prevErr != nil && !errors.Is(prevErr, gorm.ErrRecordNotFound) {
+		Limit(1), &prev)
+	if prevErr != nil {
 		return nil, nil, prevErr
 	}
 
 	var next model.LogEntry
-	nextErr := DB.
+	nextFound, nextErr := findFirst(DB.
 		Where(
 			"log_date > ? OR (log_date = ? AND log_time > ?) OR (log_date = ? AND log_time = ? AND id > ?)",
 			entry.LogDate, entry.LogDate, entry.LogTime, entry.LogDate, entry.LogTime, entry.ID,
 		).
 		Order("log_date ASC, log_time ASC, id ASC").
-		First(&next).Error
-	if nextErr != nil && !errors.Is(nextErr, gorm.ErrRecordNotFound) {
+		Limit(1), &next)
+	if nextErr != nil {
 		return nil, nil, nextErr
 	}
 
 	var prevPtr *model.LogEntry
-	if prevErr == nil {
+	if prevFound {
 		prevPtr = &prev
 	}
 
 	var nextPtr *model.LogEntry
-	if nextErr == nil {
+	if nextFound {
 		nextPtr = &next
 	}
 
 	return prevPtr, nextPtr, nil
+}
+
+func findFirst(tx *gorm.DB, dest interface{}) (bool, error) {
+	result := tx.Find(dest)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
 }
 
 func applyFilters(tx *gorm.DB, q LogEntryQuery) *gorm.DB {

@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import { motion } from "framer-motion"
 import { Lock, Eye, EyeOff } from "lucide-react"
+import { isAxiosError } from "axios"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,6 +10,40 @@ import { toast } from "sonner"
 
 interface LoginPageProps {
   onLogin: (token: string) => void
+}
+
+function getLoginErrorDescription(err: unknown) {
+  if (!isAxiosError(err)) {
+    return "登录请求处理失败，请稍后重试"
+  }
+
+  if (!err.response) {
+    if (err.code === "ECONNABORTED") {
+      return "连接后端服务超时，请稍后重试"
+    }
+    return "后端服务暂不可用，请确认服务已启动或稍后重试"
+  }
+
+  const status = err.response.status
+  const message = (err.response.data as { message?: string } | undefined)?.message
+
+  if (status === 401) {
+    return message || "密码错误"
+  }
+  if (status === 400) {
+    return message || "登录参数有误，请检查后重试"
+  }
+  if (status === 404) {
+    return "登录接口暂不可用，请确认后端服务版本和路由配置"
+  }
+  if (status === 502 || status === 503 || status === 504) {
+    return "后端服务暂不可用，请稍后重试"
+  }
+  if (status >= 500) {
+    return message || "后端服务异常，请稍后重试"
+  }
+
+  return message || `登录请求失败 (${status})`
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
@@ -24,8 +59,8 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       const data = await login(password)
       localStorage.setItem("token", data.token)
       onLogin(data.token)
-    } catch {
-      toast.error("登录失败", { description: "密码错误" })
+    } catch (err) {
+      toast.error("登录失败", { description: getLoginErrorDescription(err) })
     } finally {
       setLoading(false)
     }
