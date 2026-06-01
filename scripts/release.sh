@@ -1,7 +1,25 @@
 #!/usr/bin/env bash
+#
+# Lifelog 发布标签辅助脚本。
+#
+# 用途：
+#   创建或更新语义化版本标签，并推送到 origin。推送标签后通常会触发
+#   GitHub Actions 中的 release workflow。
+#
+# 用法：
+#   ./scripts/release.sh v0.0.1
+#
+# 安全检查：
+#   - 标签必须符合 v<major>.<minor>.<patch> 格式。
+#   - 当前分支必须是 main。
+#   - 工作区和暂存区必须干净。
+#   - 打标签前会从 origin/main 拉取最新状态。
+#
+# 注意：
+#   - 本地标签会通过 `git tag -f` 重建。
+#   - 远端标签会通过 `git push --force` 覆盖，请仅用于明确要发布的版本标签。
 set -euo pipefail
 
-# Usage: ./scripts/release.sh v0.0.1
 if [ $# -ne 1 ]; then
   echo "Usage: $0 <tag>  (e.g. v0.0.1)"
   exit 1

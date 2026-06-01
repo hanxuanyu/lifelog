@@ -1,13 +1,27 @@
 #!/usr/bin/env bash
+#
+# Lifelog Linux/macOS 安装、更新、卸载脚本。
+#
+# 用途：
+#   从 GitHub Releases 下载 Lifelog 发布包并安装到 /opt/lifelog，
+#   创建独立系统用户，注册 systemd 服务，并在更新/卸载时保留已有数据。
+#
+# 用法：
+#   sudo bash scripts/install.sh
+#   sudo bash scripts/install.sh v0.0.3
+#   sudo bash scripts/install.sh --uninstall
+#
+# 行为：
+#   - 不传版本号时，通过 GitHub Releases API 获取最新版本。
+#   - 传入版本号时，下载指定版本的发布包。
+#   - 更新模式会停止服务、替换二进制、修正权限并重新启动服务。
+#   - 卸载模式会移除服务和二进制，但保留 /opt/lifelog 下的数据与日志。
+#
+# 依赖：
+#   - root 权限
+#   - curl、tar、find、systemctl、useradd
+#   - 支持 linux/darwin 的 amd64/arm64 发布包；systemd 服务面向 Linux 主机。
 set -euo pipefail
-
-# ============================================================
-# Lifelog 安装/更新/卸载脚本
-# 用法:
-#   安装或更新(latest):  sudo bash install.sh
-#   安装指定版本:        sudo bash install.sh v0.0.3
-#   卸载:               sudo bash install.sh --uninstall
-# ============================================================
 
 APP_NAME="lifelog"
 INSTALL_DIR="/opt/${APP_NAME}"

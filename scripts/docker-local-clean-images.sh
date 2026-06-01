@@ -1,4 +1,23 @@
 #!/usr/bin/env bash
+#
+# Lifelog 本地 Docker 历史镜像清理脚本。
+#
+# 用途：
+#   清理本地构建流程产生的旧 dangling 镜像，只处理带有 Lifelog 本地构建
+#   标签的镜像，并输出当前镜像是否存在以便确认。
+#
+# 用法：
+#   ./scripts/docker-local-clean-images.sh
+#
+# 环境变量：
+#   LIFELOG_LOCAL_IMAGE_REPO   本地镜像仓库名，默认 lifelog-local。
+#   LIFELOG_IMAGE_TAG          当前镜像标签，默认 main。
+#   LIFELOG_IMAGE_PRUNE_UNTIL  镜像清理年龄阈值，默认 168h。
+#
+# 行为：
+#   - 解析变量前会加载项目根目录下可选的 .env。
+#   - 仅对 dangling=true、label=io.lifelog.local-build=true 且超过年龄阈值的
+#     镜像执行 `docker image prune`。
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
