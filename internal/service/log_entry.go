@@ -65,7 +65,7 @@ func CreateLogMarker(req model.LogMarkerRequest) (*model.LogEntry, error) {
 		LogTime:       parsedTime,
 		EventType:     "",
 		Detail:        "",
-		TimePointMode: "mark",
+		TimePointMode: "end",
 	}
 
 	if err := repository.CreateLogEntry(entry); err != nil {

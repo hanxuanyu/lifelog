@@ -127,6 +127,8 @@ export function RailSvg({
       {entries.map((entry, i) => {
         const durItem = getDurationForEntry(i)
         if (durItem && !durItem.unknown && durItem.start_time && durItem.end_time) return null
+        const isMarker = entry.is_marker || entry.time_point_mode === "mark"
+        if (isMarker) return null
         const dotY = timeToRailY(formatTime(entry.log_time))
         const color = getCategoryColor(entry.category)
         const isHl = highlightIndex === i

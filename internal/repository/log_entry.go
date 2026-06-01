@@ -158,7 +158,7 @@ func GetStaleMarkers(cutoffDate, cutoffTime string, limit int) ([]model.LogEntry
 	}
 
 	var entries []model.LogEntry
-	err := DB.Where("time_point_mode = ? AND event_type = '' AND detail = ''", "mark").
+	err := DB.Where("event_type = '' AND detail = ''").
 		Where("log_date < ? OR (log_date = ? AND log_time <= ?)", cutoffDate, cutoffDate, cutoffTime).
 		Order("log_date ASC, log_time ASC").
 		Limit(limit).
@@ -232,9 +232,9 @@ func applyFilters(tx *gorm.DB, q LogEntryQuery) *gorm.DB {
 	}
 	if q.Marker != nil {
 		if *q.Marker {
-			tx = tx.Where("time_point_mode = ? AND event_type = '' AND detail = ''", "mark")
+			tx = tx.Where("event_type = '' AND detail = ''")
 		} else {
-			tx = tx.Where("NOT (time_point_mode = ? AND event_type = '' AND detail = '')", "mark")
+			tx = tx.Where("NOT (event_type = '' AND detail = '')")
 		}
 	}
 	return tx

@@ -25,7 +25,6 @@ export function CurveSvg({
         const color = getCategoryColor(entry.category)
         const durItem = getDurationForEntry(i)
         const isHl = highlightIndex === i
-
         if (durItem && !durItem.unknown && durItem.start_time && durItem.end_time) {
           return (
             <g key={entry.id}>

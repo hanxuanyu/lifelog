@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Pencil, Trash2, Maximize2, CalendarClock, PlayCircle, Flag } from "lucide-react"
+import { Pencil, Trash2, Maximize2, CalendarClock, PlayCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { LogEntry, DurationItem } from "@/types"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
@@ -68,8 +68,19 @@ export function EntryCard({
       .trim()
   }, [entry.detail])
 
+  const isMarker = entry.is_marker || entry.time_point_mode === "mark"
+  const isUncategorized = entry.category === "未分类"
+  const displayEventType = isMarker ? "待补全事项" : entry.event_type
+  const displayCategory = isMarker ? "待完善" : entry.category
+  const hasTimeRange = !!(durItem?.start_time && durItem?.end_time && !durItem.unknown)
+  const timeText = hasTimeRange
+    ? `${formatTime(durItem!.start_time)}~${formatTime(durItem!.end_time)}`
+    : `${formatTime(entry.log_time)}(结束)`
+  const showDuration = !!(durItem && !durItem.unknown && durItem.duration > 0)
+
   const isFuturePlan = useMemo(() => {
     if (!isToday) return false
+    if (isMarker) return false
     if (durItem?.cross_day) return false
 
     const today = new Date()
@@ -79,10 +90,10 @@ export function EntryCard({
 
     const entryTime = durItem?.start_time ? formatTime(durItem.start_time) : formatTime(entry.log_time)
     return timeToMinutes(entryTime) > timeToMinutes(currentTime)
-  }, [currentTime, durItem?.cross_day, durItem?.start_time, entry.log_date, entry.log_time, isToday])
+  }, [currentTime, durItem?.cross_day, durItem?.start_time, entry.log_date, entry.log_time, isMarker, isToday])
 
   const isOngoing = useMemo(() => {
-    if (!isToday || isFuturePlan) return false
+    if (!isToday || isFuturePlan || isMarker) return false
 
     const currentMinutes = timeToMinutes(currentTime)
 
@@ -100,10 +111,7 @@ export function EntryCard({
     }
 
     return false
-  }, [currentTime, durItem, entry.log_time, isFuturePlan, isToday])
-
-  const isMarker = entry.is_marker || entry.time_point_mode === "mark"
-  const isUncategorized = entry.category === "\u672a\u5206\u7c7b"
+  }, [currentTime, durItem, entry.log_time, isFuturePlan, isMarker, isToday])
 
   return (
     <motion.div
@@ -148,35 +156,24 @@ export function EntryCard({
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-1.5">
-                {isMarker ? (
-                  <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
-                    <Flag className="h-3.5 w-3.5" />
-                    {"\u5f85\u8865\u5145"}
-                  </span>
-                ) : (
-                  <>
-                    <span className="truncate text-sm font-medium">{entry.event_type}</span>
-                    <span
-                      className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium${isUncategorized ? " cursor-pointer transition-opacity hover:opacity-80" : ""}`}
-                      style={{ backgroundColor: color, color: getContrastText(color) }}
-                      onClick={isUncategorized ? (event) => { event.stopPropagation(); onAssignCategory(entry.event_type) } : undefined}
-                      title={isUncategorized ? "\u70b9\u51fb\u5206\u914d\u5206\u7c7b" : undefined}
-                    >
-                      {entry.category}
-                    </span>
-                  </>
-                )}
-                <span className="font-mono text-[11px] text-muted-foreground">
-                  {durItem && !durItem.unknown && durItem.start_time && durItem.end_time
-                    ? `${formatTime(durItem.start_time)}~${formatTime(durItem.end_time)}`
-                    : isMarker ? `${formatTime(entry.log_time)}(\u6253\u6807)` : `${formatTime(entry.log_time)}(\u7ed3\u675f)`}
+                <span className="truncate text-sm font-medium">{displayEventType}</span>
+                <span
+                  className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium${isUncategorized && !isMarker ? " cursor-pointer transition-opacity hover:opacity-80" : ""}`}
+                  style={{ backgroundColor: color, color: getContrastText(color) }}
+                  onClick={isUncategorized && !isMarker ? (event) => { event.stopPropagation(); onAssignCategory(entry.event_type) } : undefined}
+                  title={isUncategorized && !isMarker ? "点击分配分类" : undefined}
+                >
+                  {displayCategory}
                 </span>
-                {durItem && !durItem.unknown && durItem.duration > 0 && (
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {timeText}
+                </span>
+                {showDuration && (
                   <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                    {durItem.display}
+                    {durItem!.display}
                   </span>
                 )}
-                {durItem?.unknown && (
+                {durItem?.unknown && !isMarker && (
                   <span className="text-[10px] italic text-muted-foreground/60">{durItem.display}</span>
                 )}
                 {isFuturePlan && (
@@ -231,7 +228,7 @@ export function EntryCard({
                   className="h-6 w-6"
                   onClick={(event) => {
                     event.stopPropagation()
-                    onDetailView(entry.event_type, entry.detail, formatTime(entry.log_time))
+                    onDetailView(displayEventType, entry.detail, formatTime(entry.log_time))
                   }}
                   title="查看详情"
                 >
@@ -284,7 +281,7 @@ export function EntryCard({
               onClick={(event) => {
                 event.stopPropagation()
                 setSwipedEntryId(null)
-                onDetailView(entry.event_type, entry.detail, formatTime(entry.log_time))
+                onDetailView(displayEventType, entry.detail, formatTime(entry.log_time))
               }}
               title="查看详情"
             >

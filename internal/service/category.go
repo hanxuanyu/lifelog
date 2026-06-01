@@ -73,7 +73,7 @@ func ToResponse(e *model.LogEntry) model.LogEntryResponse {
 
 // IsMarkerEntry reports whether a log entry is a temporary time marker.
 func IsMarkerEntry(e model.LogEntry) bool {
-	return e.TimePointMode == "mark" && e.EventType == "" && e.Detail == ""
+	return e.EventType == "" && e.Detail == ""
 }
 
 func matchRegex(pattern, s string) bool {

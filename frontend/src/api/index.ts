@@ -94,6 +94,7 @@ export async function getLogs(params: {
   event_type?: string
   category?: string
   keyword?: string
+  marker?: boolean
   page?: number
   size?: number
 }) {
