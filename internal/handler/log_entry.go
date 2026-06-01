@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hxuanyu/lifelog/internal/events"
@@ -44,6 +45,63 @@ func CreateLogEntry(c *gin.Context) {
 		"log_time": entry.LogTime, "event_type": entry.EventType,
 		"detail": entry.Detail, "category": resp.Category,
 	})
+}
+
+// CreateLogMarker creates a temporary time marker.
+func CreateLogMarker(c *gin.Context) {
+	var req model.LogMarkerRequest
+	if c.Request.Body != nil && c.Request.ContentLength != 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "鍙傛暟閿欒: " + err.Error()})
+			return
+		}
+	}
+
+	entry, err := service.CreateLogMarker(req)
+	if err != nil {
+		slog.Error("鍒涘缓涓存椂鎵撴爣澶辫触", "error", err)
+		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: err.Error()})
+		return
+	}
+
+	resp := service.ToResponse(entry)
+	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "鍒涘缓鎴愬姛", Data: resp})
+	go events.Publish("log.marker.created", map[string]string{
+		"log_id":   fmt.Sprintf("%d", entry.ID),
+		"log_date": entry.LogDate,
+		"log_time": entry.LogTime,
+		"source":   strings.TrimSpace(req.Source),
+	})
+}
+
+// InferLogSuggestions returns likely event candidates for a time point.
+func InferLogSuggestions(c *gin.Context) {
+	var req model.LogSuggestionRequest
+	if c.Request.Body != nil && c.Request.ContentLength != 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: "鍙傛暟閿欒: " + err.Error()})
+			return
+		}
+	}
+	if req.LogDate == "" {
+		req.LogDate = c.Query("log_date")
+	}
+	if req.LogTime == "" {
+		req.LogTime = c.Query("log_time")
+	}
+	if req.Limit == 0 {
+		req.Limit, _ = strconv.Atoi(c.DefaultQuery("limit", "0"))
+	}
+	if req.WindowDays == 0 {
+		req.WindowDays, _ = strconv.Atoi(c.DefaultQuery("window_days", "0"))
+	}
+
+	result, err := service.InferLogSuggestions(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.Response{Code: 400, Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "ok", Data: result})
 }
 
 // GetLogEntry 获取单条日志
@@ -159,6 +217,10 @@ func QueryLogEntries(c *gin.Context) {
 		Keyword:   c.Query("keyword"),
 		Page:      page,
 		Size:      size,
+	}
+	if markerQuery := c.Query("marker"); markerQuery != "" {
+		marker := markerQuery == "true" || markerQuery == "1"
+		q.Marker = &marker
 	}
 	category := c.Query("category")
 

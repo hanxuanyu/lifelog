@@ -21,6 +21,7 @@
 - **键盘快捷键** — `←` `→` 切换日期，`T` 回到今天，`Alt+Shift+N` 快速记录
 - **深浅模式** — 亮色/暗色主题，自动跟随系统偏好
 - **事件与自动化** — 事件总线 + Webhook 推送，内置日报/周报/月报、未记录提醒、未分类提醒、活动提醒等定时任务
+- **外部设备接入** — 提供事项推断与临时打标 API，适合实体按钮、快捷指令、自动化 App 等低打断记录场景
 - **AI 对话与提示词管理** — 内置 AI 对话分析日志，支持自定义提示词模板，AI 页面和定时任务共享提示词库
 - **数据导入导出** — ZIP 格式全量备份与恢复
 
@@ -209,6 +210,7 @@ Lifelog 内置事件总线（Event Bus），系统操作（创建日志、修改
 | `log.created` | 日志创建 | `log_id`, `log_date`, `log_time`, `event_type`, `detail`, `category` |
 | `log.updated` | 日志更新 | `log_id`, `log_date`, `log_time`, `event_type`, `detail`, `category` |
 | `log.deleted` | 日志删除 | `log_id` |
+| `log.marker.created` | 临时打标创建 | `log_id`, `log_date`, `log_time`, `source` |
 | `auth.login.succeeded` | 登录成功 | `ip`, `timestamp` |
 | `auth.password.changed` | 密码修改 | `ip`, `timestamp` |
 | `categories.updated` | 分类规则更新 | `count`, `timestamp` |
@@ -223,6 +225,7 @@ Lifelog 内置事件总线（Event Bus），系统操作（创建日志、修改
 | `task.monthly_report` | 月报生成完成 | `start_date`, `end_date`, `summary`, `total_known`, `day_count`, `detail`, `report_source`, `report_provider`, `report_model`, `timestamp` |
 | `task.no_log_reminder` | 长时间未记录提醒 | `last_log_time`, `idle_hours`, `message`, `timestamp` |
 | `task.uncategorized_reminder` | 未分类事项提醒 | `report_date`, `uncategorized_count`, `message`, `detail`, `timestamp` |
+| `task.stale_marker_reminder` | 临时打标待补充提醒 | `marker_count`, `threshold_hours`, `oldest_marker`, `detail`, `message`, `timestamp` |
 | `task.activity_end_reminder` | 活动结束提醒 | `event_type`, `category`, `start_time`, `end_time`, `duration`, `timestamp` |
 | `task.next_activity_reminder` | 下一活动提醒 | `event_type`, `category`, `start_time`, `timestamp` |
 
@@ -263,6 +266,7 @@ Webhook 的 URL、Headers、Query Params、Body 中可使用 `{{变量名}}` 占
 | 每月月报 | `task.monthly_report` | `0 0 10 1 * *` | 每月 1 日 10:00:00 生成上月汇总 |
 | 未记录提醒 | `task.no_log_reminder` | `0 0 */2 * * *` | 每 2 小时检查，超过 4 小时未记录则提醒 |
 | 未分类提醒 | `task.uncategorized_reminder` | `0 30 21 * * *` | 每天 21:30:00 检查当天未分类事项 |
+| 临时打标提醒 | `task.stale_marker_reminder` | `0 0 */4 * * *` | 每 4 小时检查，超过 24 小时未补全的临时打标则提醒 |
 | 活动提醒 | `task.activity_end_reminder` / `task.next_activity_reminder` | `*/30 * * * * *` | 每 30 秒检查活动结束和下一活动 |
 
 Cron 表达式格式：`秒 分 时 日 月 周`，可在设置页面的「事件绑定」标签页中修改。
@@ -285,6 +289,9 @@ scheduled_tasks:
     enabled: false
   - name: uncategorized_reminder
     cron: "0 30 21 * * *"
+    enabled: false
+  - name: stale_marker_reminder
+    cron: "0 0 */4 * * *"
     enabled: false
 ```
 
@@ -367,6 +374,119 @@ mcp:
   }
 }
 ```
+
+## 外部设备/API 接入
+
+除网页和 MCP 外，Lifelog 也提供面向硬件设备、快捷指令、自动化 App 的轻量 API。典型场景是：用户不打开页面，只通过一个实体按钮或外部自动化触发记录；之后再回到时间线补全事项。
+
+调用这些接口需要认证。可以在设置页创建 API Token，然后通过请求头传入：
+
+```http
+Authorization: Bearer <your-api-token>
+```
+
+### 接口清单
+
+| 接口 | 方法 | 说明 |
+| ---- | ---- | ---- |
+| `/api/logs/suggestions` | `GET` / `POST` | 根据指定时间点推断可能刚完成的事项，返回候选列表 |
+| `/api/logs/markers` | `POST` | 创建临时打标，只记录时间点，不填写事项、分类和详情 |
+| `/api/logs` | `POST` | 根据调用方选择的候选事项或手动输入内容创建正式日志 |
+| `/api/logs/{id}` | `PUT` | 将临时打标补全为正式日志，或修改已有日志 |
+| `/api/logs?marker=true` | `GET` | 查询仍未补全的临时打标 |
+
+### 事项推断
+
+`/api/logs/suggestions` 会基于历史日志的相近时间、同星期和近期频率返回候选事项，不会直接写入日志。
+
+GET 示例：
+
+```bash
+curl -H "Authorization: Bearer $LIFELOG_TOKEN" \
+  "http://localhost:8080/api/logs/suggestions?log_date=2026-06-01&log_time=18:30&limit=5"
+```
+
+POST 示例：
+
+```bash
+curl -X POST "http://localhost:8080/api/logs/suggestions" \
+  -H "Authorization: Bearer $LIFELOG_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"log_date":"2026-06-01","log_time":"18:30","limit":5,"window_days":90}'
+```
+
+响应示例：
+
+```json
+{
+  "code": 200,
+  "message": "ok",
+  "data": {
+    "log_date": "2026-06-01",
+    "log_time": "18:30:00",
+    "candidates": [
+      {
+        "event_type": "通勤",
+        "category": "交通",
+        "score": 72.5,
+        "reason": "相近时间出现 8 次，同星期出现 2 次，近两周出现 3 次",
+        "last_used_at": "2026-05-31 18:24:00",
+        "count": 12
+      }
+    ]
+  }
+}
+```
+
+调用方可以展示 `candidates` 给用户选择，也可以让用户手动输入事项后调用 `/api/logs` 创建正式日志：
+
+```bash
+curl -X POST "http://localhost:8080/api/logs" \
+  -H "Authorization: Bearer $LIFELOG_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"log_date":"2026-06-01","log_time":"18:30","event_type":"通勤","detail":"下班回家"}'
+```
+
+### 临时打标
+
+`/api/logs/markers` 用于“先记一个时间点，事后再补内容”。接口不需要事项名称，适合实体按钮、NFC 标签、手机快捷指令等低打断入口。
+
+不传 body 时，默认使用服务器当前日期和时间：
+
+```bash
+curl -X POST "http://localhost:8080/api/logs/markers" \
+  -H "Authorization: Bearer $LIFELOG_TOKEN"
+```
+
+也可以显式传入时间和来源：
+
+```bash
+curl -X POST "http://localhost:8080/api/logs/markers" \
+  -H "Authorization: Bearer $LIFELOG_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"log_date":"2026-06-01","log_time":"14:05","source":"desk-button"}'
+```
+
+临时打标会在时间线显示为“待补充”，不参与分类统计；补全时调用更新接口即可转为正式日志：
+
+```bash
+curl -X PUT "http://localhost:8080/api/logs/123" \
+  -H "Authorization: Bearer $LIFELOG_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"log_time":"14:05","event_type":"深度工作","detail":"完成接口设计"}'
+```
+
+### 示例接入：桌面实体按钮
+
+一个低打断工作流可以这样设计：
+
+1. 在 Lifelog 设置页创建一个名为 `desk-button` 的 API Token。
+2. 将实体按钮、Home Assistant、Node-RED、ESP32 或手机快捷指令配置为按下时请求 `POST /api/logs/markers`。
+3. 用户工作时只按一下按钮，Lifelog 生成一个当前时间点的临时打标。
+4. 用户稍后打开 Lifelog，在时间线中点击“待补充”卡片，填写事项和详情。
+5. 启用 `stale_marker_reminder` 定时任务，并将 `task.stale_marker_reminder` 绑定到 Webhook；超过阈值仍未补全的打标会被自动提醒。
+
+这个流程适合会议开始/结束、番茄钟切换、实验记录、工位按钮、NFC 贴纸等场景：先保存时间线锚点，减少当下上下文切换，事后再补充语义信息。
 
 ## API 文档
 

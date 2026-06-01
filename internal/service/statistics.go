@@ -190,6 +190,10 @@ func calculateDurations(entries []model.LogEntry, currentDate string, prevEntry 
 	}
 
 	items := make([]model.DurationItem, len(entries))
+	var prevConcrete *model.LogEntry
+	if prevEntry != nil && !IsMarkerEntry(*prevEntry) {
+		prevConcrete = prevEntry
+	}
 
 	for i, e := range entries {
 		items[i] = model.DurationItem{
@@ -197,39 +201,49 @@ func calculateDurations(entries []model.LogEntry, currentDate string, prevEntry 
 			Category:  MatchCategory(e.EventType),
 		}
 
-		logTime := e.LogTime[:5] // "HH:mm"
+		logTime := e.LogTime[:5]
 		items[i].EndTime = logTime
-		if i == 0 {
-			if prevEntry == nil {
-				items[i].Unknown = true
-				items[i].Display = "未知起点"
-				continue
-			}
-			prevTime := prevEntry.LogTime[:5]
-			items[i].StartTime = prevTime
-			items[i].CrossDay = prevEntry.LogDate != currentDate
-			dur := crossDayDiffSeconds(prevEntry.LogDate, prevTime, currentDate, logTime)
-			items[i].Duration = dur
-			items[i].Display = formatDuration(dur)
+		if IsMarkerEntry(e) {
+			items[i].Unknown = true
+			items[i].StartTime = logTime
+			items[i].Display = "待补充"
 			continue
 		}
 
-		prevTime := entries[i-1].LogTime[:5]
+		if prevConcrete == nil {
+			items[i].Unknown = true
+			items[i].Display = "未知起点"
+			prevConcrete = &entries[i]
+			continue
+		}
+
+		if prevConcrete.LogDate != currentDate {
+			prevTime := prevConcrete.LogTime[:5]
+			items[i].StartTime = prevTime
+			items[i].CrossDay = true
+			dur := crossDayDiffSeconds(prevConcrete.LogDate, prevTime, currentDate, logTime)
+			items[i].Duration = dur
+			items[i].Display = formatDuration(dur)
+			prevConcrete = &entries[i]
+			continue
+		}
+
+		prevTime := prevConcrete.LogTime[:5]
 		items[i].StartTime = prevTime
-		dur := timeDiffSeconds(entries[i-1].LogTime, e.LogTime)
+		dur := timeDiffSeconds(prevConcrete.LogTime, e.LogTime)
 		items[i].Duration = dur
 		items[i].Display = formatDuration(dur)
+		prevConcrete = &entries[i]
 	}
 
 	return items
 }
-
 func buildSummary(items []model.DurationItem) ([]model.CategorySummary, int) {
 	catMap := make(map[string]int)
 	totalKnown := 0
 
 	for _, item := range items {
-		if !item.Unknown {
+		if !item.Unknown && item.Category != "" {
 			catMap[item.Category] += item.Duration
 			totalKnown += item.Duration
 		}

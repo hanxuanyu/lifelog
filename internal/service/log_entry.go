@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hxuanyu/lifelog/internal/model"
@@ -11,12 +12,17 @@ import (
 
 // CreateLogEntry 新增日志条目
 func CreateLogEntry(req model.LogEntryRequest) (*model.LogEntry, error) {
+	eventType := strings.TrimSpace(req.EventType)
+	if eventType == "" {
+		return nil, fmt.Errorf("事项不能为空")
+	}
+
 	logTime, err := util.ParseTime(req.LogTime)
 	if err != nil {
 		return nil, fmt.Errorf("时间格式错误: %w", err)
 	}
 
-	logDate := req.LogDate
+	logDate := strings.TrimSpace(req.LogDate)
 	if logDate == "" {
 		logDate = time.Now().Format("2006-01-02")
 	}
@@ -24,9 +30,42 @@ func CreateLogEntry(req model.LogEntryRequest) (*model.LogEntry, error) {
 	entry := &model.LogEntry{
 		LogDate:       logDate,
 		LogTime:       logTime,
-		EventType:     req.EventType,
-		Detail:        req.Detail,
+		EventType:     eventType,
+		Detail:        strings.TrimSpace(req.Detail),
 		TimePointMode: "end",
+	}
+
+	if err := repository.CreateLogEntry(entry); err != nil {
+		return nil, fmt.Errorf("保存日志失败: %w", err)
+	}
+	return entry, nil
+}
+
+// CreateLogMarker 创建一个仅包含时间点的临时打标，后续可补全为正式日志。
+func CreateLogMarker(req model.LogMarkerRequest) (*model.LogEntry, error) {
+	logDate := strings.TrimSpace(req.LogDate)
+	logTime := strings.TrimSpace(req.LogTime)
+	if logDate == "" || logTime == "" {
+		now := time.Now()
+		if logDate == "" {
+			logDate = now.Format("2006-01-02")
+		}
+		if logTime == "" {
+			logTime = now.Format("15:04")
+		}
+	}
+
+	parsedTime, err := util.ParseTime(logTime)
+	if err != nil {
+		return nil, fmt.Errorf("时间格式错误: %w", err)
+	}
+
+	entry := &model.LogEntry{
+		LogDate:       logDate,
+		LogTime:       parsedTime,
+		EventType:     "",
+		Detail:        "",
+		TimePointMode: "mark",
 	}
 
 	if err := repository.CreateLogEntry(entry); err != nil {
@@ -60,12 +99,19 @@ func UpdateLogEntry(id uint, req model.LogEntryRequest) (*model.LogEntry, error)
 		entry.LogTime = logTime
 	}
 	if req.LogDate != "" {
-		entry.LogDate = req.LogDate
+		entry.LogDate = strings.TrimSpace(req.LogDate)
 	}
 	if req.EventType != "" {
-		entry.EventType = req.EventType
+		eventType := strings.TrimSpace(req.EventType)
+		if eventType == "" {
+			return nil, fmt.Errorf("事项不能为空")
+		}
+		entry.EventType = eventType
+		if entry.EventType != "" && entry.TimePointMode == "mark" {
+			entry.TimePointMode = "end"
+		}
 	}
-	entry.Detail = req.Detail
+	entry.Detail = strings.TrimSpace(req.Detail)
 
 	if err := repository.UpdateLogEntry(entry); err != nil {
 		return nil, fmt.Errorf("更新日志失败: %w", err)

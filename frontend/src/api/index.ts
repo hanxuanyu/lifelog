@@ -3,6 +3,8 @@ import type {
   ApiResponse,
   LogEntry,
   LogEntryRequest,
+  LogMarkerRequest,
+  LogSuggestionResponse,
   PageResult,
   Category,
   DailyStatistics,
@@ -67,6 +69,21 @@ export async function setPassword(oldPassword: string, newPassword: string) {
 // Logs
 export async function createLog(data: LogEntryRequest) {
   const res = await http.post<ApiResponse<LogEntry>>("/logs", data)
+  return res.data.data
+}
+
+export async function createLogMarker(data: LogMarkerRequest = {}) {
+  const res = await http.post<ApiResponse<LogEntry>>("/logs/markers", data)
+  return res.data.data
+}
+
+export async function getLogSuggestions(params?: {
+  log_date?: string
+  log_time?: string
+  limit?: number
+  window_days?: number
+}) {
+  const res = await http.get<ApiResponse<LogSuggestionResponse>>("/logs/suggestions", { params })
   return res.data.data
 }
 
