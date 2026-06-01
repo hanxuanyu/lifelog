@@ -10,7 +10,6 @@ interface RailSvgProps {
   crossDayHints: CrossDayHint[]
   getCategoryColor: (category: string) => string
   getDurationForEntry: (index: number) => DurationItem | null
-  getEntryMode: (entry: LogEntry) => string
   durationToEntryMap: Map<number, number>
   highlightIndex: number | null
   highlightSourceRef: React.MutableRefObject<"rail" | "card" | null>
@@ -20,16 +19,15 @@ interface RailSvgProps {
   hoverTime: string | null
   hoverRailY: number
   isTouching: boolean
-  timePointMode: string
   currentTime: string
   hoverGapInfo: { gapDisplay: string; prevTime: string; detail: string; crossDay: boolean } | null
 }
 
 export function RailSvg({
   railHeight, usableHeight, timeToRailY, durationItems, entries, crossDayHints,
-  getCategoryColor, getDurationForEntry, getEntryMode, durationToEntryMap,
+  getCategoryColor, getDurationForEntry, durationToEntryMap,
   highlightIndex, highlightSourceRef, setHighlightIndex,
-  isToday, currentTimeRailY, hoverTime, hoverRailY, isTouching, timePointMode, currentTime,
+  isToday, currentTimeRailY, hoverTime, hoverRailY, isTouching, currentTime,
   hoverGapInfo,
 }: RailSvgProps) {
   if (railHeight <= 0) return null
@@ -77,9 +75,8 @@ export function RailSvg({
         }
 
         if (item.cross_day) {
-          const entryMode = item.time_point_mode || (entryIdx !== undefined ? getEntryMode(entries[entryIdx]) : timePointMode)
-          const y1 = entryMode === "end" ? timeToRailY("00:00") : timeToRailY(formatTime(item.start_time))
-          const y2 = entryMode === "end" ? timeToRailY(formatTime(item.end_time)) : timeToRailY("23:59")
+          const y1 = timeToRailY("00:00")
+          const y2 = timeToRailY(formatTime(item.end_time))
           if (y2 <= y1) return null
           return (
             <rect key={`seg-${i}`} x={cx - 4} y={y1} width={8} height={y2 - y1} rx={4}

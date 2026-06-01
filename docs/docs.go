@@ -1719,9 +1719,6 @@ const docTemplate = `{
                         "$ref": "#/definitions/model.CategorySummary"
                     }
                 },
-                "time_point_mode": {
-                    "type": "string"
-                },
                 "total_known": {
                     "description": "已知时长总秒数",
                     "type": "integer"
@@ -1792,10 +1789,6 @@ const docTemplate = `{
                 },
                 "start_time": {
                     "description": "HH:mm",
-                    "type": "string"
-                },
-                "time_point_mode": {
-                    "description": "该条目创建时的模式",
                     "type": "string"
                 },
                 "unknown": {
@@ -1877,9 +1870,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "log_time": {
-                    "type": "string"
-                },
-                "time_point_mode": {
                     "type": "string"
                 },
                 "time_range": {

@@ -242,7 +242,6 @@ func buildFallbackDailyReport(stats *model.DailyStatistics) string {
 	sb.WriteString(fmt.Sprintf("- 记录事项：%d 条\n", len(stats.Items)))
 	sb.WriteString(fmt.Sprintf("- 已知总时长：%s\n", formatSeconds(stats.TotalKnown)))
 	sb.WriteString(fmt.Sprintf("- 分类数量：%d 类\n", len(stats.Summary)))
-	sb.WriteString(fmt.Sprintf("- 记录模式：`%s`\n", stats.TimePointMode))
 	if unknownCount > 0 {
 		sb.WriteString(fmt.Sprintf("- 未知时长片段：%d 条\n", unknownCount))
 	}

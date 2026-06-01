@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hxuanyu/lifelog/internal/config"
 	"github.com/hxuanyu/lifelog/internal/events"
 	"github.com/hxuanyu/lifelog/internal/model"
 	"github.com/hxuanyu/lifelog/internal/repository"
@@ -73,8 +72,7 @@ func (t *ActivityReminderTask) Execute(cfg model.ScheduledTaskConfig) (map[strin
 	window := 60 * time.Second
 
 	for i, entry := range entries {
-		mode := entryMode(&entries[i])
-		endTime, startTime, ok := resolveEndTime(entries, i, mode, today)
+		endTime, startTime, ok := resolveEndTime(entries, i)
 		if !ok {
 			continue
 		}
@@ -84,10 +82,9 @@ func (t *ActivityReminderTask) Execute(cfg model.ScheduledTaskConfig) (map[strin
 			continue
 		}
 
-		// In "end" mode, the entry itself marks the end of an activity.
-		// If the entry was created recently (within the polling window of its end time),
-		// it means the user just manually logged the end — no need to remind.
-		if mode == "end" && !entry.CreatedAt.IsZero() {
+		// The entry itself marks the end of an activity. If it was created
+		// close to its end time, the user just logged it manually.
+		if !entry.CreatedAt.IsZero() {
 			if entry.CreatedAt.Sub(endTime).Abs() <= window {
 				continue
 			}
@@ -111,7 +108,7 @@ func (t *ActivityReminderTask) Execute(cfg model.ScheduledTaskConfig) (map[strin
 		// Try next activity reminder first; fall back to end reminder.
 		nextPublished := false
 		if hasNextBinding {
-			nextPublished = publishNextActivityReminder(entries, i, mode, today, entry, category, endTime, now)
+			nextPublished = publishNextActivityReminder(entries, i, entry, category, endTime, now)
 		}
 
 		if !nextPublished && hasEndBinding {
@@ -135,90 +132,34 @@ func (t *ActivityReminderTask) Execute(cfg model.ScheduledTaskConfig) (map[strin
 	return nil, nil
 }
 
-// entryMode returns the time point mode for an entry, falling back to global config.
-func entryMode(e *model.LogEntry) string {
-	if e.TimePointMode == "start" || e.TimePointMode == "end" {
-		return e.TimePointMode
-	}
-	return config.GetTimePointMode()
-}
-
 // resolveEndTime calculates the end time and start time for a given entry.
 // Returns (endTime, startTime, ok).
-func resolveEndTime(entries []model.LogEntry, idx int, mode, today string) (time.Time, time.Time, bool) {
+func resolveEndTime(entries []model.LogEntry, idx int) (time.Time, time.Time, bool) {
 	entry := entries[idx]
-	entryTime, err := parseEntryTime(&entry)
+	endTime, err := parseEntryTime(&entry)
 	if err != nil {
 		return time.Time{}, time.Time{}, false
 	}
 
-	switch mode {
-	case "end":
-		// End mode: LogTime is the end time. Start time comes from previous entry.
-		endTime := entryTime
-		var startTime time.Time
-		if idx > 0 {
-			prev := entries[idx-1]
-			st, err := parseEntryTime(&prev)
-			if err == nil {
-				startTime = st
-			}
+	startTime := endTime
+	if idx > 0 {
+		prev := entries[idx-1]
+		if st, err := parseEntryTime(&prev); err == nil {
+			startTime = st
 		}
-		return endTime, startTime, true
-
-	case "start":
-		// Start mode: LogTime is the start time. End time comes from next entry.
-		startTime := entryTime
-		if idx >= len(entries)-1 {
-			return time.Time{}, time.Time{}, false // no next entry, activity ongoing
-		}
-		next := entries[idx+1]
-		endTime, err := parseEntryTime(&next)
-		if err != nil {
-			return time.Time{}, time.Time{}, false
-		}
-		return endTime, startTime, true
 	}
-
-	return time.Time{}, time.Time{}, false
+	return endTime, startTime, true
 }
 
 // publishNextActivityReminder checks for a subsequent activity after the ended one
 // and publishes a next_activity_reminder event if found. Returns true if published.
-func publishNextActivityReminder(entries []model.LogEntry, idx int, mode, today string, ended model.LogEntry, endedCategory string, endedTime, now time.Time) bool {
-	var nextEntry *model.LogEntry
-
-	switch mode {
-	case "end":
-		// In end mode, the next entry in timeline is the next activity.
-		if idx+1 < len(entries) {
-			nextEntry = &entries[idx+1]
-		}
-	case "start":
-		// In start mode, the next entry is the one that provided the end time (idx+1).
-		// The activity AFTER that is idx+2.
-		if idx+2 < len(entries) {
-			nextEntry = &entries[idx+2]
-		}
-	}
-
-	if nextEntry == nil {
+func publishNextActivityReminder(entries []model.LogEntry, idx int, ended model.LogEntry, endedCategory string, endedTime, now time.Time) bool {
+	if idx+1 >= len(entries) {
 		return false
 	}
 
+	nextEntry := &entries[idx+1]
 	nextCategory := service.MatchCategory(nextEntry.EventType)
-	nextMode := entryMode(nextEntry)
-	nextStartTime := ""
-	nextEndTime := ""
-
-	switch nextMode {
-	case "start":
-		nextStartTime = nextEntry.LogTime[:5]
-	case "end":
-		// In end mode, start time is the previous entry's time (which is the ended entry's end time).
-		nextStartTime = endedTime.Format("15:04")
-		nextEndTime = nextEntry.LogTime[:5]
-	}
 
 	msg := fmt.Sprintf("[%s] 已结束，接下来是 [%s]", ended.EventType, nextEntry.EventType)
 	events.Publish(nextActivityReminderEvent, map[string]string{
@@ -229,8 +170,8 @@ func publishNextActivityReminder(entries []model.LogEntry, idx int, mode, today 
 		"next_event_type":  nextEntry.EventType,
 		"next_category":    nextCategory,
 		"next_detail":      nextEntry.Detail,
-		"next_start_time":  nextStartTime,
-		"next_end_time":    nextEndTime,
+		"next_start_time":  endedTime.Format("15:04"),
+		"next_end_time":    nextEntry.LogTime[:5],
 		"message":          msg,
 		"timestamp":        now.Format("2006-01-02 15:04:05"),
 	})

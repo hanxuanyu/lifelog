@@ -16,7 +16,6 @@ interface EntryCardProps {
   swipedEntryId: number | null
   isToday: boolean
   currentTime: string
-  getEntryMode: (entry: LogEntry) => string
   onCardClick: (entry: LogEntry) => void
   onCardContextMenu: (e: React.MouseEvent, entry: LogEntry) => void
   onCardTouchStart: (e: React.TouchEvent, entry: LogEntry) => void
@@ -43,7 +42,6 @@ export function EntryCard({
   swipedEntryId,
   isToday,
   currentTime,
-  getEntryMode,
   onCardClick,
   onCardContextMenu,
   onCardTouchStart,
@@ -92,13 +90,7 @@ export function EntryCard({
       const startMinutes = timeToMinutes(formatTime(durItem.start_time))
       const endMinutes = timeToMinutes(formatTime(durItem.end_time))
 
-      if (durItem.cross_day) {
-        const mode = durItem.time_point_mode || getEntryMode(entry)
-        if (mode === "end") {
-          return currentMinutes < endMinutes
-        }
-        return currentMinutes >= startMinutes
-      }
+      if (durItem.cross_day) return currentMinutes < endMinutes
 
       return currentMinutes >= startMinutes && currentMinutes < endMinutes
     }
@@ -108,7 +100,7 @@ export function EntryCard({
     }
 
     return false
-  }, [currentTime, durItem, entry, getEntryMode, isFuturePlan, isToday])
+  }, [currentTime, durItem, entry.log_time, isFuturePlan, isToday])
 
   const isUncategorized = entry.category === "未分类"
 
@@ -167,7 +159,7 @@ export function EntryCard({
                 <span className="font-mono text-[11px] text-muted-foreground">
                   {durItem && !durItem.unknown && durItem.start_time && durItem.end_time
                     ? `${formatTime(durItem.start_time)}~${formatTime(durItem.end_time)}`
-                    : `${formatTime(entry.log_time)}(${getEntryMode(entry) === "end" ? "结束" : "开始"})`}
+                    : `${formatTime(entry.log_time)}(结束)`}
                 </span>
                 {durItem && !durItem.unknown && durItem.duration > 0 && (
                   <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">

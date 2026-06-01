@@ -10,9 +10,8 @@ import (
 
 func TestBuildFallbackDailyReportUsesMarkdownSections(t *testing.T) {
 	report := buildFallbackDailyReport(&model.DailyStatistics{
-		Date:          "2026-04-10",
-		TotalKnown:    8100,
-		TimePointMode: "end",
+		Date:       "2026-04-10",
+		TotalKnown: 8100,
 		Summary: []model.CategorySummary{
 			{Category: "Work", Duration: 5400, Display: "1h30m", Percentage: 66.7},
 			{Category: "Growth", Duration: 2700, Display: "45m", Percentage: 33.3},

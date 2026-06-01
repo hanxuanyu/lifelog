@@ -3,7 +3,6 @@ package service
 import (
 	"strings"
 
-	"github.com/hxuanyu/lifelog/internal/config"
 	"github.com/hxuanyu/lifelog/internal/model"
 	"github.com/hxuanyu/lifelog/internal/repository"
 )
@@ -24,41 +23,25 @@ func enrichTimeRanges(entries []model.LogEntry, responses []model.LogEntryRespon
 			continue
 		}
 
-		prev, next, err := repository.GetAdjacentEntries(entry)
+		prev, _, err := repository.GetAdjacentEntries(entry)
 		if err != nil {
 			return nil, err
 		}
 
-		resp.TimeRange = buildTimeRange(entry, prev, next)
+		resp.TimeRange = buildTimeRange(entry, prev)
 	}
 
 	return responses, nil
 }
 
-func buildTimeRange(entry model.LogEntry, prev, next *model.LogEntry) string {
+func buildTimeRange(entry model.LogEntry, prev *model.LogEntry) string {
 	currentTime := trimClock(entry.LogTime)
 
-	switch getEntryModeForRange(entry) {
-	case "start":
-		if next != nil && getEntryModeForRange(*next) == "start" {
-			return formatTimeEdge(entry.LogDate, trimClock(entry.LogTime), entry.LogDate) + " ~ " +
-				formatTimeEdge(next.LogDate, trimClock(next.LogTime), entry.LogDate)
-		}
-		return formatTimeEdge(entry.LogDate, currentTime, entry.LogDate) + " ~ ..."
-	default:
-		if prev != nil && getEntryModeForRange(*prev) == "end" {
-			return formatTimeEdge(prev.LogDate, trimClock(prev.LogTime), entry.LogDate) + " ~ " +
-				formatTimeEdge(entry.LogDate, currentTime, entry.LogDate)
-		}
-		return "... ~ " + formatTimeEdge(entry.LogDate, currentTime, entry.LogDate)
+	if prev != nil {
+		return formatTimeEdge(prev.LogDate, trimClock(prev.LogTime), entry.LogDate) + " ~ " +
+			formatTimeEdge(entry.LogDate, currentTime, entry.LogDate)
 	}
-}
-
-func getEntryModeForRange(entry model.LogEntry) string {
-	if entry.TimePointMode == "start" || entry.TimePointMode == "end" {
-		return entry.TimePointMode
-	}
-	return config.GetTimePointMode()
+	return "... ~ " + formatTimeEdge(entry.LogDate, currentTime, entry.LogDate)
 }
 
 func trimClock(value string) string {

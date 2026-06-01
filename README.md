@@ -153,7 +153,7 @@ make build-all      # 跨平台构建（6 个平台）
 
 | 文件 | 说明 | 热重载 |
 | ---- | ---- | ------ |
-| `config.yaml` | 基础配置：服务端口、数据库路径、认证、时间点模式、AI、MCP | 部分支持 |
+| `config.yaml` | 基础配置：服务端口、数据库路径、认证、AI、MCP | 部分支持 |
 | `categories.yaml` | 分类规则配置 | 是 |
 | `webhooks.yaml` | Webhook、事件绑定与定时任务配置 | 是 |
 | `prompts.yaml` | 自定义提示词模板 | 是 |
@@ -166,7 +166,6 @@ make build-all      # 跨平台构建（6 个平台）
 | `server.db_path` | 数据库文件路径 | `./data/lifelog.db` | 否 |
 | `auth.jwt_secret` | JWT 密钥（建议修改） | `change-me-to-a-random-string` | 否 |
 | `auth.jwt_expire_hours` | 登录有效期（小时） | `168`（7 天） | 否 |
-| `time_point_mode` | 时间点模式（`start` / `end`） | `end` | 是 |
 | `ai.providers` | AI 服务提供商配置 | `[]` | 是 |
 | `mcp.enabled` | 启用 MCP 服务 | `false` | 否 |
 | `mcp.port` | MCP 服务端口 | `8081` | 否 |
@@ -182,7 +181,6 @@ make build-all      # 跨平台构建（6 个平台）
 | `LIFELOG_AUTH_JWT_SECRET` | `auth.jwt_secret` |
 | `LIFELOG_AUTH_JWT_EXPIRE_HOURS` | `auth.jwt_expire_hours` |
 | `LIFELOG_AUTH_PASSWORD_HASH` | `auth.password_hash` |
-| `LIFELOG_TIME_POINT_MODE` | `time_point_mode` |
 | `LIFELOG_MCP_ENABLED` | `mcp.enabled` |
 | `LIFELOG_MCP_PORT` | `mcp.port` |
 
