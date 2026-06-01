@@ -44,11 +44,10 @@ type aiProvidersConfig struct {
 }
 
 type baseFileConfig struct {
-	Server        serverConfig      `mapstructure:"server" yaml:"server"`
-	Auth          authConfig        `mapstructure:"auth" yaml:"auth"`
-	TimePointMode string            `mapstructure:"time_point_mode" yaml:"time_point_mode"`
-	AI            aiProvidersConfig `mapstructure:"ai" yaml:"ai"`
-	MCP           mcpConfig         `mapstructure:"mcp" yaml:"mcp"`
+	Server serverConfig      `mapstructure:"server" yaml:"server"`
+	Auth   authConfig        `mapstructure:"auth" yaml:"auth"`
+	AI     aiProvidersConfig `mapstructure:"ai" yaml:"ai"`
+	MCP    mcpConfig         `mapstructure:"mcp" yaml:"mcp"`
 }
 
 type categoriesFileConfig struct {
@@ -136,7 +135,6 @@ func Init() {
 		"dir", configDir,
 		"port", GetPort(),
 		"db_path", GetDBPath(),
-		"time_point_mode", GetTimePointMode(),
 		"categories_count", len(GetCategories()),
 		"webhooks_count", len(GetWebhooks()),
 		"ai_providers_count", len(GetAIProviders()),
@@ -198,7 +196,6 @@ func applyBaseDefaults(cfg *viper.Viper) {
 	cfg.SetDefault("auth.password_hash", defaults.Auth.PasswordHash)
 	cfg.SetDefault("auth.jwt_secret", defaults.Auth.JWTSecret)
 	cfg.SetDefault("auth.jwt_expire_hours", defaults.Auth.JWTExpireHours)
-	cfg.SetDefault("time_point_mode", defaults.TimePointMode)
 	cfg.SetDefault("ai.providers", defaults.AI.Providers)
 	cfg.SetDefault("ai.default_model", defaults.AI.DefaultModel)
 	cfg.SetDefault("mcp.enabled", defaults.MCP.Enabled)
@@ -236,7 +233,6 @@ func defaultBaseConfig() baseFileConfig {
 			JWTSecret:      "change-me-to-a-random-string",
 			JWTExpireHours: 168,
 		},
-		TimePointMode: "end",
 		AI: aiProvidersConfig{
 			Providers:    []model.AIProvider{},
 			DefaultModel: "",
@@ -404,18 +400,6 @@ func GetDBPath() string {
 	return dbPath
 }
 
-// GetTimePointMode returns start or end mode.
-func GetTimePointMode() string {
-	mode := strings.TrimSpace(baseViper.GetString("time_point_mode"))
-	if envMode, ok := envString("LIFELOG_TIME_POINT_MODE"); ok {
-		mode = envMode
-	}
-	if mode != "start" {
-		return "end"
-	}
-	return "start"
-}
-
 // GetJWTSecret returns the JWT secret.
 func GetJWTSecret() string {
 	if secret, ok := envString("LIFELOG_AUTH_JWT_SECRET"); ok {
@@ -464,15 +448,6 @@ func SetAuthBackupConfig(passwordHash, jwtSecret *string, jwtExpireHours *int) e
 	if jwtExpireHours != nil && *jwtExpireHours > 0 {
 		baseViper.Set("auth.jwt_expire_hours", *jwtExpireHours)
 	}
-	return baseViper.WriteConfig()
-}
-
-// SetTimePointMode persists the time point mode into config.yaml.
-func SetTimePointMode(mode string) error {
-	if mode != "start" && mode != "end" {
-		mode = "end"
-	}
-	baseViper.Set("time_point_mode", mode)
 	return baseViper.WriteConfig()
 }
 

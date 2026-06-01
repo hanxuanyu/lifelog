@@ -8,7 +8,6 @@ import { getSettings, updateSettings } from "@/api"
 import { toast } from "sonner"
 import { VersionInfoCard } from "@/components/settings/VersionInfoCard"
 import { ServerMonitorCard } from "@/components/settings/ServerMonitorCard"
-import { TimePointModeCard } from "@/components/settings/TimePointModeCard"
 import { NavigationStyleCard } from "@/components/settings/NavigationStyleCard"
 import { ServerConfigCard } from "@/components/settings/ServerConfigCard"
 import { AuthConfigCard } from "@/components/settings/AuthConfigCard"
@@ -36,14 +35,13 @@ export function SettingsPage() {
   const [highlightedSection, setHighlightedSection] = useState<string | null>(null)
 
   // Settings save group
-  const [timePointMode, setTimePointMode] = useState("end")
   const [serverPort, setServerPort] = useState(8080)
   const [dbPath, setDbPath] = useState("./data/lifelog.db")
   const [jwtExpireHours, setJwtExpireHours] = useState(168)
   const [mcpEnabled, setMcpEnabled] = useState(false)
   const [mcpPort, setMcpPort] = useState(8081)
   const [origSettings, setOrigSettings] = useState({
-    timePointMode: "end", serverPort: 8080, dbPath: "", jwtExpireHours: 168, mcpEnabled: false, mcpPort: 8081,
+    serverPort: 8080, dbPath: "", jwtExpireHours: 168, mcpEnabled: false, mcpPort: 8081,
   })
   const [savingSettings, setSavingSettings] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -51,14 +49,12 @@ export function SettingsPage() {
   useEffect(() => {
     getSettings()
       .then((settings) => {
-        setTimePointMode(settings?.time_point_mode || "end")
         setServerPort(settings?.server?.port || 8080)
         setDbPath(settings?.server?.db_path || "./data/lifelog.db")
         setJwtExpireHours(settings?.auth?.jwt_expire_hours || 168)
         setMcpEnabled(settings?.mcp?.enabled || false)
         setMcpPort(settings?.mcp?.port || 8081)
         setOrigSettings({
-          timePointMode: settings?.time_point_mode || "end",
           serverPort: settings?.server?.port || 8080,
           dbPath: settings?.server?.db_path || "./data/lifelog.db",
           jwtExpireHours: settings?.auth?.jwt_expire_hours || 168,
@@ -98,7 +94,6 @@ export function SettingsPage() {
   }, [location.key, location.state])
 
   const settingsDirty =
-    timePointMode !== origSettings.timePointMode ||
     serverPort !== origSettings.serverPort ||
     dbPath !== origSettings.dbPath ||
     jwtExpireHours !== origSettings.jwtExpireHours ||
@@ -109,14 +104,13 @@ export function SettingsPage() {
     setSavingSettings(true)
     try {
       const req: Record<string, unknown> = {}
-      if (timePointMode !== origSettings.timePointMode) req.time_point_mode = timePointMode
       if (serverPort !== origSettings.serverPort) req.server_port = serverPort
       if (dbPath !== origSettings.dbPath) req.server_db_path = dbPath
       if (jwtExpireHours !== origSettings.jwtExpireHours) req.jwt_expire_hours = jwtExpireHours
       if (mcpEnabled !== origSettings.mcpEnabled) req.mcp_enabled = mcpEnabled
       if (mcpPort !== origSettings.mcpPort) req.mcp_port = mcpPort
       const res = await updateSettings(req)
-      setOrigSettings({ timePointMode, serverPort, dbPath, jwtExpireHours, mcpEnabled, mcpPort })
+      setOrigSettings({ serverPort, dbPath, jwtExpireHours, mcpEnabled, mcpPort })
       if (res.data?.need_restart) {
         toast.success("配置已保存", { description: "端口、数据库路径或JWT过期时间的变更需要重启服务后生效" })
       } else { toast.success("配置已保存并实时生效") }
@@ -129,14 +123,12 @@ export function SettingsPage() {
   const handleImportComplete = () => {
     setRefreshKey((k) => k + 1)
     getSettings().then((settings) => {
-      setTimePointMode(settings?.time_point_mode || "end")
       setServerPort(settings?.server?.port || 8080)
       setDbPath(settings?.server?.db_path || "./data/lifelog.db")
       setJwtExpireHours(settings?.auth?.jwt_expire_hours || 168)
       setMcpEnabled(settings?.mcp?.enabled || false)
       setMcpPort(settings?.mcp?.port || 8081)
       setOrigSettings({
-        timePointMode: settings?.time_point_mode || "end",
         serverPort: settings?.server?.port || 8080,
         dbPath: settings?.server?.db_path || "./data/lifelog.db",
         jwtExpireHours: settings?.auth?.jwt_expire_hours || 168,
@@ -216,9 +208,6 @@ export function SettingsPage() {
 
             <TabsContent value="basic">
               <div className="space-y-4">
-                <div id="time-point-mode" className={getSectionClassName("time-point-mode")}>
-                  <TimePointModeCard value={timePointMode} onChange={setTimePointMode} />
-                </div>
                 <div id="navigation-style" className={getSectionClassName("navigation-style")}>
                   <NavigationStyleCard value={navigationStyle} onChange={setNavigationStyle} />
                 </div>

@@ -56,11 +56,10 @@ func UpdateCategories(c *gin.Context) {
 // @Router /api/settings [get]
 func GetSettings(c *gin.Context) {
 	settings := map[string]interface{}{
-		"time_point_mode": config.GetTimePointMode(),
-		"server":          config.GetServerConfig(),
-		"auth":            config.GetAuthConfig(),
-		"ai":              config.GetAIConfig(),
-		"mcp":             config.GetMCPConfig(),
+		"server": config.GetServerConfig(),
+		"auth":   config.GetAuthConfig(),
+		"ai":     config.GetAIConfig(),
+		"mcp":    config.GetMCPConfig(),
 	}
 	c.JSON(http.StatusOK, model.Response{Code: 200, Message: "ok", Data: settings})
 }
@@ -74,7 +73,6 @@ func GetSettings(c *gin.Context) {
 // @Router /api/settings [put]
 func UpdateSettings(c *gin.Context) {
 	var req struct {
-		TimePointMode  *string `json:"time_point_mode"`
 		ServerPort     *int    `json:"server_port"`
 		ServerDBPath   *string `json:"server_db_path"`
 		JWTExpireHours *int    `json:"jwt_expire_hours"`
@@ -88,15 +86,6 @@ func UpdateSettings(c *gin.Context) {
 	}
 
 	needRestart := false
-
-	if req.TimePointMode != nil {
-		if err := config.SetTimePointMode(*req.TimePointMode); err != nil {
-			slog.Error("设置时间模式失败", "error", err, "mode", *req.TimePointMode)
-			c.JSON(http.StatusInternalServerError, model.Response{Code: 500, Message: "保存失败: " + err.Error()})
-			return
-		}
-		slog.Info("时间模式已更新", "mode", *req.TimePointMode)
-	}
 
 	if req.ServerPort != nil || req.ServerDBPath != nil {
 		port := 0

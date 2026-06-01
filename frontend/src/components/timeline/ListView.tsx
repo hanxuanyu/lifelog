@@ -40,7 +40,6 @@ interface ListViewProps {
   prevDayLastTime?: string
   isToday: boolean
   currentTime: string
-  timePointMode?: string
   onEditRequest?: (entry: LogEntry) => void
   onRailCreate?: (time: string) => void
   highlightedEntryId?: number | null
@@ -49,13 +48,8 @@ interface ListViewProps {
 export function ListView({
   entries, durationItems, onUpdate, onDeleteRequest, getCategoryColor,
   getDurationForEntry, crossDayHints = [], prevDayLastTime, isToday, currentTime,
-  timePointMode = "end", onEditRequest, onRailCreate, highlightedEntryId,
+  onEditRequest, onRailCreate, highlightedEntryId,
 }: ListViewProps) {
-  const getEntryMode = useCallback(
-    (entry: LogEntry) => entry.time_point_mode || timePointMode,
-    [timePointMode]
-  )
-
   // State
   const [detailDialog, setDetailDialog] = useState<{ title: string; detail: string; time: string } | null>(null)
   const [assignDialog, setAssignDialog] = useState<{ open: boolean; eventType: string }>({ open: false, eventType: "" })
@@ -153,12 +147,6 @@ export function ListView({
 
     if (!prevTime) return null
 
-    // Respect time_point_mode: only show gap when previous entry is "end" mode
-    if (prev) {
-      const prevMode = prev.time_point_mode || timePointMode
-      if (prevMode !== "end") return null
-    }
-
     const gap = prev
       ? hoverMins - timeToMinutes(prevTime)
       : hoverMins + (24 * 60 - timeToMinutes(prevTime)) // cross-day: remaining of prev day + current day
@@ -171,7 +159,7 @@ export function ListView({
       : `昨日 ${prevTime} ~ ${hoverTime}`
 
     return { gapDisplay, prevTime, detail, crossDay: !prev }
-  }, [hoverTime, entries, prevDayLastTime, timePointMode])
+  }, [hoverTime, entries, prevDayLastTime])
 
   const durationToEntryMap = useMemo(() => {
     const map = new Map<number, number>()
@@ -236,9 +224,7 @@ export function ListView({
       if (durItem && !durItem.unknown && durItem.start_time && durItem.end_time) {
         let railTop: number, railBottom: number
         if (durItem.cross_day) {
-          const mode = durItem.time_point_mode || getEntryMode(entry)
-          if (mode === "end") { railTop = timeToRailY("00:00"); railBottom = timeToRailY(formatTime(durItem.end_time)) }
-          else { railTop = timeToRailY(formatTime(durItem.start_time)); railBottom = timeToRailY("23:59") }
+          railTop = timeToRailY("00:00"); railBottom = timeToRailY(formatTime(durItem.end_time))
         } else { railTop = timeToRailY(formatTime(durItem.start_time)); railBottom = timeToRailY(formatTime(durItem.end_time)) }
         if (railBottom <= railTop) railBottom = railTop + 2
         const railEdge = cx + 3, midX = railEdge + (curveEndX - railEdge) * 0.5
@@ -268,7 +254,7 @@ export function ListView({
       const railEdge = cx + 3, midX = railEdge + (curveEndX - railEdge) * 0.5
       pathEl.setAttribute('d', `M ${railEdge} ${railTop} C ${midX} ${railTop}, ${midX} ${cardTop}, ${curveEndX} ${cardTop} L ${curveEndX} ${cardBottom} C ${midX} ${cardBottom}, ${midX} ${railBottom}, ${railEdge} ${railBottom} Z`)
     })
-  }, [entries, cardPositions, railHeight, getDurationForEntry, getEntryMode, timeToRailY, crossDayHints, ghostCardPositions])
+  }, [entries, cardPositions, railHeight, getDurationForEntry, timeToRailY, crossDayHints, ghostCardPositions])
 
   useEffect(() => {
     const el = cardsScrollRef.current
@@ -345,9 +331,9 @@ export function ListView({
 
   const railSvgProps = {
     railHeight, usableHeight, timeToRailY, durationItems, entries, crossDayHints,
-    getCategoryColor, getDurationForEntry, getEntryMode, durationToEntryMap,
+    getCategoryColor, getDurationForEntry, durationToEntryMap,
     highlightIndex, highlightSourceRef, setHighlightIndex,
-    isToday, currentTimeRailY, hoverTime, hoverRailY, isTouching, timePointMode, currentTime,
+    isToday, currentTimeRailY, hoverTime, hoverRailY, isTouching, currentTime,
     hoverGapInfo,
   }
 
@@ -388,7 +374,7 @@ export function ListView({
                 durItem={getDurationForEntry(index)} highlightIndex={highlightIndex}
                 expandedEntryId={expandedEntryId} swipedEntryId={swipedEntryId}
                 isToday={isToday} currentTime={currentTime}
-                getEntryMode={getEntryMode} onCardClick={handleCardClick}
+                onCardClick={handleCardClick}
                 onCardContextMenu={handleCardContextMenu}
                 onCardTouchStart={handleCardTouchStart} onCardTouchMove={handleCardTouchMove}
                 onCardTouchEnd={handleCardTouchEnd}

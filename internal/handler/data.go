@@ -28,7 +28,6 @@ type exportData struct {
 
 // exportConfig 导出配置的结构
 type exportConfig struct {
-	TimePointMode  string                      `json:"time_point_mode"`
 	Server         exportServerConfig          `json:"server"`
 	Auth           exportAuthConfig            `json:"auth"`
 	AI             exportAIConfig              `json:"ai"`
@@ -103,7 +102,6 @@ func ExportData(c *gin.Context) {
 	}
 
 	cfg := exportConfig{
-		TimePointMode: config.GetTimePointMode(),
 		Server: exportServerConfig{
 			Port:   config.GetPort(),
 			DBPath: config.GetDBPath(),
@@ -334,10 +332,6 @@ func ImportData(c *gin.Context) {
 			for _, configType := range selectedConfigTypes {
 				switch configType {
 				case importConfigBasic:
-					if err := config.SetTimePointMode(cfgData.TimePointMode); err != nil {
-						configErrors = append(configErrors, "设置时间模式失败: "+err.Error())
-						break
-					}
 					if err := config.SetServerConfig(cfgData.Server.Port, cfgData.Server.DBPath); err != nil {
 						configErrors = append(configErrors, "导入服务器配置失败: "+err.Error())
 						break
@@ -352,7 +346,6 @@ func ImportData(c *gin.Context) {
 					}
 					importedTypes = append(importedTypes, configType)
 					restartRequiredTypes = append(restartRequiredTypes, "服务端口", "数据库路径", "MCP 配置")
-					hotReloadedTypes = append(hotReloadedTypes, "时间点模式")
 				case importConfigAuth:
 					if err := config.SetAuthBackupConfig(&cfgData.Auth.PasswordHash, &cfgData.Auth.JWTSecret, &cfgData.Auth.JWTExpireHours); err != nil {
 						configErrors = append(configErrors, "导入认证配置失败: "+err.Error())

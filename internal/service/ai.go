@@ -46,6 +46,8 @@ func BuildLogContext(startDate, endDate string, categories []string) (string, er
 
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("以下是用户在 %s 至 %s 期间的活动日志：\n\n", startDate, endDate))
+	b.WriteString("日志时间说明：每行开头的 HH:MM 是该事项的结束时间，不是开始时间。\n")
+	b.WriteString("时长推断说明：结束时间点模式下，某条日志的开始时间通常由上一条日志时间推断；第一条日志若没有上一条记录，起点未知。\n\n")
 
 	currentDate := ""
 	count := 0

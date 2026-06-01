@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { X, Send, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { EventForm, type SuggestionTag } from "@/components/EventForm"
-import { createLog, updateLog, getCategories, getEventTypes, getTimeline, getSettings } from "@/api"
+import { createLog, updateLog, getCategories, getEventTypes, getTimeline } from "@/api"
 import { formatDuration } from "@/components/timeline/shared"
 import type { Category, LogEntry } from "@/types"
 import { format, parseISO, subDays } from "date-fns"
@@ -36,10 +36,6 @@ function parseTimeToMinutes(time: string): number | null {
   return hours * 60 + minutes
 }
 
-function getEntryMode(entry: Pick<LogEntry, "time_point_mode">, fallbackMode: string) {
-  return entry.time_point_mode || fallbackMode
-}
-
 function diffMinutes(fromDate: string, fromTime: string, toDate: string, toTime: string) {
   const from = new Date(`${fromDate}T${fromTime.slice(0, 5)}:00`)
   const to = new Date(`${toDate}T${toTime.slice(0, 5)}:00`)
@@ -52,7 +48,6 @@ function buildEndModeDurationPreview(
   currentTime: string,
   entries: LogEntry[],
   previousDayLastEntry: LogEntry | null,
-  fallbackMode: string,
 ): DurationPreview | null {
   const currentMinutes = parseTimeToMinutes(currentTime)
   if (currentMinutes === null) return null
@@ -71,15 +66,6 @@ function buildEndModeDurationPreview(
       tone: "muted",
       label: "持续待定",
       detail: "暂无起点",
-    }
-  }
-
-  const previousMode = getEntryMode(previousEntry, fallbackMode)
-  if (previousMode !== "end") {
-    return {
-      tone: "muted",
-      label: "持续待定",
-      detail: "模式边界",
     }
   }
 
@@ -140,7 +126,6 @@ function QuickAddDialogInner({
   const [allEvents, setAllEvents] = useState<string[]>([])
   const [timelineEntries, setTimelineEntries] = useState<LogEntry[]>([])
   const [previousDayEntries, setPreviousDayEntries] = useState<LogEntry[]>([])
-  const [timePointMode, setTimePointMode] = useState<string | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
   const [dataReady, setDataReady] = useState(false)
   const [validationError, setValidationError] = useState(false)
@@ -179,12 +164,10 @@ function QuickAddDialogInner({
         getEventTypes().catch(() => [] as string[]),
         getTimeline(date).catch(() => [] as LogEntry[]),
         getTimeline(previousDate).catch(() => [] as LogEntry[]),
-        getSettings().catch(() => null),
-      ]).then(([cats, types, entries, prevEntries, settings]) => {
+      ]).then(([cats, types, entries, prevEntries]) => {
         setCategories(cats || [])
         setTimelineEntries(entries || [])
         setPreviousDayEntries(prevEntries || [])
-        setTimePointMode(settings?.time_point_mode || null)
         const recent = [...new Set(entries.map((e) => e.event_type))].reverse()
         const fixedEvents: string[] = []
         ;(cats || []).forEach((cat) =>
@@ -213,16 +196,15 @@ function QuickAddDialogInner({
   }, [allEvents, categories])
 
   const endModeDurationPreview = useMemo(() => {
-    if (!dataReady || isEdit || timePointMode !== "end") return null
+    if (!dataReady || isEdit) return null
     const previousDayLastEntry = previousDayEntries.length > 0 ? previousDayEntries[previousDayEntries.length - 1] : null
     return buildEndModeDurationPreview(
       date,
       timeValue,
       timelineEntries,
       previousDayLastEntry,
-      timePointMode,
     )
-  }, [dataReady, isEdit, timePointMode, previousDayEntries, date, timeValue, timelineEntries])
+  }, [dataReady, isEdit, previousDayEntries, date, timeValue, timelineEntries])
 
   const editDurationPreview = useMemo((): DurationPreview | null => {
     if (!dataReady || !isEdit || !editEntry) return null
@@ -230,37 +212,20 @@ function QuickAddDialogInner({
     if (idx < 0) return null
 
     const entry = timelineEntries[idx]
-    const mode = getEntryMode(entry, timePointMode || "end")
-
-    if (mode === "end") {
-      const prevEntry = idx > 0 ? timelineEntries[idx - 1] : null
-      if (!prevEntry) {
-        const prevDayLast = previousDayEntries.length > 0 ? previousDayEntries[previousDayEntries.length - 1] : null
-        if (!prevDayLast) return { tone: "muted", label: "持续待定", detail: "暂无起点" }
-        const prevMode = getEntryMode(prevDayLast, timePointMode || "end")
-        if (prevMode !== "end") return { tone: "muted", label: "持续待定", detail: "模式边界" }
-        const mins = diffMinutes(prevDayLast.log_date, prevDayLast.log_time, entry.log_date, entry.log_time)
-        const display = mins > 0 ? formatDuration(mins * 60) : "0m"
-        const prevTime = prevDayLast.log_time.slice(0, 5)
-        return { tone: "info", label: `持续 ${display}`, detail: `昨日 ${prevTime} ~ 今日 ${entry.log_time.slice(0, 5)}` }
-      }
-      const prevMode = getEntryMode(prevEntry, timePointMode || "end")
-      if (prevMode !== "end") return { tone: "muted", label: "持续待定", detail: "模式边界" }
-      const mins = diffMinutes(prevEntry.log_date, prevEntry.log_time, entry.log_date, entry.log_time)
+    const prevEntry = idx > 0 ? timelineEntries[idx - 1] : null
+    if (!prevEntry) {
+      const prevDayLast = previousDayEntries.length > 0 ? previousDayEntries[previousDayEntries.length - 1] : null
+      if (!prevDayLast) return { tone: "muted", label: "持续待定", detail: "暂无起点" }
+      const mins = diffMinutes(prevDayLast.log_date, prevDayLast.log_time, entry.log_date, entry.log_time)
       const display = mins > 0 ? formatDuration(mins * 60) : "0m"
-      return { tone: "info", label: `持续 ${display}`, detail: `${prevEntry.log_time.slice(0, 5)} ~ ${entry.log_time.slice(0, 5)}` }
+      const prevTime = prevDayLast.log_time.slice(0, 5)
+      return { tone: "info", label: `持续 ${display}`, detail: `昨日 ${prevTime} ~ 今日 ${entry.log_time.slice(0, 5)}` }
     }
 
-    if (mode === "start") {
-      const nextEntry = idx < timelineEntries.length - 1 ? timelineEntries[idx + 1] : null
-      if (!nextEntry) return { tone: "muted", label: "持续待定", detail: "暂无终点" }
-      const mins = diffMinutes(entry.log_date, entry.log_time, nextEntry.log_date, nextEntry.log_time)
-      const display = mins > 0 ? formatDuration(mins * 60) : "0m"
-      return { tone: "info", label: `持续 ${display}`, detail: `${entry.log_time.slice(0, 5)} ~ ${nextEntry.log_time.slice(0, 5)}` }
-    }
-
-    return null
-  }, [dataReady, isEdit, editEntry, timelineEntries, previousDayEntries, timePointMode])
+    const mins = diffMinutes(prevEntry.log_date, prevEntry.log_time, entry.log_date, entry.log_time)
+    const display = mins > 0 ? formatDuration(mins * 60) : "0m"
+    return { tone: "info", label: `持续 ${display}`, detail: `${prevEntry.log_time.slice(0, 5)} ~ ${entry.log_time.slice(0, 5)}` }
+  }, [dataReady, isEdit, editEntry, timelineEntries, previousDayEntries])
 
   const handleSubmit = async () => {
     if (!timeValue.trim() || !eventValue.trim()) {

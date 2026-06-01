@@ -67,14 +67,6 @@ export const SETTINGS_SEARCH_ITEMS: SettingsSearchItem[] = [
     section: "shortcut-settings",
   },
   {
-    id: "time-point-mode",
-    title: "时间点模式",
-    description: "设置日志时间记录为开始时间或结束时间。",
-    keywords: ["时间点", "开始", "结束", "模式", "日志时间"],
-    tab: "basic",
-    section: "time-point-mode",
-  },
-  {
     id: "navigation-style",
     title: "导航样式",
     description: "切换顶部导航、底部导航或悬浮导航。",

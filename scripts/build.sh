@@ -1,4 +1,24 @@
 #!/usr/bin/env bash
+#
+# Lifelog 多平台构建脚本。
+#
+# 用途：
+#   构建前端静态资源，并将 Go 服务端交叉编译为多个平台的发布二进制，
+#   产物输出到 ./bin。
+#
+# 用法：
+#   ./scripts/build.sh
+#   ./scripts/build.sh --skip-frontend
+#
+# 行为：
+#   - 默认在 ./frontend 中执行 `npm install --silent && npm run build`。
+#   - 传入 --skip-frontend 时跳过前端构建，适合 CI 已单独构建前端的场景。
+#   - 从最新 Git tag 和当前 commit 注入版本信息。
+#   - 使用 CGO_ENABLED=0 构建 Linux、macOS、Windows 的 amd64/arm64 二进制。
+#
+# 依赖：
+#   - git、Go、Node.js、npm
+#   - 可从任意目录执行，脚本会自动切换到项目根目录。
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

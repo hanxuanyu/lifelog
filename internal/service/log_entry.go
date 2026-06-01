@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hxuanyu/lifelog/internal/config"
 	"github.com/hxuanyu/lifelog/internal/model"
 	"github.com/hxuanyu/lifelog/internal/repository"
 	"github.com/hxuanyu/lifelog/internal/util"
@@ -27,7 +26,7 @@ func CreateLogEntry(req model.LogEntryRequest) (*model.LogEntry, error) {
 		LogTime:       logTime,
 		EventType:     req.EventType,
 		Detail:        req.Detail,
-		TimePointMode: config.GetTimePointMode(),
+		TimePointMode: "end",
 	}
 
 	if err := repository.CreateLogEntry(entry); err != nil {

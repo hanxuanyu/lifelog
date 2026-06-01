@@ -6,7 +6,6 @@ export interface LogEntry {
   event_type: string
   detail: string
   category: string
-  time_point_mode?: string
   created_at: string
   updated_at: string
 }
@@ -38,7 +37,6 @@ export interface DurationItem {
   cross_day?: boolean
   start_time: string
   end_time: string
-  time_point_mode?: string
 }
 
 export interface CategorySummary {
@@ -61,7 +59,6 @@ export interface DailyStatistics {
   items: DurationItem[]
   summary: CategorySummary[]
   total_known: string
-  time_point_mode: string
   cross_day_hints?: CrossDayHint[]
   prev_day_last_time?: string
 }
@@ -101,7 +98,6 @@ export interface ApiResponse<T = unknown> {
 }
 
 export interface Settings {
-  time_point_mode: string
   server: {
     port: number
     db_path: string
@@ -119,7 +115,6 @@ export interface Settings {
 }
 
 export interface UpdateSettingsRequest {
-  time_point_mode?: string
   server_port?: number
   server_db_path?: string
   jwt_expire_hours?: number

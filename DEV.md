@@ -163,7 +163,6 @@ lifelog/
             │   ├── AuthConfigCard.tsx      # 认证配置
             │   ├── PasswordCard.tsx        # 密码设置
             │   ├── ServerConfigCard.tsx    # 服务器配置
-            │   ├── TimePointModeCard.tsx   # 时间点模式
             │   ├── CategoriesCard.tsx      # 分类管理
             │   ├── ShortcutCard.tsx        # 快捷键设置
             │   ├── DataManagementCard.tsx  # 数据导入导出
@@ -375,14 +374,14 @@ frontend/AISummaryChat.tsx（AI 页面展示提示词按钮）
 
 ### 时间点模式
 
+当前版本固定使用 `end` 模式：
+
 | 模式 | 含义 | 时长计算 |
 | ---- | ---- | ---- |
 | `end` | 记录时间 = 事件结束时间 | 当前时间 - 上一条时间 |
-| `start` | 记录时间 = 事件开始时间 | 下一条时间 - 当前时间 |
 
-- 全局配置 `time_point_mode` 设定默认模式
-- 每条日志可单独记录模式，优先级高于全局
-- 相邻两条模式不同时标记为「模式边界」（Unknown）
+- 新增日志统一写入 `time_point_mode = "end"`
+- 历史日志也统一按结束时间点解释，不再保留 start/end 分支计算
 - 支持跨天事项计算（查询前一天末条 / 后一天首条衔接）
 
 ### 统计系统
@@ -507,7 +506,7 @@ log_entries (
   log_time      VARCHAR(8)  NOT NULL,   -- HH:mm:ss
   event_type    VARCHAR(100) NOT NULL,  -- 事件名称
   detail        TEXT,                    -- Markdown 详情
-  time_point_mode VARCHAR(5),           -- "start" / "end" / ""
+  time_point_mode VARCHAR(5),           -- fixed "end"; retained for compatibility
   created_at    DATETIME,
   updated_at    DATETIME
 )

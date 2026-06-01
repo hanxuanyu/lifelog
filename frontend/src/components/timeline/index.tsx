@@ -14,7 +14,6 @@ interface TimelineProps {
   durationItems?: DurationItem[]
   crossDayHints?: CrossDayHint[]
   prevDayLastTime?: string
-  timePointMode?: string
   onEditRequest?: (entry: LogEntry) => void
   onRailCreate?: (time: string) => void
   externalHighlightedEntryId?: number | null
@@ -29,7 +28,6 @@ export function Timeline({
   durationItems = [],
   crossDayHints = [],
   prevDayLastTime,
-  timePointMode = "end",
   onEditRequest,
   onRailCreate,
   externalHighlightedEntryId,
@@ -142,7 +140,6 @@ export function Timeline({
           prevDayLastTime={prevDayLastTime}
           isToday={isToday}
           currentTime={currentTime}
-          timePointMode={timePointMode}
           onEditRequest={onEditRequest}
           onRailCreate={onRailCreate}
           highlightedEntryId={externalHighlightedEntryId ?? highlightedEntryId}

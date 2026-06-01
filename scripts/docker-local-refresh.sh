@@ -1,4 +1,32 @@
 #!/usr/bin/env bash
+#
+# Lifelog 本地 Docker 环境刷新脚本。
+#
+# 用途：
+#   基于当前 Git 分支刷新本地 Docker 环境：检查工作区、拉取上游最新提交、
+#   构建本地镜像、重建服务、清理旧镜像，并输出服务状态和近期日志。
+#
+# 用法：
+#   ./scripts/docker-local-refresh.sh
+#
+# 必要文件：
+#   - docker-compose-local.yaml
+#   - scripts/docker-local-clean-images.sh
+#   - 可选：项目根目录 .env，用于本地覆盖环境变量。
+#
+# 环境变量：
+#   DOCKER_BUILD_PROGRESS      Docker 构建进度模式，默认 plain。
+#   LIFELOG_LOCAL_IMAGE_REPO   本地镜像仓库名，默认 lifelog-local。
+#   LIFELOG_IMAGE_TAG          镜像标签，默认使用清洗后的当前分支名。
+#   LIFELOG_VERSION            注入构建的版本号，默认当前分支名。
+#   LIFELOG_COMMIT             注入构建的 commit，默认当前 HEAD 短哈希。
+#   LIFELOG_BUILD_NPM_REGISTRY 可选 npm registry，传递给 Docker 构建。
+#   LIFELOG_BUILD_GO_PROXY     可选 Go proxy，传递给 Docker 构建。
+#
+# 安全检查：
+#   - 要求已安装 git 和 Docker Compose。
+#   - 工作区存在未提交或未跟踪文件时拒绝执行。
+#   - detached HEAD 状态下拒绝执行，因为镜像元数据依赖当前分支名。
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
