@@ -126,7 +126,7 @@ export function EntryCard({
         <motion.div
           className={`group cursor-pointer select-none rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm transition-[box-shadow,background-color,border-color] duration-150 active:brightness-90 ${
             highlightIndex === index ? "brightness-95 shadow-md" : "hover:brightness-95"
-          } ${highlighted ? "animate-[pulse_0.8s_ease-in-out_2] ring-2 ring-primary/30" : ""}`}
+          } ${isMarker ? "border-dashed" : ""} ${highlighted ? "animate-[pulse_0.8s_ease-in-out_2] ring-2 ring-primary/30" : ""}`}
           style={{
             backgroundColor: highlightIndex === index ? `${color}33` : `${color}1a`,
             borderColor: highlightIndex === index ? `${color}50` : `${color}33`,
