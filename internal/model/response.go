@@ -15,23 +15,57 @@ type PageResult struct {
 	Items interface{} `json:"items"`
 }
 
-// LogEntryResponse 日志响应 DTO（含动态匹配的大类）
+// LogEntryResponse is the public log DTO.
 type LogEntryResponse struct {
-	ID        uint   `json:"id"`
-	LogDate   string `json:"log_date"`
-	LogTime   string `json:"log_time"`
-	EventType string `json:"event_type"`
-	Detail    string `json:"detail"`
-	Category  string `json:"category"`
-	TimeRange string `json:"time_range,omitempty"`
+	ID            uint   `json:"id"`
+	LogDate       string `json:"log_date"`
+	LogTime       string `json:"log_time"`
+	EventType     string `json:"event_type"`
+	Detail        string `json:"detail"`
+	Category      string `json:"category"`
+	TimePointMode string `json:"time_point_mode"`
+	IsMarker      bool   `json:"is_marker"`
+	TimeRange     string `json:"time_range,omitempty"`
 }
 
-// LogEntryRequest 新增/修改日志请求
+// LogEntryRequest creates or updates a concrete log entry.
 type LogEntryRequest struct {
-	LogDate   string `json:"log_date" binding:"omitempty"` // 可选，默认今天
-	LogTime   string `json:"log_time" binding:"required"`  // 必填，支持多种格式
+	LogDate   string `json:"log_date" binding:"omitempty"`
+	LogTime   string `json:"log_time" binding:"required"`
 	EventType string `json:"event_type" binding:"required"`
 	Detail    string `json:"detail"`
+}
+
+// LogMarkerRequest creates a temporary marker with only a time point.
+type LogMarkerRequest struct {
+	LogDate string `json:"log_date"`
+	LogTime string `json:"log_time"`
+	Source  string `json:"source"`
+}
+
+// LogSuggestionRequest asks the server to infer likely events for a time point.
+type LogSuggestionRequest struct {
+	LogDate    string `json:"log_date"`
+	LogTime    string `json:"log_time"`
+	Limit      int    `json:"limit"`
+	WindowDays int    `json:"window_days"`
+}
+
+// LogSuggestionCandidate is one inferred event candidate.
+type LogSuggestionCandidate struct {
+	EventType  string  `json:"event_type"`
+	Category   string  `json:"category"`
+	Score      float64 `json:"score"`
+	Reason     string  `json:"reason"`
+	LastUsedAt string  `json:"last_used_at,omitempty"`
+	Count      int     `json:"count"`
+}
+
+// LogSuggestionResponse contains inferred candidates for the requested time point.
+type LogSuggestionResponse struct {
+	LogDate    string                   `json:"log_date"`
+	LogTime    string                   `json:"log_time"`
+	Candidates []LogSuggestionCandidate `json:"candidates"`
 }
 
 // LoginRequest 登录请求

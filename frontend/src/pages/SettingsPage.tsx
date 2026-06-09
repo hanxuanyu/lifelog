@@ -20,6 +20,7 @@ import { CategoriesCard } from "@/components/settings/CategoriesCard"
 import { WebhookSettingsCard } from "@/components/settings/WebhookSettingsCard"
 import { EventBindingsCard } from "@/components/settings/EventBindingsCard"
 import { ScheduledTasksCard } from "@/components/settings/ScheduledTasksCard"
+import { ExternalApiTestCard } from "@/components/settings/ExternalApiTestCard"
 import { OnlineDevicesCard } from "@/components/settings/OnlineDevicesCard"
 import { TokenManagementCard } from "@/components/settings/TokenManagementCard"
 import { useNavigationStyle } from "@/hooks/use-navigation-style"
@@ -243,6 +244,9 @@ export function SettingsPage() {
 
             <TabsContent value="automation">
               <div className="space-y-4">
+                <div id="external-api-test" className={getSectionClassName("external-api-test")}>
+                  <ExternalApiTestCard />
+                </div>
                 <div id="webhook-settings" className={getSectionClassName("webhook-settings")}>
                   <WebhookSettingsCard />
                 </div>

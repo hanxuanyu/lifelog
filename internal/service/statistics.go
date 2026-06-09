@@ -9,27 +9,22 @@ import (
 	"github.com/hxuanyu/lifelog/internal/repository"
 )
 
-// GetDailyStatistics 获取某天的统计数据
 func GetDailyStatistics(date string) (*model.DailyStatistics, error) {
 	entries, err := repository.GetTimelineEntries(date)
 	if err != nil {
 		return nil, err
 	}
 
-	// 始终查询前一天最后一条日志（用于跨日时间差计算）
 	var prevEntry *model.LogEntry
-
 	prev, err := repository.GetLastEntryBefore(date)
 	if err == nil {
 		prevEntry = prev
 	}
 
-	items := calculateDurations(entries, date, prevEntry)
+	items := calculateDurationsEndMode(entries, date, prevEntry)
 	summary, totalKnown := buildSummary(items)
 
-	// 生成跨日提示
 	var hints []model.CrossDayHint
-
 	if len(entries) > 0 {
 		nextEntry, err := repository.GetFirstEntryAfter(date)
 		if err == nil && nextEntry != nil && nextEntry.LogDate != date {
@@ -44,7 +39,6 @@ func GetDailyStatistics(date string) (*model.DailyStatistics, error) {
 		}
 	}
 
-	// 获取前一天最后一条日志时间
 	var prevDayLastTime string
 	if prevEntry != nil && prevEntry.LogDate != date {
 		prevDayLastTime = prevEntry.LogTime[:5]
@@ -60,14 +54,12 @@ func GetDailyStatistics(date string) (*model.DailyStatistics, error) {
 	}, nil
 }
 
-// GetWeeklyStatistics 获取某天所在周的统计
 func GetWeeklyStatistics(dateStr string) (*model.PeriodStatistics, error) {
 	t, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
 		return nil, fmt.Errorf("日期格式错误: %w", err)
 	}
 
-	// 计算周一和周日
 	weekday := t.Weekday()
 	if weekday == time.Sunday {
 		weekday = 7
@@ -78,7 +70,6 @@ func GetWeeklyStatistics(dateStr string) (*model.PeriodStatistics, error) {
 	return getPeriodStatistics(monday.Format("2006-01-02"), sunday.Format("2006-01-02"))
 }
 
-// GetMonthlyStatistics 获取某月的统计
 func GetMonthlyStatistics(year, month int) (*model.PeriodStatistics, error) {
 	start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
 	end := start.AddDate(0, 1, -1)
@@ -92,10 +83,8 @@ func getPeriodStatistics(startDate, endDate string) (*model.PeriodStatistics, er
 		return nil, err
 	}
 
-	// 按天分组计算，支持跨天衔接
 	dayGroups := groupByDate(entries)
 
-	// 排序日期
 	var dates []string
 	for d := range dayGroups {
 		dates = append(dates, d)
@@ -103,12 +92,11 @@ func getPeriodStatistics(startDate, endDate string) (*model.PeriodStatistics, er
 	sort.Strings(dates)
 
 	var allItems []model.DurationItem
-
 	for i, date := range dates {
 		dayEntries := dayGroups[date]
 		prevEntry := resolvePreviousEntry(dayGroups, dates, i)
 
-		items := calculateDurations(dayEntries, date, prevEntry)
+		items := calculateDurationsEndMode(dayEntries, date, prevEntry)
 		allItems = append(allItems, items...)
 	}
 
@@ -124,7 +112,6 @@ func getPeriodStatistics(startDate, endDate string) (*model.PeriodStatistics, er
 	}, nil
 }
 
-// GetTrendStatistics 获取日期范围内每天的分类汇总（趋势分析）
 func GetTrendStatistics(startDate, endDate string) (*model.TrendStatistics, error) {
 	entries, err := repository.GetEntriesByDateRange(startDate, endDate)
 	if err != nil {
@@ -140,12 +127,11 @@ func GetTrendStatistics(startDate, endDate string) (*model.TrendStatistics, erro
 	sort.Strings(dates)
 
 	days := make([]model.DayBreakdown, 0, len(dates))
-
 	for i, date := range dates {
 		dayEntries := dayGroups[date]
 		prevEntry := resolvePreviousEntry(dayGroups, dates, i)
 
-		items := calculateDurations(dayEntries, date, prevEntry)
+		items := calculateDurationsEndMode(dayEntries, date, prevEntry)
 		summary, totalKnown := buildSummary(items)
 
 		days = append(days, model.DayBreakdown{
@@ -162,7 +148,6 @@ func GetTrendStatistics(startDate, endDate string) (*model.TrendStatistics, erro
 	}, nil
 }
 
-// resolvePreviousEntry 获取某天的前一条衔接日志
 func resolvePreviousEntry(dayGroups map[string][]model.LogEntry, dates []string, i int) *model.LogEntry {
 	date := dates[i]
 
@@ -182,43 +167,47 @@ func resolvePreviousEntry(dayGroups map[string][]model.LogEntry, dates []string,
 	return nil
 }
 
-// calculateDurations 按结束时间点模式计算持续时间
-// prevEntry: 前一天最后一条记录（用于补全第一条的起点）
-func calculateDurations(entries []model.LogEntry, currentDate string, prevEntry *model.LogEntry) []model.DurationItem {
+func calculateDurationsEndMode(entries []model.LogEntry, currentDate string, prevEntry *model.LogEntry) []model.DurationItem {
 	if len(entries) == 0 {
 		return nil
 	}
 
 	items := make([]model.DurationItem, len(entries))
+	var prevBoundary *model.LogEntry
+	if prevEntry != nil {
+		prevBoundary = prevEntry
+	}
 
 	for i, e := range entries {
+		logTime := e.LogTime[:5]
 		items[i] = model.DurationItem{
 			EventType: e.EventType,
 			Category:  MatchCategory(e.EventType),
+			EndTime:   logTime,
 		}
 
-		logTime := e.LogTime[:5] // "HH:mm"
-		items[i].EndTime = logTime
-		if i == 0 {
-			if prevEntry == nil {
-				items[i].Unknown = true
-				items[i].Display = "未知起点"
-				continue
-			}
-			prevTime := prevEntry.LogTime[:5]
-			items[i].StartTime = prevTime
-			items[i].CrossDay = prevEntry.LogDate != currentDate
-			dur := crossDayDiffSeconds(prevEntry.LogDate, prevTime, currentDate, logTime)
-			items[i].Duration = dur
-			items[i].Display = formatDuration(dur)
+		if prevBoundary == nil {
+			items[i].Unknown = true
+			items[i].StartTime = logTime
+			items[i].Display = "未知起点"
+			prevBoundary = &entries[i]
 			continue
 		}
 
-		prevTime := entries[i-1].LogTime[:5]
+		prevTime := prevBoundary.LogTime[:5]
 		items[i].StartTime = prevTime
-		dur := timeDiffSeconds(entries[i-1].LogTime, e.LogTime)
+
+		var dur int
+		if prevBoundary.LogDate != currentDate {
+			items[i].CrossDay = true
+			dur = crossDayDiffSeconds(prevBoundary.LogDate, prevTime, currentDate, logTime)
+		} else {
+			dur = timeDiffSeconds(prevBoundary.LogTime, e.LogTime)
+		}
+
 		items[i].Duration = dur
 		items[i].Display = formatDuration(dur)
+		prevBoundary = &entries[i]
 	}
 
 	return items
@@ -229,7 +218,7 @@ func buildSummary(items []model.DurationItem) ([]model.CategorySummary, int) {
 	totalKnown := 0
 
 	for _, item := range items {
-		if !item.Unknown {
+		if !item.Unknown && item.EventType != "" && item.Category != "" {
 			catMap[item.Category] += item.Duration
 			totalKnown += item.Duration
 		}
@@ -277,7 +266,6 @@ func timeDiffSeconds(from, to string) int {
 	return diff
 }
 
-// crossDayDiffSeconds 计算跨天的时间差（秒），支持不同日期
 func crossDayDiffSeconds(fromDate, fromTime, toDate, toTime string) int {
 	t1, err1 := time.Parse("2006-01-02 15:04", fromDate+" "+fromTime)
 	t2, err2 := time.Parse("2006-01-02 15:04", toDate+" "+toTime)
@@ -296,7 +284,8 @@ func formatDuration(seconds int) string {
 	m := (seconds % 3600) / 60
 	if h > 0 && m > 0 {
 		return fmt.Sprintf("%dh%dm", h, m)
-	} else if h > 0 {
+	}
+	if h > 0 {
 		return fmt.Sprintf("%dh", h)
 	}
 	return fmt.Sprintf("%dm", m)

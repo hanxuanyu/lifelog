@@ -16,6 +16,9 @@ var (
 
 // MatchCategory 根据当前配置匹配 event_type 到大类名称
 func MatchCategory(eventType string) string {
+	if eventType == "" {
+		return ""
+	}
 	categories := config.GetCategories()
 	for _, cat := range categories {
 		for _, rule := range cat.Rules {
@@ -38,13 +41,16 @@ func MatchCategory(eventType string) string {
 func MatchCategories(entries []model.LogEntry) []model.LogEntryResponse {
 	result := make([]model.LogEntryResponse, len(entries))
 	for i, e := range entries {
+		category := MatchCategory(e.EventType)
 		result[i] = model.LogEntryResponse{
-			ID:        e.ID,
-			LogDate:   e.LogDate,
-			LogTime:   e.LogTime,
-			EventType: e.EventType,
-			Detail:    e.Detail,
-			Category:  MatchCategory(e.EventType),
+			ID:            e.ID,
+			LogDate:       e.LogDate,
+			LogTime:       e.LogTime,
+			EventType:     e.EventType,
+			Detail:        e.Detail,
+			Category:      category,
+			TimePointMode: e.TimePointMode,
+			IsMarker:      IsMarkerEntry(e),
 		}
 	}
 	return result
@@ -52,14 +58,22 @@ func MatchCategories(entries []model.LogEntry) []model.LogEntryResponse {
 
 // ToResponse 单条日志转响应 DTO
 func ToResponse(e *model.LogEntry) model.LogEntryResponse {
+	category := MatchCategory(e.EventType)
 	return model.LogEntryResponse{
-		ID:        e.ID,
-		LogDate:   e.LogDate,
-		LogTime:   e.LogTime,
-		EventType: e.EventType,
-		Detail:    e.Detail,
-		Category:  MatchCategory(e.EventType),
+		ID:            e.ID,
+		LogDate:       e.LogDate,
+		LogTime:       e.LogTime,
+		EventType:     e.EventType,
+		Detail:        e.Detail,
+		Category:      category,
+		TimePointMode: e.TimePointMode,
+		IsMarker:      IsMarkerEntry(*e),
 	}
+}
+
+// IsMarkerEntry reports whether a log entry is a temporary time marker.
+func IsMarkerEntry(e model.LogEntry) bool {
+	return e.EventType == "" && e.Detail == ""
 }
 
 func matchRegex(pattern, s string) bool {

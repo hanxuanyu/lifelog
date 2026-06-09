@@ -115,6 +115,14 @@ export const SETTINGS_SEARCH_ITEMS: SettingsSearchItem[] = [
     section: "webhook-settings",
   },
   {
+    id: "external-api-test",
+    title: "外部 API 测试",
+    description: "测试事项推断、临时打标、待补充打标查询和补全流程。",
+    keywords: ["API", "外部设备", "打标", "事项推断", "硬件", "快捷指令", "marker", "suggestions"],
+    tab: "automation",
+    section: "external-api-test",
+  },
+  {
     id: "event-bindings",
     title: "事件绑定",
     description: "为事件绑定对应的 Webhook。",

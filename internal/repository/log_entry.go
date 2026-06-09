@@ -12,6 +12,7 @@ type LogEntryQuery struct {
 	EndDate   string // 范围查询结束
 	EventType string
 	Keyword   string
+	Marker    *bool
 	Page      int
 	Size      int
 }
@@ -127,8 +128,42 @@ func GetLatestEntry() (*model.LogEntry, error) {
 // GetDistinctEventTypes 获取所有不重复的事项类型
 func GetDistinctEventTypes() ([]string, error) {
 	var types []string
-	err := DB.Model(&model.LogEntry{}).Distinct("event_type").Order("event_type").Pluck("event_type", &types).Error
+	err := DB.Model(&model.LogEntry{}).
+		Where("event_type <> ''").
+		Distinct("event_type").
+		Order("event_type").
+		Pluck("event_type", &types).Error
 	return types, err
+}
+
+// GetSuggestionEntries returns historical concrete entries that can be used for inference.
+func GetSuggestionEntries(startDate, targetDate, targetTime string, limit int) ([]model.LogEntry, error) {
+	if limit <= 0 {
+		limit = 500
+	}
+
+	var entries []model.LogEntry
+	err := DB.Where("log_date >= ? AND event_type <> '' AND time_point_mode <> ?", startDate, "mark").
+		Where("log_date < ? OR (log_date = ? AND log_time <= ?)", targetDate, targetDate, targetTime).
+		Order("log_date DESC, log_time DESC").
+		Limit(limit).
+		Find(&entries).Error
+	return entries, err
+}
+
+// GetStaleMarkers returns temporary markers older than the provided cutoff time.
+func GetStaleMarkers(cutoffDate, cutoffTime string, limit int) ([]model.LogEntry, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	var entries []model.LogEntry
+	err := DB.Where("event_type = '' AND detail = ''").
+		Where("log_date < ? OR (log_date = ? AND log_time <= ?)", cutoffDate, cutoffDate, cutoffTime).
+		Order("log_date ASC, log_time ASC").
+		Limit(limit).
+		Find(&entries).Error
+	return entries, err
 }
 
 // GetAdjacentEntries 获取某条日志前后相邻的原始日志记录
@@ -194,6 +229,13 @@ func applyFilters(tx *gorm.DB, q LogEntryQuery) *gorm.DB {
 	if q.Keyword != "" {
 		like := "%" + q.Keyword + "%"
 		tx = tx.Where("event_type LIKE ? OR detail LIKE ?", like, like)
+	}
+	if q.Marker != nil {
+		if *q.Marker {
+			tx = tx.Where("event_type = '' AND detail = ''")
+		} else {
+			tx = tx.Where("NOT (event_type = '' AND detail = '')")
+		}
 	}
 	return tx
 }

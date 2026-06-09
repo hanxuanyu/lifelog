@@ -3,6 +3,8 @@ import type {
   ApiResponse,
   LogEntry,
   LogEntryRequest,
+  LogMarkerRequest,
+  LogSuggestionResponse,
   PageResult,
   Category,
   DailyStatistics,
@@ -70,6 +72,21 @@ export async function createLog(data: LogEntryRequest) {
   return res.data.data
 }
 
+export async function createLogMarker(data: LogMarkerRequest = {}) {
+  const res = await http.post<ApiResponse<LogEntry>>("/logs/markers", data)
+  return res.data.data
+}
+
+export async function getLogSuggestions(params?: {
+  log_date?: string
+  log_time?: string
+  limit?: number
+  window_days?: number
+}) {
+  const res = await http.get<ApiResponse<LogSuggestionResponse>>("/logs/suggestions", { params })
+  return res.data.data
+}
+
 export async function getLogs(params: {
   date?: string
   start_date?: string
@@ -77,6 +94,7 @@ export async function getLogs(params: {
   event_type?: string
   category?: string
   keyword?: string
+  marker?: boolean
   page?: number
   size?: number
 }) {

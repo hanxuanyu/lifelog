@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { X, Send, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { EventForm, type SuggestionTag } from "@/components/EventForm"
-import { createLog, updateLog, getCategories, getEventTypes, getTimeline } from "@/api"
+import { createLog, updateLog, getCategories, getEventTypes, getTimeline, getLogSuggestions } from "@/api"
 import { formatDuration } from "@/components/timeline/shared"
 import type { Category, LogEntry } from "@/types"
 import { format, parseISO, subDays } from "date-fns"
@@ -164,24 +164,28 @@ function QuickAddDialogInner({
         getEventTypes().catch(() => [] as string[]),
         getTimeline(date).catch(() => [] as LogEntry[]),
         getTimeline(previousDate).catch(() => [] as LogEntry[]),
-      ]).then(([cats, types, entries, prevEntries]) => {
+        !isEdit && timeValue
+          ? getLogSuggestions({ log_date: date, log_time: timeValue, limit: 8 }).catch(() => null)
+          : Promise.resolve(null),
+      ]).then(([cats, types, entries, prevEntries, inferred]) => {
         setCategories(cats || [])
         setTimelineEntries(entries || [])
         setPreviousDayEntries(prevEntries || [])
         const recent = [...new Set(entries.map((e) => e.event_type))].reverse()
+        const inferredEvents = inferred?.candidates?.map((c) => c.event_type) || []
         const fixedEvents: string[] = []
         ;(cats || []).forEach((cat) =>
           cat.rules.forEach((r) => {
             if (r.type === "fixed") fixedEvents.push(r.pattern)
           })
         )
-        setAllEvents([...new Set([...recent, ...fixedEvents, ...types])])
+        setAllEvents([...new Set([...inferredEvents, ...recent, ...fixedEvents, ...types])])
         setDataReady(true)
       })
     }, 250)
     setTimeout(() => eventInputRef.current?.focus(), 100)
     return () => clearTimeout(timer)
-  }, [date])
+  }, [date, isEdit, timeValue])
 
   const suggestions: SuggestionTag[] = useMemo(() => {
     return allEvents.map((name) => {

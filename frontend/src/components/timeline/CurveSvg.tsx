@@ -25,12 +25,16 @@ export function CurveSvg({
         const color = getCategoryColor(entry.category)
         const durItem = getDurationForEntry(i)
         const isHl = highlightIndex === i
-
+        const isMarker = entry.is_marker || entry.time_point_mode === "mark"
         if (durItem && !durItem.unknown && durItem.start_time && durItem.end_time) {
           return (
             <g key={entry.id}>
               <path data-curve-index={i} d="" fill={color}
-                fillOpacity={isHl ? 0.20 : 0.10} stroke="none"
+                fillOpacity={isHl ? 0.20 : 0.10}
+                stroke={isMarker ? color : "none"}
+                strokeWidth={isMarker ? (isHl ? 1.5 : 1) : 0}
+                strokeOpacity={isMarker ? (isHl ? 0.31 : 0.20) : 0}
+                strokeDasharray={isMarker ? "4 3" : undefined}
                 style={{ transition: "fill-opacity 0.15s" }} />
             </g>
           )

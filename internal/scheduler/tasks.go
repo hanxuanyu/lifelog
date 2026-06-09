@@ -383,6 +383,7 @@ func RegisterBuiltinTasks() {
 	RegisterBuiltinTask(&MonthlyReportTask{})
 	RegisterBuiltinTask(&NoLogReminderTask{})
 	RegisterBuiltinTask(&UncategorizedReminderTask{})
+	RegisterBuiltinTask(&StaleMarkerReminderTask{})
 	RegisterBuiltinTask(&ActivityReminderTask{})
 	RegisterBuiltinTask(&SmartReminderAnalyzeTask{})
 	RegisterBuiltinTask(&SmartReminderCheckTask{})

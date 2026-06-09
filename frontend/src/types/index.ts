@@ -6,6 +6,8 @@ export interface LogEntry {
   event_type: string
   detail: string
   category: string
+  time_point_mode: string
+  is_marker: boolean
   created_at: string
   updated_at: string
 }
@@ -15,6 +17,27 @@ export interface LogEntryRequest {
   log_time: string
   event_type: string
   detail?: string
+}
+
+export interface LogMarkerRequest {
+  log_date?: string
+  log_time?: string
+  source?: string
+}
+
+export interface LogSuggestionCandidate {
+  event_type: string
+  category: string
+  score: number
+  reason: string
+  last_used_at?: string
+  count: number
+}
+
+export interface LogSuggestionResponse {
+  log_date: string
+  log_time: string
+  candidates: LogSuggestionCandidate[]
 }
 
 export interface Category {

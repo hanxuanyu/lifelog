@@ -68,8 +68,19 @@ export function EntryCard({
       .trim()
   }, [entry.detail])
 
+  const isMarker = entry.is_marker || entry.time_point_mode === "mark"
+  const isUncategorized = entry.category === "未分类"
+  const displayEventType = isMarker ? "待补全事项" : entry.event_type
+  const displayCategory = isMarker ? "待完善" : entry.category
+  const hasTimeRange = !!(durItem?.start_time && durItem?.end_time && !durItem.unknown)
+  const timeText = hasTimeRange
+    ? `${formatTime(durItem!.start_time)}~${formatTime(durItem!.end_time)}`
+    : `${formatTime(entry.log_time)}(结束)`
+  const showDuration = !!(durItem && !durItem.unknown && durItem.duration > 0)
+
   const isFuturePlan = useMemo(() => {
     if (!isToday) return false
+    if (isMarker) return false
     if (durItem?.cross_day) return false
 
     const today = new Date()
@@ -79,10 +90,10 @@ export function EntryCard({
 
     const entryTime = durItem?.start_time ? formatTime(durItem.start_time) : formatTime(entry.log_time)
     return timeToMinutes(entryTime) > timeToMinutes(currentTime)
-  }, [currentTime, durItem?.cross_day, durItem?.start_time, entry.log_date, entry.log_time, isToday])
+  }, [currentTime, durItem?.cross_day, durItem?.start_time, entry.log_date, entry.log_time, isMarker, isToday])
 
   const isOngoing = useMemo(() => {
-    if (!isToday || isFuturePlan) return false
+    if (!isToday || isFuturePlan || isMarker) return false
 
     const currentMinutes = timeToMinutes(currentTime)
 
@@ -100,9 +111,7 @@ export function EntryCard({
     }
 
     return false
-  }, [currentTime, durItem, entry.log_time, isFuturePlan, isToday])
-
-  const isUncategorized = entry.category === "未分类"
+  }, [currentTime, durItem, entry.log_time, isFuturePlan, isMarker, isToday])
 
   return (
     <motion.div
@@ -117,7 +126,7 @@ export function EntryCard({
         <motion.div
           className={`group cursor-pointer select-none rounded-r-xl border-y border-r border-l-0 px-2.5 py-1.5 shadow-sm transition-[box-shadow,background-color,border-color] duration-150 active:brightness-90 ${
             highlightIndex === index ? "brightness-95 shadow-md" : "hover:brightness-95"
-          } ${highlighted ? "animate-[pulse_0.8s_ease-in-out_2] ring-2 ring-primary/30" : ""}`}
+          } ${isMarker ? "border-dashed" : ""} ${highlighted ? "animate-[pulse_0.8s_ease-in-out_2] ring-2 ring-primary/30" : ""}`}
           style={{
             backgroundColor: highlightIndex === index ? `${color}33` : `${color}1a`,
             borderColor: highlightIndex === index ? `${color}50` : `${color}33`,
@@ -147,26 +156,24 @@ export function EntryCard({
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="truncate text-sm font-medium">{entry.event_type}</span>
+                <span className="truncate text-sm font-medium">{displayEventType}</span>
                 <span
-                  className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium${isUncategorized ? " cursor-pointer transition-opacity hover:opacity-80" : ""}`}
+                  className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium${isUncategorized && !isMarker ? " cursor-pointer transition-opacity hover:opacity-80" : ""}`}
                   style={{ backgroundColor: color, color: getContrastText(color) }}
-                  onClick={isUncategorized ? (event) => { event.stopPropagation(); onAssignCategory(entry.event_type) } : undefined}
-                  title={isUncategorized ? "点击分配分类" : undefined}
+                  onClick={isUncategorized && !isMarker ? (event) => { event.stopPropagation(); onAssignCategory(entry.event_type) } : undefined}
+                  title={isUncategorized && !isMarker ? "点击分配分类" : undefined}
                 >
-                  {entry.category}
+                  {displayCategory}
                 </span>
                 <span className="font-mono text-[11px] text-muted-foreground">
-                  {durItem && !durItem.unknown && durItem.start_time && durItem.end_time
-                    ? `${formatTime(durItem.start_time)}~${formatTime(durItem.end_time)}`
-                    : `${formatTime(entry.log_time)}(结束)`}
+                  {timeText}
                 </span>
-                {durItem && !durItem.unknown && durItem.duration > 0 && (
+                {showDuration && (
                   <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                    {durItem.display}
+                    {durItem!.display}
                   </span>
                 )}
-                {durItem?.unknown && (
+                {durItem?.unknown && !isMarker && (
                   <span className="text-[10px] italic text-muted-foreground/60">{durItem.display}</span>
                 )}
                 {isFuturePlan && (
@@ -221,7 +228,7 @@ export function EntryCard({
                   className="h-6 w-6"
                   onClick={(event) => {
                     event.stopPropagation()
-                    onDetailView(entry.event_type, entry.detail, formatTime(entry.log_time))
+                    onDetailView(displayEventType, entry.detail, formatTime(entry.log_time))
                   }}
                   title="查看详情"
                 >
@@ -274,7 +281,7 @@ export function EntryCard({
               onClick={(event) => {
                 event.stopPropagation()
                 setSwipedEntryId(null)
-                onDetailView(entry.event_type, entry.detail, formatTime(entry.log_time))
+                onDetailView(displayEventType, entry.detail, formatTime(entry.log_time))
               }}
               title="查看详情"
             >

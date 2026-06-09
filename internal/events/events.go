@@ -185,6 +185,28 @@ var Registry = []EventDefinition{
 		},
 	},
 	{
+		Name:        "log.marker.created",
+		Description: "临时打标创建",
+		Variables: []EventVariable{
+			{Key: "log_id", Description: "日志ID"},
+			{Key: "log_date", Description: "日志日期"},
+			{Key: "log_time", Description: "日志时间"},
+			{Key: "source", Description: "来源"},
+		},
+	},
+	{
+		Name:        "task.stale_marker_reminder",
+		Description: "临时打标待补充提醒",
+		Variables: []EventVariable{
+			{Key: "marker_count", Description: "待补充打标数量"},
+			{Key: "threshold_hours", Description: "提醒阈值小时数"},
+			{Key: "oldest_marker", Description: "最早待补充打标"},
+			{Key: "detail", Description: "待补充打标列表"},
+			{Key: "message", Description: "提醒消息"},
+			{Key: "timestamp", Description: "时间戳"},
+		},
+	},
+	{
 		Name:        "task.activity_end_reminder",
 		Description: "活动结束提醒",
 		Variables: []EventVariable{
